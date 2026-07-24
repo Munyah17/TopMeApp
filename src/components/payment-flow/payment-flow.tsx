@@ -99,6 +99,7 @@ export function PaymentFlow({
       } else {
         const tx = await payService({
           serviceId: service.id,
+          serviceName: service.name,
           amount: currentAmount(),
           recipient: identifier,
           networkId,

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getStripe } from "@/lib/payments/stripe";
 import { createAdminClient } from "@/lib/supabase/server";
+import { notifyTopupResult } from "@/lib/email/notify";
 import type Stripe from "stripe";
 
 export async function POST(request: NextRequest) {
@@ -39,6 +40,7 @@ export async function POST(request: NextRequest) {
           p_meta: { sessionId: session.id },
         });
         await admin.from("topup_intents").update({ status: "completed" }).eq("reference", reference);
+        await notifyTopupResult(admin, { userId, amount: intent.amount, provider: "stripe", reference, success: true });
       }
     }
   }

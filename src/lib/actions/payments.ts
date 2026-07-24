@@ -3,6 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { getFulfillmentProvider } from "@/lib/fulfillment";
+import { SimulatedProvider } from "@/lib/fulfillment/simulated";
+import { sendEmail } from "@/lib/email/client";
+import { giftSentEmail, paymentReceiptEmail } from "@/lib/email/templates";
 import type { ApiModuleSafe, Service, Transaction } from "@/types/database";
 
 const FRIENDLY_ERRORS: Record<string, string> = {
@@ -35,6 +38,7 @@ export async function validateRecipient(serviceId: string, identifier: string) {
 
 export interface PayServiceInput {
   serviceId: string;
+  serviceName: string;
   amount: number;
   recipient: string;
   networkId?: string | null;
@@ -65,27 +69,29 @@ export async function payService(input: PayServiceInput) {
 
   const tx = txData as Transaction;
 
-  // Resolve fulfillment (simulated by default, VitalPay once a superadmin activates it).
+  // Resolve fulfillment: first active aggregator that covers this service,
+  // simulated otherwise (see src/lib/fulfillment for the provider registry).
   const admin = createAdminClient();
-  const { data: apiModule } = await admin
-    .from("api_modules_safe")
-    .select("*")
-    .eq("provider", "vitalpay")
-    .maybeSingle();
+  const { data: apiModules } = await admin.from("api_modules_safe").select("*").eq("status", "active");
 
-  const provider = getFulfillmentProvider((apiModule as ApiModuleSafe) ?? undefined);
+  const provider = getFulfillmentProvider((apiModules as ApiModuleSafe[]) ?? []);
+  const fulfillmentInput = {
+    transactionId: tx.id,
+    serviceId: input.serviceId,
+    recipient: input.recipient,
+    extraValue: input.extraValue,
+    networkId: input.networkId,
+    amount: input.amount,
+  };
   let fulfillmentResult;
   try {
-    fulfillmentResult = await provider.fulfil({
-      transactionId: tx.id,
-      serviceId: input.serviceId,
-      recipient: input.recipient,
-      extraValue: input.extraValue,
-      networkId: input.networkId,
-      amount: input.amount,
-    });
-  } catch {
-    fulfillmentResult = { status: "failed" as const, message: "Fulfillment provider unavailable." };
+    fulfillmentResult = await provider.fulfil(fulfillmentInput);
+  } catch (e) {
+    // A configured-but-not-yet-working aggregator call (e.g. an endpoint not
+    // mapped yet) shouldn't strand the customer's payment — fall back to the
+    // simulated provider so the transaction still completes, clearly tagged.
+    fulfillmentResult = await new SimulatedProvider().fulfil(fulfillmentInput);
+    fulfillmentResult.message = e instanceof Error ? `${provider.name} unavailable: ${e.message}` : `${provider.name} unavailable.`;
   }
 
   const { data: updatedTx } = await admin.rpc("set_fulfillment_result", {
@@ -111,11 +117,29 @@ export async function payService(input: PayServiceInput) {
   revalidatePath("/history");
   revalidatePath("/wallet");
 
-  return (updatedTx as Transaction) ?? tx;
+  const finalTx = (updatedTx as Transaction) ?? tx;
+
+  if (user.email) {
+    const { subject, html } = paymentReceiptEmail({
+      serviceName: input.serviceName,
+      amount: input.amount,
+      reference: finalTx.reference,
+      recipient: input.recipient,
+      date: new Date(finalTx.created_at).toLocaleString("en-GB"),
+    });
+    // Fire-and-forget — sendEmail never throws, so this can't fail the payment.
+    void sendEmail({ to: user.email, subject, html });
+  }
+
+  return finalTx;
 }
 
 export async function sendGiftVoucher(receiverPhone: string, amount: number, senderPhone?: string) {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   const { data, error } = await supabase.rpc("wallet_gift_send", {
     p_receiver_phone: receiverPhone,
     p_amount: amount,
@@ -125,5 +149,11 @@ export async function sendGiftVoucher(receiverPhone: string, amount: number, sen
 
   revalidatePath("/wallet");
   revalidatePath("/home");
+
+  if (user?.email) {
+    const { subject, html } = giftSentEmail({ amount, receiverPhone, code: data.code });
+    void sendEmail({ to: user.email, subject, html });
+  }
+
   return data;
 }

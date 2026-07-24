@@ -16,14 +16,14 @@ export default function LandingPage() {
     <div style={{ minHeight: "100vh", background: "var(--bg)" }}>
       <header
         className="row between"
-        style={{ maxWidth: 1180, margin: "0 auto", padding: "22px 24px" }}
+        style={{ maxWidth: 1180, margin: "0 auto", padding: "18px 20px", gap: 12 }}
       >
-        <Logo showTagline />
-        <div className="row gap-2" style={{ gap: 12 }}>
-          <Link href="/login" className="btn btn-ghost" style={{ textDecoration: "none" }}>
+        <Logo />
+        <div className="row gap-2" style={{ gap: 10, flexShrink: 0 }}>
+          <Link href="/login" className="btn btn-ghost" style={{ textDecoration: "none", whiteSpace: "nowrap", padding: "0 10px" }}>
             Log in
           </Link>
-          <Link href="/signup" className="btn btn-primary" style={{ textDecoration: "none", padding: "0 20px" }}>
+          <Link href="/signup" className="btn btn-primary" style={{ textDecoration: "none", padding: "0 18px", whiteSpace: "nowrap" }}>
             Get started
           </Link>
         </div>

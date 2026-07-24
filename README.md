@@ -53,7 +53,22 @@ Each gateway is optional and only activates once its env vars are set (see `.env
 Wallet debits are real and atomic (`wallet_pay` Postgres RPC). Actually delivering a
 top-up/bill payment to the underlying biller is simulated until a superadmin activates a
 real aggregator from **Admin → APIs Management**. `src/lib/fulfillment/vitalpay.ts` is the
-integration point for VitalPay — fill in the API call once credentials are available.
+integration point for VitalPay (Tayari / KMG Vital Links) — the base URL and sandbox keys
+are wired up (`VITALPAY_BASE_URL`, `VITALPAY_PUBLIC_KEY`, `VITALPAY_SECRET_KEY`) and the
+authenticated request helper is ready, but the per-service endpoint calls
+(`SERVICE_HANDLERS` in that file) are still placeholders — VitalPay's actual endpoint/
+payload reference hasn't been supplied yet. `src/lib/fulfillment/index.ts` is a small
+provider registry, so adding a second aggregator (or swapping VitalPay out) later is just
+registering another class there plus an `api_modules` row — no other code changes.
+
+## Email notifications
+
+`src/lib/email` sends transactional emails over SMTP (`nodemailer`) for: successful
+payments, wallet top-up success/failure (Paynow/Stripe/EcoCash), and gift vouchers sent.
+These are treated as essential account/money notifications and always send regardless of
+the in-app "Notifications" toggle (that toggle is reserved for future optional alerts).
+Configure `EMAIL_SMTP_HOST`/`PORT`/`SECURE`/`USER`/`PASS`/`EMAIL_FROM` — see `.env.example`.
+`sendEmail()` never throws, so a mail-server hiccup can't break a payment or top-up.
 
 ## Project structure
 

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import { verifyPaynowCallback } from "@/lib/payments/paynow";
+import { notifyTopupResult } from "@/lib/email/notify";
 import type { TopupIntent } from "@/types/database";
 
 // Paynow POSTs application/x-www-form-urlencoded to this URL (PAYNOW_RESULT_URL).
@@ -38,8 +39,10 @@ export async function POST(request: NextRequest) {
       p_meta: fields,
     });
     await admin.from("topup_intents").update({ status: "completed" }).eq("reference", reference);
+    await notifyTopupResult(admin, { userId: row.user_id, amount: row.amount, provider: "paynow", reference, success: true });
   } else if (status === "cancelled" || status === "disputed") {
     await admin.from("topup_intents").update({ status: "failed" }).eq("reference", reference);
+    await notifyTopupResult(admin, { userId: row.user_id, amount: row.amount, provider: "paynow", reference, success: false });
   }
 
   return NextResponse.json({ ok: true });

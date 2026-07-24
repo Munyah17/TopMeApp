@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { getEcocashStatus } from "@/lib/payments/ecocash";
+import { notifyTopupResult } from "@/lib/email/notify";
 import type { TopupIntent } from "@/types/database";
 
 // Called from the client while showing "Approve on your phone". Uses the
@@ -34,10 +35,13 @@ export async function POST(request: NextRequest) {
       p_meta: intent.meta,
     });
     await admin.from("topup_intents").update({ status: "completed" }).eq("reference", reference);
+    await notifyTopupResult(admin, { userId: intent.user_id, amount: intent.amount, provider: "ecocash", reference, success: true });
     return NextResponse.json({ status: "completed" });
   }
   if (providerStatus === "failed" || providerStatus === "cancelled") {
     await supabase.from("topup_intents").update({ status: "failed" }).eq("reference", reference);
+    const admin = createAdminClient();
+    await notifyTopupResult(admin, { userId: intent.user_id, amount: intent.amount, provider: "ecocash", reference, success: false });
     return NextResponse.json({ status: "failed" });
   }
   return NextResponse.json({ status: "pending" });
