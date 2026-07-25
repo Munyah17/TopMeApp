@@ -2,29 +2,25 @@ import Link from "next/link";
 import { Icon } from "@/components/icons";
 import { FavoriteButton } from "@/components/home/favorite-button";
 import { ProductCard } from "@/components/home/product-card";
-import { fmt, priceHint } from "@/lib/data/catalog-helpers";
+import { fmt } from "@/lib/data/catalog-helpers";
 import {
   getAllServices,
   getBeneficiaries,
   getCategories,
   getCurrentProfile,
-  getDataBundles,
   getFavoriteServiceIds,
   getRecentTransactions,
-  getTvPackages,
 } from "@/lib/data/queries";
 
 export default async function HomePage() {
   const profile = await getCurrentProfile();
   if (!profile) return null;
 
-  const [categories, services, favoriteIds, recent, bundles, packages, beneficiaries] = await Promise.all([
+  const [categories, services, favoriteIds, recent, beneficiaries] = await Promise.all([
     getCategories(),
     getAllServices(),
     getFavoriteServiceIds(profile.id),
     getRecentTransactions(profile.id, 3),
-    getDataBundles(),
-    getTvPackages(),
     getBeneficiaries(profile.id),
   ]);
 
@@ -255,7 +251,7 @@ export default async function HomePage() {
                 </div>
                 <div className="cat-section-row">
                   {items.map((i) => (
-                    <ProductCard key={i.id} service={i} categoryColor={c.color} priceLabel={priceHint(i, bundles, packages)} />
+                    <ProductCard key={i.id} service={i} categoryColor={c.color} />
                   ))}
                 </div>
               </div>

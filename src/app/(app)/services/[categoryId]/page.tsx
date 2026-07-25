@@ -2,20 +2,17 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Icon } from "@/components/icons";
 import { ProductCard } from "@/components/home/product-card";
-import { priceHint } from "@/lib/data/catalog-helpers";
-import { getAllServices, getCategories, getCategory, getDataBundles, getServicesByCategory, getTvPackages, shuffle } from "@/lib/data/queries";
+import { getAllServices, getCategories, getCategory, getServicesByCategory, shuffle } from "@/lib/data/queries";
 
 export default async function CategoryPage({ params }: { params: Promise<{ categoryId: string }> }) {
   const { categoryId } = await params;
   const category = await getCategory(categoryId);
   if (!category) notFound();
 
-  const [items, allServices, categories, bundles, packages] = await Promise.all([
+  const [items, allServices, categories] = await Promise.all([
     getServicesByCategory(categoryId),
     getAllServices(),
     getCategories(),
-    getDataBundles(),
-    getTvPackages(),
   ]);
 
   const others = shuffle(allServices.filter((s) => s.category_id !== categoryId)).slice(0, 8);
@@ -42,7 +39,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ categ
       <div className="px content-wrap">
         <div className="catpage-grid">
           {items.map((i) => (
-            <ProductCard key={i.id} service={i} categoryColor={category.color} priceLabel={priceHint(i, bundles, packages)} />
+            <ProductCard key={i.id} service={i} categoryColor={category.color} />
           ))}
         </div>
 
@@ -54,7 +51,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ categ
             <div className="catpage-grid">
               {others.map((i) => {
                 const c = categoryById.get(i.category_id);
-                return <ProductCard key={i.id} service={i} categoryColor={c?.color || i.color} priceLabel={priceHint(i, bundles, packages)} />;
+                return <ProductCard key={i.id} service={i} categoryColor={c?.color || i.color} />;
               })}
             </div>
           </>

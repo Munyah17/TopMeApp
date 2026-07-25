@@ -55,25 +55,27 @@ export async function getCategory(id: string): Promise<ServiceCategory | null> {
   return (data as ServiceCategory) ?? null;
 }
 
-export async function getServicesByCategory(categoryId: string): Promise<Service[]> {
+export async function getServicesByCategory(categoryId: string, includeInactive = false): Promise<Service[]> {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("services")
-    .select("*")
-    .eq("category_id", categoryId)
-    .order("sort_order");
+  let query = supabase.from("services").select("*").eq("category_id", categoryId);
+  if (!includeInactive) query = query.eq("is_active", true);
+  const { data } = await query.order("sort_order");
   return (data as Service[]) ?? [];
 }
 
-export async function getAllServices(): Promise<Service[]> {
+export async function getAllServices(includeInactive = false): Promise<Service[]> {
   const supabase = await createClient();
-  const { data } = await supabase.from("services").select("*").order("sort_order");
+  let query = supabase.from("services").select("*");
+  if (!includeInactive) query = query.eq("is_active", true);
+  const { data } = await query.order("sort_order");
   return (data as Service[]) ?? [];
 }
 
-export async function getService(id: string): Promise<Service | null> {
+export async function getService(id: string, includeInactive = false): Promise<Service | null> {
   const supabase = await createClient();
-  const { data } = await supabase.from("services").select("*").eq("id", id).single();
+  let query = supabase.from("services").select("*").eq("id", id);
+  if (!includeInactive) query = query.eq("is_active", true);
+  const { data } = await query.single();
   return (data as Service) ?? null;
 }
 

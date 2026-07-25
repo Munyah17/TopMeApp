@@ -88,6 +88,7 @@ create table if not exists public.services (
   description              text,
   icon                     text not null,
   provider_label           text,
+  logo_url                 text,
   color                    text not null default '#00C853',
   amount_mode              amount_mode not null,
   chips                    numeric(12,2)[],
@@ -102,7 +103,13 @@ create table if not exists public.services (
   validate_msg             text,
   mock_name                text,
   mock_sub                 text,
-  sort_order               integer not null default 0
+  sort_order               integer not null default 0,
+  is_active                boolean not null default true,
+  -- What the fulfilling provider charges us, as a % of what the customer
+  -- pays (e.g. 95.00 = provider keeps $0.95 of every $1, TopMe keeps $0.05).
+  -- Owner-configurable per service from /admin/products — defaults to 0
+  -- (100% recorded as TopMe revenue) rather than a guessed figure.
+  cost_percentage          numeric(5,2) not null default 0 check (cost_percentage >= 0 and cost_percentage <= 100)
 );
 create index if not exists services_category_idx on public.services(category_id);
 
@@ -139,6 +146,16 @@ create table if not exists public.transactions (
   receipt               jsonb not null default '{}',
   fulfillment_provider  text not null default 'simulated',
   fulfillment_status    fulfillment_status not null default 'pending',
+  -- Revenue-split bookkeeping, snapshotted at transaction time so later
+  -- catalog edits (price/cost changes) never rewrite historic figures.
+  -- provider_cost: what we owe the fulfilling provider for this sale.
+  -- revenue: what TopMe actually keeps (amount - provider_cost).
+  -- owner_label: the real-world org this was sold on behalf of (e.g.
+  -- "Econet Wireless", "DStv") — snapshot of services.provider_label, for
+  -- audit trails ("sold by TopMe, processed and paid to <owner_label>").
+  provider_cost         numeric(12,2) not null default 0,
+  revenue               numeric(12,2) generated always as (amount - provider_cost) stored,
+  owner_label           text,
   created_at            timestamptz not null default now()
 );
 create index if not exists transactions_user_idx on public.transactions(user_id, created_at desc);
@@ -327,6 +344,9 @@ declare
   v_balance  numeric;
   v_tx       public.transactions;
   v_reference text;
+  v_cost_pct  numeric;
+  v_owner_label text;
+  v_provider_cost numeric;
 begin
   if v_user is null then
     raise exception 'not_authenticated';
@@ -343,6 +363,10 @@ begin
     raise exception 'insufficient_funds';
   end if;
 
+  select cost_percentage, provider_label into v_cost_pct, v_owner_label
+    from public.services where id = p_service_id;
+  v_provider_cost := round(p_amount * coalesce(v_cost_pct, 0) / 100, 2);
+
   v_reference := public.generate_reference('TPM');
 
   update public.wallets set balance = balance - p_amount, updated_at = now() where user_id = v_user;
@@ -352,10 +376,12 @@ begin
 
   insert into public.transactions (
     user_id, service_id, network_id, recipient_identifier, extra_value,
-    amount, fee, status, reference, fulfillment_provider, fulfillment_status
+    amount, fee, status, reference, fulfillment_provider, fulfillment_status,
+    provider_cost, owner_label
   ) values (
     v_user, p_service_id, p_network_id, p_recipient, p_extra_value,
-    p_amount, 0, 'success', v_reference, p_fulfillment_provider, 'pending'
+    p_amount, 0, 'success', v_reference, p_fulfillment_provider, 'pending',
+    v_provider_cost, v_owner_label
   ) returning * into v_tx;
 
   return v_tx;

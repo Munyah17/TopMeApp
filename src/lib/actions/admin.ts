@@ -79,3 +79,142 @@ export async function togglePermission(memberId: string, permission: string, cur
   await admin.from("team_members").update({ permissions: next }).eq("id", memberId);
   revalidatePath("/admin/team");
 }
+
+function revalidateCatalog() {
+  revalidatePath("/admin/products");
+  revalidatePath("/home");
+  // "layout" cascades to /services/[categoryId] sub-routes too — a plain
+  // "page" revalidation only covers the exact /services path.
+  revalidatePath("/services", "layout");
+}
+
+export interface CategoryInput {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  bg: string;
+  description: string;
+  sortOrder: number;
+}
+
+export async function createCategory(input: CategoryInput) {
+  await requireSuperadmin();
+  const admin = createAdminClient();
+  const { error } = await admin.from("service_categories").insert({
+    id: input.id,
+    name: input.name,
+    icon: input.icon,
+    color: input.color,
+    bg: input.bg,
+    description: input.description || null,
+    sort_order: input.sortOrder,
+  });
+  if (error) throw new Error(error.message.includes("duplicate") ? "A category with that ID already exists." : error.message);
+  revalidateCatalog();
+}
+
+export async function updateCategory(id: string, input: Omit<CategoryInput, "id">) {
+  await requireSuperadmin();
+  const admin = createAdminClient();
+  await admin
+    .from("service_categories")
+    .update({
+      name: input.name,
+      icon: input.icon,
+      color: input.color,
+      bg: input.bg,
+      description: input.description || null,
+      sort_order: input.sortOrder,
+    })
+    .eq("id", id);
+  revalidateCatalog();
+}
+
+export interface ServiceInput {
+  id: string;
+  categoryId: string;
+  name: string;
+  description: string;
+  icon: string;
+  providerLabel: string;
+  logoUrl: string;
+  color: string;
+  amountMode: "chips" | "bundles" | "packages" | "outstanding";
+  chips: number[];
+  outstanding: number | null;
+  needsNetwork: boolean;
+  idLabel: string;
+  idPlaceholder: string;
+  extraFieldLabel: string;
+  extraFieldPlaceholder: string;
+  isGift: boolean;
+  validateMsg: string;
+  mockName: string;
+  mockSub: string;
+  sortOrder: number;
+  costPercentage: number;
+}
+
+function serviceRow(input: ServiceInput) {
+  return {
+    category_id: input.categoryId,
+    name: input.name,
+    description: input.description || null,
+    icon: input.icon,
+    provider_label: input.providerLabel || null,
+    logo_url: input.logoUrl || null,
+    color: input.color,
+    amount_mode: input.amountMode,
+    chips: input.amountMode === "chips" ? input.chips : null,
+    outstanding: input.amountMode === "outstanding" ? input.outstanding : null,
+    needs_network: input.needsNetwork,
+    id_label: input.idLabel,
+    id_placeholder: input.idPlaceholder || null,
+    extra_field_label: input.extraFieldLabel || null,
+    extra_field_placeholder: input.extraFieldPlaceholder || null,
+    is_gift: input.isGift,
+    validate_msg: input.validateMsg || null,
+    mock_name: input.mockName || null,
+    mock_sub: input.mockSub || null,
+    sort_order: input.sortOrder,
+    cost_percentage: input.costPercentage,
+  };
+}
+
+export async function createService(input: ServiceInput) {
+  await requireSuperadmin();
+  const admin = createAdminClient();
+  const { error } = await admin.from("services").insert({ id: input.id, ...serviceRow(input) });
+  if (error) throw new Error(error.message.includes("duplicate") ? "A service with that ID already exists." : error.message);
+  revalidateCatalog();
+}
+
+export async function updateService(id: string, input: ServiceInput) {
+  await requireSuperadmin();
+  const admin = createAdminClient();
+  const { error } = await admin.from("services").update(serviceRow(input)).eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidateCatalog();
+}
+
+export async function toggleServiceActive(id: string, currentlyActive: boolean) {
+  await requireSuperadmin();
+  const admin = createAdminClient();
+  await admin.from("services").update({ is_active: !currentlyActive }).eq("id", id);
+  revalidateCatalog();
+}
+
+export async function deleteService(id: string) {
+  await requireSuperadmin();
+  const admin = createAdminClient();
+  const { error } = await admin.from("services").delete().eq("id", id);
+  if (error) {
+    throw new Error(
+      error.code === "23503"
+        ? "This service has transaction history and can't be deleted — deactivate it instead."
+        : error.message
+    );
+  }
+  revalidateCatalog();
+}

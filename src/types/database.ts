@@ -56,6 +56,7 @@ export interface Service {
   description: string | null;
   icon: string;
   provider_label: string | null;
+  logo_url: string | null;
   color: string;
   amount_mode: AmountMode;
   chips: number[] | null;
@@ -71,6 +72,9 @@ export interface Service {
   mock_name: string | null;
   mock_sub: string | null;
   sort_order: number;
+  is_active: boolean;
+  /** % of the customer amount the fulfilling provider charges us. 0 until an owner sets a real figure. */
+  cost_percentage: number;
 }
 
 export interface DataBundle {
@@ -105,6 +109,12 @@ export interface Transaction {
   receipt: Record<string, unknown>;
   fulfillment_provider: string;
   fulfillment_status: FulfillmentStatus;
+  /** What we owe the fulfilling provider for this sale, snapshotted at transaction time. */
+  provider_cost: number;
+  /** amount - provider_cost, generated column. */
+  revenue: number;
+  /** Real-world org this was sold on behalf of (snapshot of services.provider_label). */
+  owner_label: string | null;
   created_at: string;
 }
 

@@ -55,16 +55,32 @@ export default async function AdminPage() {
 
   const [{ data: recentTx }, services] = await Promise.all([
     supabase.from("transactions").select("*").gte("created_at", since7d).order("created_at", { ascending: false }),
-    getAllServices(),
+    getAllServices(true),
   ]);
   const tx = (recentTx as Transaction[]) ?? [];
   const serviceById = new Map(services.map((s) => [s.id, s]));
 
   const todayTx = tx.filter((t) => new Date(t.created_at) >= startOfToday);
-  const todayRevenue = todayTx.filter((t) => t.status === "success").reduce((s, t) => s + t.amount, 0);
+  const todaySuccess = todayTx.filter((t) => t.status === "success");
+  const todayGross = todaySuccess.reduce((s, t) => s + t.amount, 0);
+  const todayRevenue = todaySuccess.reduce((s, t) => s + t.revenue, 0);
   const pending = tx.filter((t) => t.status === "pending").length;
   const failed = tx.filter((t) => t.status === "failed").length;
   const settled = tx.filter((t) => t.status === "success").reduce((s, t) => s + t.amount, 0);
+
+  const successTx = tx.filter((t) => t.status === "success");
+  const byOwner = new Map<string, { revenue: number; cost: number; count: number }>();
+  for (const t of successTx) {
+    const key = t.owner_label || serviceById.get(t.service_id)?.provider_label || "Unlabelled";
+    const row = byOwner.get(key) ?? { revenue: 0, cost: 0, count: 0 };
+    row.revenue += t.revenue;
+    row.cost += t.provider_cost;
+    row.count += 1;
+    byOwner.set(key, row);
+  }
+  const ownerRows = Array.from(byOwner.entries())
+    .map(([owner, v]) => ({ owner, ...v }))
+    .sort((a, b) => b.cost + b.revenue - (a.cost + a.revenue));
 
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
@@ -114,6 +130,18 @@ export default async function AdminPage() {
       <div className="px content-wrap">
         {profile.role === "superadmin" && (
           <div className="row gap-2 mt-1">
+            <Link href="/admin/products" className="card card-pad tap row gap-2" style={{ flex: 1, textDecoration: "none" }}>
+              <div className="ibadge round" style={{ width: 36, height: 36, background: "#FEF6E7", color: "var(--warning)" }}>
+                <Icon name="grid" size={17} stroke={1.8} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, fontSize: 13, color: "var(--text)" }}>Products & Services</div>
+                <div className="muted" style={{ fontSize: 11 }}>
+                  Catalog
+                </div>
+              </div>
+              <Icon name="chevronR" size={16} stroke={2} />
+            </Link>
             <Link href="/admin/apis" className="card card-pad tap row gap-2" style={{ flex: 1, textDecoration: "none" }}>
               <div className="ibadge round" style={{ width: 36, height: 36, background: "var(--green-50)", color: "var(--green)" }}>
                 <Icon name="plug" size={17} stroke={1.8} />
@@ -143,8 +171,12 @@ export default async function AdminPage() {
 
         <div className="row gap-2 mt-2">
           <div className="card card-pad" style={{ flex: 1 }}>
-            <div className="muted">Today&apos;s Revenue</div>
-            <div style={{ fontWeight: 800, fontSize: 19, marginTop: 2 }}>{fmt(todayRevenue)}</div>
+            <div className="muted">Today&apos;s gross volume</div>
+            <div style={{ fontWeight: 800, fontSize: 19, marginTop: 2 }}>{fmt(todayGross)}</div>
+          </div>
+          <div className="card card-pad" style={{ flex: 1 }}>
+            <div className="muted">Today&apos;s net revenue</div>
+            <div style={{ fontWeight: 800, fontSize: 19, marginTop: 2, color: "var(--success)" }}>{fmt(todayRevenue)}</div>
           </div>
           <div className="card card-pad" style={{ flex: 1 }}>
             <div className="muted">Transactions today</div>
@@ -186,6 +218,32 @@ export default async function AdminPage() {
               </div>
             ))}
           </div>
+        </div>
+
+        <div className="section-title mt-3 mb-2">Revenue split by provider · last 7 days</div>
+        <div className="card" style={{ overflow: "hidden" }}>
+          {ownerRows.length === 0 ? (
+            <div className="card-pad muted">No settled transactions yet.</div>
+          ) : (
+            ownerRows.map((r, i) => (
+              <div
+                key={r.owner}
+                className="row between"
+                style={{ padding: "12px 16px", borderBottom: i < ownerRows.length - 1 ? "1px solid var(--border)" : "none" }}
+              >
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 13.5 }}>{r.owner}</div>
+                  <div className="muted" style={{ fontSize: 11.5 }}>
+                    {r.count} sale{r.count === 1 ? "" : "s"} · sold by TopMe, processed &amp; paid to {r.owner}
+                  </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontWeight: 800, fontSize: 13.5, color: "var(--success)" }}>+{fmt(r.revenue)} ours</div>
+                  <div className="muted" style={{ fontSize: 11.5 }}>{fmt(r.cost)} theirs</div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
 
         <div className="section-title mt-3 mb-2">Most purchased services · last 7 days</div>
