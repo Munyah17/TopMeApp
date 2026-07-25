@@ -660,6 +660,21 @@ function ReceiptStep({
               Simulated fulfillment
             </span>
           )}
+          {result.fulfillment_status === "pending" && (
+            <span
+              style={{
+                marginLeft: 6,
+                background: "var(--blue-50)",
+                color: "var(--blue)",
+                fontSize: 11,
+                fontWeight: 700,
+                padding: "4px 10px",
+                borderRadius: 8,
+              }}
+            >
+              Delivering…
+            </span>
+          )}
         </div>
         <div className="dashed" />
         <ReviewRow label="Reference" value={result.reference} />

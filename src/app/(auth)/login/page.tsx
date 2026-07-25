@@ -2,11 +2,10 @@
 
 import { useState, Suspense } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -24,8 +23,10 @@ function LoginForm() {
       setError(error.message);
       return;
     }
-    router.push(searchParams.get("redirect") || "/home");
-    router.refresh();
+    // A hard navigation (not router.push + router.refresh) so the proxy
+    // middleware sees the just-set auth cookie on the very next request —
+    // push+refresh back-to-back races and can drop the navigation entirely.
+    window.location.assign(searchParams.get("redirect") || "/home");
   }
 
   return (

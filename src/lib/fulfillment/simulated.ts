@@ -9,6 +9,8 @@ import type { FulfillmentInput, FulfillmentProvider, FulfillmentResult } from ".
  */
 export class SimulatedProvider implements FulfillmentProvider {
   readonly name = "simulated";
+  // Fallback of last resort — "covers" everything so it's always a valid pick.
+  readonly coverage = ["*"] as const;
 
   async fulfil(input: FulfillmentInput): Promise<FulfillmentResult> {
     await new Promise((resolve) => setTimeout(resolve, 300));

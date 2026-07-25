@@ -1,0 +1,58 @@
+import crypto from "crypto";
+import { NextResponse, type NextRequest } from "next/server";
+import { createAdminClient } from "@/lib/supabase/server";
+
+/**
+ * Receives VitalPay's async fulfillment webhooks (service.completed /
+ * service.failed) for airtime/bills purchases that returned status=processing
+ * synchronously. `reference` in the payload is the TopMe transaction
+ * reference we passed as VitalPay's `reference` field when calling
+ * /airtime/purchase or /bills/pay (see src/lib/fulfillment/vitalpay.ts).
+ *
+ * Signature verification uses HMAC-SHA256 of the raw body with the webhook
+ * secret (VITALPAY_WEBHOOK_SECRET, returned once by POST /webhooks) — this
+ * is the standard convention but wasn't spelled out explicitly in the docs
+ * we have; if verification always fails in practice, confirm the exact
+ * scheme with VitalPay and adjust `verifySignature` below.
+ */
+function verifySignature(rawBody: string, signatureHeader: string | null): boolean {
+  const secret = process.env.VITALPAY_WEBHOOK_SECRET;
+  if (!secret || !signatureHeader) return false;
+  const expected = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+  try {
+    return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signatureHeader));
+  } catch {
+    return false;
+  }
+}
+
+export async function POST(request: NextRequest) {
+  const rawBody = await request.text();
+  const signature = request.headers.get("x-vitalpay-signature");
+
+  if (!verifySignature(rawBody, signature)) {
+    return NextResponse.json({ error: "invalid_signature" }, { status: 401 });
+  }
+
+  const payload = JSON.parse(rawBody) as {
+    event: string;
+    data?: { reference?: string; status?: string };
+  };
+
+  const reference = payload.data?.reference;
+  if (!reference || !["service.completed", "service.failed"].includes(payload.event)) {
+    return NextResponse.json({ ok: true }); // acknowledge, nothing to do
+  }
+
+  const admin = createAdminClient();
+  const { data: tx } = await admin.from("transactions").select("id").eq("reference", reference).maybeSingle();
+  if (!tx) return NextResponse.json({ ok: true });
+
+  await admin.rpc("set_fulfillment_result", {
+    p_transaction_id: tx.id,
+    p_status: payload.event === "service.completed" ? "fulfilled" : "failed",
+    p_receipt: { provider: "vitalpay", event: payload.event },
+  });
+
+  return NextResponse.json({ ok: true });
+}

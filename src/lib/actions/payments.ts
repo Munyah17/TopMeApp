@@ -74,7 +74,7 @@ export async function payService(input: PayServiceInput) {
   const admin = createAdminClient();
   const { data: apiModules } = await admin.from("api_modules_safe").select("*").eq("status", "active");
 
-  const provider = getFulfillmentProvider((apiModules as ApiModuleSafe[]) ?? []);
+  const provider = getFulfillmentProvider(input.serviceId, (apiModules as ApiModuleSafe[]) ?? []);
   const fulfillmentInput = {
     transactionId: tx.id,
     serviceId: input.serviceId,

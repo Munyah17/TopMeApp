@@ -2,11 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 export default function SignupPage() {
-  const router = useRouter();
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -34,8 +32,9 @@ export default function SignupPage() {
       setCheckEmail(true);
       return;
     }
-    router.push("/home");
-    router.refresh();
+    // Hard navigation so the proxy middleware sees the just-set auth cookie
+    // on the next request (see login/page.tsx for why push+refresh races).
+    window.location.assign("/home");
   }
 
   if (checkEmail) {

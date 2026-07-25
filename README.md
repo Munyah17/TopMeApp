@@ -52,14 +52,31 @@ Each gateway is optional and only activates once its env vars are set (see `.env
 
 Wallet debits are real and atomic (`wallet_pay` Postgres RPC). Actually delivering a
 top-up/bill payment to the underlying biller is simulated until a superadmin activates a
-real aggregator from **Admin → APIs Management**. `src/lib/fulfillment/vitalpay.ts` is the
-integration point for VitalPay (Tayari / KMG Vital Links) — the base URL and sandbox keys
-are wired up (`VITALPAY_BASE_URL`, `VITALPAY_PUBLIC_KEY`, `VITALPAY_SECRET_KEY`) and the
-authenticated request helper is ready, but the per-service endpoint calls
-(`SERVICE_HANDLERS` in that file) are still placeholders — VitalPay's actual endpoint/
-payload reference hasn't been supplied yet. `src/lib/fulfillment/index.ts` is a small
-provider registry, so adding a second aggregator (or swapping VitalPay out) later is just
-registering another class there plus an `api_modules` row — no other code changes.
+real aggregator from **Admin → APIs Management**. `src/lib/fulfillment/index.ts` is a
+provider registry that routes **per service, not "one provider for everything"** — each
+provider declares a `coverage` list of service ids it can fulfil, and the first active
+`api_modules` row whose provider covers the transaction's service wins. This is deliberate:
+insurance (vehicle/legal/agri/hospital-cash/funeral-cash) needs a completely different API
+from VitalPay's payments/VAS catalog, so it has its own registry slot
+(`src/lib/fulfillment/insurance.ts`, unconfigured placeholder for now) that can run
+side-by-side with VitalPay. Adding a third provider later — another airtime aggregator,
+a fallback if VitalPay changes — is the same pattern: a class + an `api_modules` row.
+
+**VitalPay** (`src/lib/fulfillment/vitalpay.ts`) is live for: airtime (Econet, NetOne — not
+Telecel yet), DStv, ZOL, TelOne. Airtime/bills are async on VitalPay's side (they return
+`processing`, then POST a `service.completed`/`service.failed` webhook) — that webhook is
+received at `src/app/api/vitalpay/webhook/route.ts`. To activate it in production:
+1. Once deployed, register the webhook: `POST /webhooks` with
+   `{"url": "https://yourapp.com/api/vitalpay/webhook", "events": ["service.completed","service.failed"]}`
+   (see VitalPay docs) — this can't be done against `localhost`.
+2. Copy the one-time `secret` it returns into `VITALPAY_WEBHOOK_SECRET`.
+
+Everything else in the catalog (ZESA, data bundles, insurance, connectivity ISPs besides
+ZOL/TelOne, gadgets, school fees, government fees, fuel, branded gift cards) is **not**
+covered by VitalPay today — confirmed by querying the live sandbox catalog, not guessed.
+The reasons are documented in `VITALPAY_GAPS` at the bottom of `vitalpay.ts`; those services
+stay on the simulated provider until either VitalPay adds coverage or another aggregator is
+wired in for them.
 
 ## Email notifications
 
