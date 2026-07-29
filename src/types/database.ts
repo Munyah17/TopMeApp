@@ -97,7 +97,9 @@ export interface TvPackage {
 
 export interface Transaction {
   id: string;
-  user_id: string;
+  user_id: string | null;
+  guest_email?: string | null;
+  guest_phone?: string | null;
   service_id: string;
   network_id: string | null;
   recipient_identifier: string;

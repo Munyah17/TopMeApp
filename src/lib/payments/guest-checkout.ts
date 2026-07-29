@@ -1,0 +1,76 @@
+import { createAdminClient } from "@/lib/supabase/server";
+import { getFulfillmentProvider } from "@/lib/fulfillment";
+import { SimulatedProvider } from "@/lib/fulfillment/simulated";
+import { sendEmail } from "@/lib/email/client";
+import { paymentReceiptEmail } from "@/lib/email/templates";
+import type { ApiModuleSafe, Transaction } from "@/types/database";
+
+/**
+ * Called server-side only, after a gateway (Paynow/Stripe/EcoCash) confirms a
+ * guest payment actually went through. Mirrors payService()'s tail — resolve
+ * fulfillment, record the result, email a receipt — but for a transaction
+ * with no profile behind it (see finalize_guest_payment RPC).
+ */
+export async function finalizeGuestCheckout(reference: string): Promise<Transaction> {
+  const admin = createAdminClient();
+
+  const { data: txData, error } = await admin.rpc("finalize_guest_payment", {
+    p_reference: reference,
+    p_fulfillment_provider: "simulated",
+  });
+  if (error) throw new Error(error.message);
+  const tx = txData as Transaction;
+
+  const [{ data: apiModules }, { data: service }] = await Promise.all([
+    admin.from("api_modules_safe").select("*").eq("status", "active"),
+    admin.from("services").select("name").eq("id", tx.service_id).single(),
+  ]);
+
+  const provider = getFulfillmentProvider(tx.service_id, (apiModules as ApiModuleSafe[]) ?? []);
+  const fulfillmentInput = {
+    transactionId: tx.id,
+    serviceId: tx.service_id,
+    recipient: tx.recipient_identifier,
+    extraValue: tx.extra_value,
+    networkId: tx.network_id,
+    amount: tx.amount,
+  };
+  let fulfillmentResult;
+  try {
+    fulfillmentResult = await provider.fulfil(fulfillmentInput);
+  } catch (e) {
+    fulfillmentResult = await new SimulatedProvider().fulfil(fulfillmentInput);
+    fulfillmentResult.message = e instanceof Error ? `${provider.name} unavailable: ${e.message}` : `${provider.name} unavailable.`;
+  }
+
+  const { data: updatedTx } = await admin.rpc("set_fulfillment_result", {
+    p_transaction_id: tx.id,
+    p_status: fulfillmentResult.status,
+    p_receipt: {
+      provider: provider.name,
+      providerRef: fulfillmentResult.providerRef ?? null,
+      message: fulfillmentResult.message ?? null,
+    },
+  });
+
+  const finalTx = (updatedTx as Transaction) ?? tx;
+
+  if (finalTx.guest_email) {
+    const { subject, html } = paymentReceiptEmail({
+      serviceName: (service as { name: string } | null)?.name ?? finalTx.service_id,
+      amount: finalTx.amount,
+      reference: finalTx.reference,
+      recipient: finalTx.recipient_identifier,
+      date: new Date(finalTx.created_at).toLocaleString("en-GB"),
+    });
+    void sendEmail({ to: finalTx.guest_email, subject, html });
+  }
+
+  return finalTx;
+}
+
+/** Marks a guest intent failed/cancelled — called server-side only. */
+export async function failGuestCheckout(reference: string): Promise<void> {
+  const admin = createAdminClient();
+  await admin.rpc("fail_guest_checkout", { p_reference: reference });
+}

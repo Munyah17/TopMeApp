@@ -7,9 +7,10 @@ import QRCode from "qrcode";
 import { Icon } from "@/components/icons";
 import { hexA } from "@/lib/data/catalog-helpers";
 import { payService, sendGiftVoucher, validateRecipient } from "@/lib/actions/payments";
+import { startGuestCheckout, type GuestGateway } from "@/lib/actions/guest-payments";
 import type { DataBundle, Network, Service, Transaction, TvPackage } from "@/types/database";
 
-type Step = "details" | "validating" | "amount" | "review" | "processing" | "success" | "receipt" | "error";
+type Step = "details" | "validating" | "amount" | "review" | "processing" | "guest-ecocash" | "success" | "receipt" | "error";
 
 export function PaymentFlow({
   service,
@@ -17,12 +18,18 @@ export function PaymentFlow({
   packages,
   networks,
   walletBalance,
+  isGuest = false,
+  guestEmail: initialGuestEmail = "",
+  guestPhone: initialGuestPhone = "",
 }: {
   service: Service;
   bundles: DataBundle[];
   packages: TvPackage[];
   networks: Network[];
   walletBalance: number;
+  isGuest?: boolean;
+  guestEmail?: string;
+  guestPhone?: string;
 }) {
   const router = useRouter();
   const [step, setStep] = useState<Step>("details");
@@ -39,7 +46,11 @@ export function PaymentFlow({
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Transaction | null>(null);
   const [voucherCode, setVoucherCode] = useState<string | null>(null);
+  const [guestEmail, setGuestEmail] = useState(initialGuestEmail);
+  const [guestPhone, setGuestPhone] = useState(initialGuestPhone);
+  const [gateway, setGateway] = useState<GuestGateway>("paynow");
   const qrRef = useRef<HTMLCanvasElement>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const currentAmount = (): number => {
     if (service.amount_mode === "chips") return amount ?? (parseFloat(customAmount) || 0);
@@ -73,7 +84,61 @@ export function PaymentFlow({
     }
   }, [step, result]);
 
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, []);
+
+  async function submitGuestPayment() {
+    setBusy(true);
+    setErrorMsg(null);
+    try {
+      const res = await startGuestCheckout({
+        serviceId: service.id,
+        serviceName: service.name,
+        amount: currentAmount(),
+        recipient: identifier,
+        networkId,
+        extraValue: extra || null,
+        guestEmail,
+        guestPhone: guestPhone || undefined,
+        gateway,
+      });
+
+      if (res.gateway === "ecocash") {
+        setStep("guest-ecocash");
+        pollRef.current = setInterval(async () => {
+          const r = await fetch("/api/guest/ecocash/poll", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ reference: res.reference }),
+          });
+          const data = await r.json();
+          if (data.status === "completed") {
+            if (pollRef.current) clearInterval(pollRef.current);
+            setResult(data.transaction);
+            setStep("success");
+          } else if (data.status === "failed") {
+            if (pollRef.current) clearInterval(pollRef.current);
+            setErrorMsg("EcoCash payment was not approved.");
+            setStep("error");
+          }
+        }, 3000);
+        return;
+      }
+
+      window.location.assign(res.redirectUrl);
+    } catch (e) {
+      setErrorMsg(e instanceof Error ? e.message : "Payment failed.");
+      setStep("error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function submitPayment() {
+    if (isGuest) return submitGuestPayment();
     setBusy(true);
     setErrorMsg(null);
     try {
@@ -121,7 +186,7 @@ export function PaymentFlow({
     }
   }
 
-  const showTop = step !== "processing" && step !== "success";
+  const showTop = step !== "processing" && step !== "guest-ecocash" && step !== "success";
   const stepIndex = ["details", "amount", "review"].indexOf(step);
 
   return (
@@ -238,8 +303,15 @@ export function PaymentFlow({
             saveBeneficiary={saveBeneficiary}
             setSaveBeneficiary={setSaveBeneficiary}
             busy={busy}
+            isGuest={isGuest}
+            guestEmail={guestEmail}
+            setGuestEmail={setGuestEmail}
+            guestPhone={guestPhone}
+            setGuestPhone={setGuestPhone}
+            gateway={gateway}
+            setGateway={setGateway}
             onPay={() => {
-              setStep("processing");
+              if (!isGuest) setStep("processing");
               submitPayment();
             }}
           />
@@ -250,6 +322,16 @@ export function PaymentFlow({
             <div className="spinner-ring" />
             <div style={{ fontWeight: 700, marginTop: 24, fontSize: 15.5 }}>Processing payment…</div>
             <div className="muted mt-1">Hang tight, this takes a few seconds</div>
+          </div>
+        )}
+
+        {step === "guest-ecocash" && (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: 520, textAlign: "center" }}>
+            <div className="spinner-ring" />
+            <div style={{ fontWeight: 700, marginTop: 24, fontSize: 15.5 }}>Approve on your phone</div>
+            <div className="muted mt-1" style={{ maxWidth: 280 }}>
+              We sent a USSD prompt to {guestPhone}. Enter your EcoCash PIN to approve the ${currentAmount().toFixed(2)} payment.
+            </div>
           </div>
         )}
 
@@ -547,6 +629,13 @@ function ReviewStep({
   saveBeneficiary,
   setSaveBeneficiary,
   busy,
+  isGuest,
+  guestEmail,
+  setGuestEmail,
+  guestPhone,
+  setGuestPhone,
+  gateway,
+  setGateway,
   onPay,
 }: {
   service: Service;
@@ -562,6 +651,13 @@ function ReviewStep({
   saveBeneficiary: boolean;
   setSaveBeneficiary: (v: boolean) => void;
   busy: boolean;
+  isGuest: boolean;
+  guestEmail: string;
+  setGuestEmail: (v: string) => void;
+  guestPhone: string;
+  setGuestPhone: (v: string) => void;
+  gateway: GuestGateway;
+  setGateway: (v: GuestGateway) => void;
   onPay: () => void;
 }) {
   let detailLabel = service.name;
@@ -572,7 +668,8 @@ function ReviewStep({
     const p = packages.find((x) => x.id === pkgId);
     if (p) detailLabel = `${p.name} Package`;
   }
-  const insufficient = amount > walletBalance;
+  const insufficient = !isGuest && amount > walletBalance;
+  const guestMissingInfo = isGuest && (!guestEmail.trim() || (gateway === "ecocash" && !guestPhone.trim()));
 
   return (
     <>
@@ -589,16 +686,73 @@ function ReviewStep({
           {service.is_gift && extra && <ReviewRow label="Sender Number" value={extra} />}
           {(validated?.name || service.mock_name) && <ReviewRow label="Recipient" value={validated?.name || service.mock_name || ""} />}
           <ReviewRow label="Fee" value="$0.00" />
-          <ReviewRow label="Payment method" value="TopMe Wallet" />
-          <ReviewRow label="Wallet balance" value={`$${walletBalance.toFixed(2)}`} />
+          {!isGuest && (
+            <>
+              <ReviewRow label="Payment method" value="TopMe Wallet" />
+              <ReviewRow label="Wallet balance" value={`$${walletBalance.toFixed(2)}`} />
+            </>
+          )}
         </div>
       </div>
 
-      {!service.is_gift && (
+      {!service.is_gift && !isGuest && (
         <label className="row gap-2 mt-3" style={{ cursor: "pointer" }}>
           <input type="checkbox" checked={saveBeneficiary} onChange={(e) => setSaveBeneficiary(e.target.checked)} />
           <span className="muted">Save this recipient for next time</span>
         </label>
+      )}
+
+      {isGuest && (
+        <div className="mt-3">
+          <div className="muted mb-2" style={{ fontSize: 13 }}>
+            No account needed — pay directly and we&apos;ll email your receipt.
+          </div>
+          <label className="field-label">Email for receipt</label>
+          <input
+            className="field"
+            type="email"
+            placeholder="you@example.com"
+            value={guestEmail}
+            onChange={(e) => setGuestEmail(e.target.value)}
+          />
+
+          <label className="field-label mt-2">Pay with</label>
+          <div className="row gap-2">
+            {(
+              [
+                { id: "paynow", label: "Paynow" },
+                { id: "stripe", label: "Card" },
+                { id: "ecocash", label: "EcoCash" },
+              ] as { id: GuestGateway; label: string }[]
+            ).map((g) => (
+              <div
+                key={g.id}
+                className={`chip tap ${gateway === g.id ? "selected" : ""}`}
+                style={{ flex: 1, textAlign: "center" }}
+                onClick={() => setGateway(g.id)}
+              >
+                {g.label}
+              </div>
+            ))}
+          </div>
+
+          {gateway === "ecocash" && (
+            <>
+              <label className="field-label mt-2">EcoCash Number</label>
+              <input
+                className="field"
+                placeholder="077 123 4567"
+                value={guestPhone}
+                onChange={(e) => setGuestPhone(e.target.value)}
+              />
+            </>
+          )}
+
+          <div className="muted mt-2" style={{ fontSize: 11.5, display: "flex", alignItems: "center", gap: 6 }}>
+            <Icon name="lock" size={13} stroke={2} /> Secured by{" "}
+            {gateway === "paynow" ? "Paynow Zimbabwe" : gateway === "stripe" ? "Stripe" : "EcoCash"}
+          </div>
+        </div>
       )}
 
       {insufficient && (
@@ -610,7 +764,7 @@ function ReviewStep({
         </div>
       )}
 
-      <button className="btn btn-primary btn-block mt-4" disabled={busy || insufficient} onClick={onPay}>
+      <button className="btn btn-primary btn-block mt-4" disabled={busy || insufficient || guestMissingInfo} onClick={onPay}>
         {busy ? "Processing…" : `Pay $${amount.toFixed(2)}`}
       </button>
     </>
@@ -691,7 +845,7 @@ function ReceiptStep({
             now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
           }
         />
-        <ReviewRow label="Paid via" value="TopMe Wallet" />
+        <ReviewRow label="Paid via" value={result.user_id ? "TopMe Wallet" : "Guest checkout"} />
         {voucherCode && <ReviewRow label="Voucher Code" value={voucherCode} />}
         {service.is_gift && extra && <ReviewRow label="Sender Number" value={extra} />}
       </div>

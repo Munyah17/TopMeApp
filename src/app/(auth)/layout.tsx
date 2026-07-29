@@ -14,7 +14,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         background: "var(--bg)",
       }}
     >
-      <Link href="/" style={{ marginBottom: 28, textDecoration: "none" }}>
+      <Link href="/login" style={{ marginBottom: 28, textDecoration: "none" }}>
         <Logo showTagline />
       </Link>
       <div className="content-narrow page-enter" style={{ width: "100%", maxWidth: 400 }}>

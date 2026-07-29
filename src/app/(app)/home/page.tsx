@@ -2,26 +2,29 @@ import Link from "next/link";
 import { Icon } from "@/components/icons";
 import { FavoriteButton } from "@/components/home/favorite-button";
 import { ProductCard } from "@/components/home/product-card";
-import { fmt } from "@/lib/data/catalog-helpers";
+import { fmt, priceHint } from "@/lib/data/catalog-helpers";
 import {
   getAllServices,
   getBeneficiaries,
   getCategories,
   getCurrentProfile,
+  getDataBundles,
   getFavoriteServiceIds,
   getRecentTransactions,
+  getTvPackages,
 } from "@/lib/data/queries";
 
 export default async function HomePage() {
   const profile = await getCurrentProfile();
-  if (!profile) return null;
 
-  const [categories, services, favoriteIds, recent, beneficiaries] = await Promise.all([
+  const [categories, services, favoriteIds, recent, bundles, packages, beneficiaries] = await Promise.all([
     getCategories(),
     getAllServices(),
-    getFavoriteServiceIds(profile.id),
-    getRecentTransactions(profile.id, 3),
-    getBeneficiaries(profile.id),
+    profile ? getFavoriteServiceIds(profile.id) : Promise.resolve(new Set<string>()),
+    profile ? getRecentTransactions(profile.id, 3) : Promise.resolve([]),
+    getDataBundles(),
+    getTvPackages(),
+    profile ? getBeneficiaries(profile.id) : Promise.resolve([]),
   ]);
 
   const servicesByCategory = new Map<string, typeof services>();
@@ -40,11 +43,11 @@ export default async function HomePage() {
       <div className="row between">
         <div>
           <div className="eyebrow">Good {now.getHours() < 12 ? "morning" : now.getHours() < 18 ? "afternoon" : "evening"}</div>
-          <h2 style={{ fontSize: 22, marginTop: 2 }}>{profile.full_name?.split(" ")[0] || "there"}</h2>
+          <h2 style={{ fontSize: 22, marginTop: 2 }}>{profile?.full_name?.split(" ")[0] || "there"}</h2>
         </div>
         <div className="row gap-2 mobile-only" style={{ gap: 12 }}>
           <Link
-            href="/account"
+            href={profile ? "/account" : "/login"}
             className="tap"
             style={{
               width: 42,
@@ -61,7 +64,7 @@ export default async function HomePage() {
             <Icon name="bell" size={19} stroke={2} />
           </Link>
           <Link
-            href="/account"
+            href={profile ? "/account" : "/login"}
             className="tap"
             style={{
               width: 42,
@@ -77,7 +80,7 @@ export default async function HomePage() {
               textDecoration: "none",
             }}
           >
-            {(profile.full_name || "TM").split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()}
+            {(profile?.full_name || "TM").split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()}
           </Link>
         </div>
       </div>
@@ -191,7 +194,18 @@ export default async function HomePage() {
             </Link>
           </div>
           {recent.length === 0 ? (
-            <div className="card card-pad muted">No transactions yet — your recent activity will show up here.</div>
+            <div className="card card-pad muted">
+              {profile ? (
+                "No transactions yet — your recent activity will show up here."
+              ) : (
+                <>
+                  <Link href="/login" style={{ color: "var(--green-600)", fontWeight: 700 }}>
+                    Log in
+                  </Link>{" "}
+                  to see your recent activity.
+                </>
+              )}
+            </div>
           ) : (
             <div className="card" style={{ overflow: "hidden" }}>
               {recent.map((t, i) => {
@@ -251,7 +265,7 @@ export default async function HomePage() {
                 </div>
                 <div className="cat-section-row">
                   {items.map((i) => (
-                    <ProductCard key={i.id} service={i} categoryColor={c.color} />
+                    <ProductCard key={i.id} service={i} categoryColor={c.color} priceLabel={priceHint(i, bundles, packages)} />
                   ))}
                 </div>
               </div>
@@ -271,35 +285,54 @@ export default async function HomePage() {
             <Icon name="chevronR" size={18} stroke={2} />
           </div>
 
-          <div className="card card-pad mt-2 desktop-only">
-            <div className="muted">Recent activity</div>
-            <div style={{ fontSize: 26, fontWeight: 800, marginTop: 4 }}>{fmt(monthSpend)}</div>
-            <div className="muted" style={{ marginTop: 2 }}>
-              Across your last {recent.length} payment{recent.length === 1 ? "" : "s"}
-            </div>
-          </div>
-
-          <div className="card card-pad mt-2 desktop-only">
-            <div className="section-title" style={{ fontSize: 14 }}>
-              Saved beneficiaries
-            </div>
-            {beneficiaries.length === 0 ? (
-              <div className="muted mt-2">Recipients you pay often will be saved here for quick reuse.</div>
-            ) : (
-              beneficiaries.slice(0, 3).map((b) => (
-                <div className="row gap-2 mt-2" key={b.id}>
-                  <div className="ibadge round" style={{ width: 34, height: 34, background: "#F1F4F9", color: "var(--text-soft)", fontSize: 12, fontWeight: 700 }}>
-                    {(b.label || b.identifier).slice(0, 2).toUpperCase()}
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, fontSize: 13 }}>{b.label || b.identifier}</div>
-                    <div className="muted">{b.service_id}</div>
-                  </div>
-                  <FavoriteButton serviceId={b.service_id || ""} isFavorite={favoriteIds.has(b.service_id || "")} />
+          {profile ? (
+            <>
+              <div className="card card-pad mt-2 desktop-only">
+                <div className="muted">Recent activity</div>
+                <div style={{ fontSize: 26, fontWeight: 800, marginTop: 4 }}>{fmt(monthSpend)}</div>
+                <div className="muted" style={{ marginTop: 2 }}>
+                  Across your last {recent.length} payment{recent.length === 1 ? "" : "s"}
                 </div>
-              ))
-            )}
-          </div>
+              </div>
+
+              <div className="card card-pad mt-2 desktop-only">
+                <div className="section-title" style={{ fontSize: 14 }}>
+                  Saved beneficiaries
+                </div>
+                {beneficiaries.length === 0 ? (
+                  <div className="muted mt-2">Recipients you pay often will be saved here for quick reuse.</div>
+                ) : (
+                  beneficiaries.slice(0, 3).map((b) => (
+                    <div className="row gap-2 mt-2" key={b.id}>
+                      <div className="ibadge round" style={{ width: 34, height: 34, background: "#F1F4F9", color: "var(--text-soft)", fontSize: 12, fontWeight: 700 }}>
+                        {(b.label || b.identifier).slice(0, 2).toUpperCase()}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 700, fontSize: 13 }}>{b.label || b.identifier}</div>
+                        <div className="muted">{b.service_id}</div>
+                      </div>
+                      <FavoriteButton serviceId={b.service_id || ""} isFavorite={favoriteIds.has(b.service_id || "")} />
+                    </div>
+                  ))
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="card card-pad mt-2 desktop-only">
+              <div className="section-title" style={{ fontSize: 14 }}>
+                Log in for more
+              </div>
+              <div className="muted mt-2">
+                Track spending, save beneficiaries and pay faster next time.
+              </div>
+              <Link href="/login" className="btn btn-primary btn-block mt-3" style={{ textDecoration: "none" }}>
+                Log in
+              </Link>
+              <Link href="/signup" className="btn btn-secondary btn-block mt-2" style={{ textDecoration: "none" }}>
+                Create account
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </div>

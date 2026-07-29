@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getStripe } from "@/lib/payments/stripe";
 import { createAdminClient } from "@/lib/supabase/server";
 import { notifyTopupResult } from "@/lib/email/notify";
+import { finalizeGuestCheckout } from "@/lib/payments/guest-checkout";
 import type Stripe from "stripe";
 
 export async function POST(request: NextRequest) {
@@ -22,6 +23,18 @@ export async function POST(request: NextRequest) {
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
     const reference = session.metadata?.reference;
+    const purpose = session.metadata?.purpose;
+
+    if (reference && purpose === "guest_service_payment") {
+      try {
+        await finalizeGuestCheckout(reference);
+      } catch {
+        // Already finalized by another webhook delivery, or intent not
+        // found/pending — safe to ignore, Stripe will not retry on 200.
+      }
+      return NextResponse.json({ received: true });
+    }
+
     const userId = session.metadata?.userId;
     if (reference && userId) {
       const admin = createAdminClient();

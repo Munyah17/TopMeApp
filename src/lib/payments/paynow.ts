@@ -27,11 +27,13 @@ export async function initiatePaynowPayment(opts: {
   reference: string;
   amount: number;
   authEmail: string;
+  additionalInfo?: string;
+  returnUrl?: string;
 }): Promise<PaynowInitiateResult> {
   const id = process.env.PAYNOW_INTEGRATION_ID;
   const key = process.env.PAYNOW_INTEGRATION_KEY;
   const resultUrl = process.env.PAYNOW_RESULT_URL;
-  const returnUrl = process.env.PAYNOW_RETURN_URL;
+  const returnUrl = opts.returnUrl || process.env.PAYNOW_RETURN_URL;
   if (!id || !key || !resultUrl || !returnUrl) {
     return { ok: false, error: "Paynow is not configured — set PAYNOW_INTEGRATION_ID/KEY and result/return URLs." };
   }
@@ -40,7 +42,7 @@ export async function initiatePaynowPayment(opts: {
     id,
     reference: opts.reference,
     amount: opts.amount.toFixed(2),
-    additionalinfo: "TopMe wallet top up",
+    additionalinfo: opts.additionalInfo || "TopMe wallet top up",
     returnurl: returnUrl,
     resulturl: resultUrl,
     authemail: opts.authEmail,

@@ -45,13 +45,13 @@ export function AppShell({ profile, children }: { profile: Profile | null; child
           ))}
         </nav>
         <div className="sidebar-bottom">
-          <Link href="/account" className="sidebar-user tap" style={{ textDecoration: "none" }}>
-            {initials(profile?.full_name ?? null)}
+          <Link href={profile ? "/account" : "/login"} className="sidebar-user tap" style={{ textDecoration: "none" }}>
+            {profile ? initials(profile.full_name) : <Icon name="user" size={17} stroke={2} />}
           </Link>
           <div className="sidebar-user-info">
-            <div style={{ fontWeight: 700, fontSize: 13 }}>{profile?.full_name || "Your account"}</div>
+            <div style={{ fontWeight: 700, fontSize: 13 }}>{profile?.full_name || "Guest"}</div>
             <div className="muted" style={{ fontSize: 11.5 }}>
-              View account
+              {profile ? "View account" : <Link href="/login" style={{ color: "var(--green-600)", fontWeight: 700 }}>Log in</Link>}
             </div>
           </div>
         </div>
@@ -68,24 +68,32 @@ export function AppShell({ profile, children }: { profile: Profile | null; child
             <span>Search services, bills, beneficiaries…</span>
           </Link>
           <div className="header-right">
-            <Link href="/account" className="header-icon-btn tap" style={{ textDecoration: "none" }}>
-              <Icon name="bell" size={18} stroke={2} />
-              <span
-                style={{
-                  position: "absolute",
-                  top: 8,
-                  right: 9,
-                  width: 6,
-                  height: 6,
-                  background: "var(--error)",
-                  borderRadius: "50%",
-                  border: "1.5px solid var(--surface)",
-                }}
-              />
-            </Link>
-            <Link href="/account" className="header-avatar tap" style={{ textDecoration: "none" }}>
-              {initials(profile?.full_name ?? null)}
-            </Link>
+            {profile ? (
+              <>
+                <Link href="/account" className="header-icon-btn tap" style={{ textDecoration: "none" }}>
+                  <Icon name="bell" size={18} stroke={2} />
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: 8,
+                      right: 9,
+                      width: 6,
+                      height: 6,
+                      background: "var(--error)",
+                      borderRadius: "50%",
+                      border: "1.5px solid var(--surface)",
+                    }}
+                  />
+                </Link>
+                <Link href="/account" className="header-avatar tap" style={{ textDecoration: "none" }}>
+                  {initials(profile.full_name)}
+                </Link>
+              </>
+            ) : (
+              <Link href="/login" className="btn btn-primary tap" style={{ textDecoration: "none", padding: "0 16px", height: 36 }}>
+                Log in
+              </Link>
+            )}
           </div>
         </header>
 
