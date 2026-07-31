@@ -8,6 +8,7 @@ import { Icon } from "@/components/icons";
 import { hexA } from "@/lib/data/catalog-helpers";
 import { payService, sendGiftVoucher, validateRecipient } from "@/lib/actions/payments";
 import { startGuestCheckout, type GuestGateway } from "@/lib/actions/guest-payments";
+import { addGuestActivity } from "@/lib/guest-activity";
 import type { DataBundle, Network, Service, Transaction, TvPackage } from "@/types/database";
 
 type Step = "details" | "validating" | "amount" | "review" | "processing" | "guest-ecocash" | "success" | "receipt" | "error";
@@ -118,6 +119,13 @@ export function PaymentFlow({
           if (data.status === "completed") {
             if (pollRef.current) clearInterval(pollRef.current);
             setResult(data.transaction);
+            addGuestActivity({
+              reference: data.transaction.reference,
+              serviceName: service.name,
+              amount: data.transaction.amount,
+              recipient: data.transaction.recipient_identifier,
+              createdAt: data.transaction.created_at,
+            });
             setStep("success");
           } else if (data.status === "failed") {
             if (pollRef.current) clearInterval(pollRef.current);

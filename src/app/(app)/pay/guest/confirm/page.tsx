@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Icon } from "@/components/icons";
 import { getGuestCheckoutStatus } from "@/lib/actions/guest-payments";
+import { addGuestActivity } from "@/lib/guest-activity";
 
 type GuestReceipt = {
   reference: string;
@@ -36,6 +37,13 @@ function ConfirmContent() {
       if (res.status === "completed") {
         setReceipt(res.transaction);
         setStatus("completed");
+        addGuestActivity({
+          reference: res.transaction.reference,
+          serviceName: res.transaction.service_name,
+          amount: res.transaction.amount,
+          recipient: res.transaction.recipient,
+          createdAt: res.transaction.created_at,
+        });
         if (pollRef.current) clearInterval(pollRef.current);
       } else if (res.status === "failed" || res.status === "not_found") {
         setStatus(res.status);

@@ -218,3 +218,52 @@ export async function deleteService(id: string) {
   }
   revalidateCatalog();
 }
+
+function revalidateBanners() {
+  revalidatePath("/admin/banners");
+  revalidatePath("/home");
+}
+
+export interface PromoBannerInput {
+  imageUrl: string;
+  linkUrl: string;
+  sortOrder: number;
+}
+
+export async function createPromoBanner(input: PromoBannerInput) {
+  await requireSuperadmin();
+  const admin = createAdminClient();
+  const { error } = await admin.from("promo_banners").insert({
+    image_url: input.imageUrl,
+    link_url: input.linkUrl || null,
+    sort_order: input.sortOrder,
+  });
+  if (error) throw new Error(error.message);
+  revalidateBanners();
+}
+
+export async function updatePromoBanner(id: string, input: PromoBannerInput) {
+  await requireSuperadmin();
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("promo_banners")
+    .update({ image_url: input.imageUrl, link_url: input.linkUrl || null, sort_order: input.sortOrder })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidateBanners();
+}
+
+export async function togglePromoBannerActive(id: string, currentlyActive: boolean) {
+  await requireSuperadmin();
+  const admin = createAdminClient();
+  await admin.from("promo_banners").update({ is_active: !currentlyActive }).eq("id", id);
+  revalidateBanners();
+}
+
+export async function deletePromoBanner(id: string) {
+  await requireSuperadmin();
+  const admin = createAdminClient();
+  const { error } = await admin.from("promo_banners").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidateBanners();
+}

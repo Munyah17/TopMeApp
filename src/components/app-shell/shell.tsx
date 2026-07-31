@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Icon } from "@/components/icons";
 import { BrandMark, Wordmark } from "@/components/logo";
+import { Footer } from "@/components/app-shell/footer";
 import type { Profile } from "@/types/database";
 
 const NAVTABS = [
@@ -31,42 +32,22 @@ export function AppShell({ profile, children }: { profile: Profile | null; child
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
-        <div className="sidebar-top">
-          <BrandMark size={34} />
-          <Wordmark size={19} showTagline />
-        </div>
-        <nav className="side-nav">
-          {NAVTABS.map((t) => (
-            <Link key={t.id} href={t.href} className={`nav-item ${isActive(pathname, t.href) ? "active" : ""}`}>
-              <Icon name={t.icon} size={22} stroke={2} />
-              <span className="nav-label">{t.label}</span>
-            </Link>
-          ))}
-        </nav>
-        <div className="sidebar-bottom">
-          <Link href={profile ? "/account" : "/login"} className="sidebar-user tap" style={{ textDecoration: "none" }}>
-            {profile ? initials(profile.full_name) : <Icon name="user" size={17} stroke={2} />}
-          </Link>
-          <div className="sidebar-user-info">
-            <div style={{ fontWeight: 700, fontSize: 13 }}>{profile?.full_name || "Guest"}</div>
-            <div className="muted" style={{ fontSize: 11.5 }}>
-              {profile ? "View account" : <Link href="/login" style={{ color: "var(--green-600)", fontWeight: 700 }}>Log in</Link>}
-            </div>
-          </div>
-        </div>
-      </aside>
-
       <div className="app-main">
         <header className="app-header">
-          <Link
-            href="/services"
-            className="header-search tap"
-            style={{ textDecoration: "none" }}
-          >
-            <Icon name="search" size={17} stroke={2} />
-            <span>Search services, bills, beneficiaries…</span>
+          <Link href="/home" className="header-logo tap" style={{ textDecoration: "none" }}>
+            <BrandMark size={30} />
+            <Wordmark size={16} />
           </Link>
+
+          <nav className="header-nav">
+            {NAVTABS.map((t) => (
+              <Link key={t.id} href={t.href} className={`header-nav-item ${isActive(pathname, t.href) ? "active" : ""}`}>
+                <Icon name={t.icon} size={17} stroke={2} />
+                <span>{t.label}</span>
+              </Link>
+            ))}
+          </nav>
+
           <div className="header-right">
             {profile ? (
               <>
@@ -90,9 +71,14 @@ export function AppShell({ profile, children }: { profile: Profile | null; child
                 </Link>
               </>
             ) : (
-              <Link href="/login" className="btn btn-primary tap" style={{ textDecoration: "none", padding: "0 16px", height: 36 }}>
-                Log in
-              </Link>
+              <>
+                <Link href="/login" className="btn btn-secondary tap" style={{ textDecoration: "none", padding: "0 16px", height: 36 }}>
+                  Log in
+                </Link>
+                <Link href="/signup" className="btn btn-primary tap" style={{ textDecoration: "none", padding: "0 16px", height: 36 }}>
+                  Sign Up
+                </Link>
+              </>
             )}
           </div>
         </header>
@@ -101,6 +87,7 @@ export function AppShell({ profile, children }: { profile: Profile | null; child
           <div className="screen-pad page-enter" key={pathname}>
             {children}
           </div>
+          <Footer />
         </div>
 
         {showFab && (

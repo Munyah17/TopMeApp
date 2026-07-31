@@ -31,6 +31,9 @@ function LoginForm() {
 
   return (
     <div className="card card-pad">
+      <Link href="/home" className="muted" style={{ display: "inline-flex", alignItems: "center", gap: 4, textDecoration: "none", fontSize: 13, fontWeight: 600, marginBottom: 10 }}>
+        ← Back to Home
+      </Link>
       <h2 style={{ fontSize: 20, marginBottom: 4 }}>Welcome back</h2>
       <div className="muted mb-2">Log in to top up and pay in seconds.</div>
 

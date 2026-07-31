@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type {
   Beneficiary,
@@ -6,6 +7,7 @@ import type {
   Favorite,
   Network,
   Profile,
+  PromoBanner,
   Service,
   ServiceCategory,
   Transaction,
@@ -19,23 +21,24 @@ export async function getNetworks(): Promise<Network[]> {
   return (data as Network[]) ?? [];
 }
 
-export async function getCurrentUser() {
+// Cached per-request: layout.tsx and individual pages each call these, and
+// without dedup that's a redundant Supabase auth round-trip on every one of
+// those calls for a single page load.
+export const getCurrentUser = cache(async () => {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   return user;
-}
+});
 
-export async function getCurrentProfile(): Promise<Profile | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export const getCurrentProfile = cache(async (): Promise<Profile | null> => {
+  const user = await getCurrentUser();
   if (!user) return null;
+  const supabase = await createClient();
   const { data } = await supabase.from("profiles").select("*").eq("id", user.id).single();
   return (data as Profile) ?? null;
-}
+});
 
 export async function getWallet(userId: string): Promise<Wallet | null> {
   const supabase = await createClient();
@@ -53,6 +56,24 @@ export async function getCategory(id: string): Promise<ServiceCategory | null> {
   const supabase = await createClient();
   const { data } = await supabase.from("service_categories").select("*").eq("id", id).single();
   return (data as ServiceCategory) ?? null;
+}
+
+export async function getActivePromoBanner(): Promise<PromoBanner | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("promo_banners")
+    .select("*")
+    .eq("is_active", true)
+    .order("sort_order")
+    .limit(1)
+    .maybeSingle();
+  return (data as PromoBanner) ?? null;
+}
+
+export async function getAllPromoBanners(): Promise<PromoBanner[]> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("promo_banners").select("*").order("sort_order");
+  return (data as PromoBanner[]) ?? [];
 }
 
 export async function getServicesByCategory(categoryId: string, includeInactive = false): Promise<Service[]> {

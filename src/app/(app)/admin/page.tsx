@@ -166,6 +166,18 @@ export default async function AdminPage() {
               </div>
               <Icon name="chevronR" size={16} stroke={2} />
             </Link>
+            <Link href="/admin/banners" className="card card-pad tap row gap-2" style={{ flex: 1, textDecoration: "none" }}>
+              <div className="ibadge round" style={{ width: 36, height: 36, background: "var(--blue-50)", color: "var(--blue)" }}>
+                <Icon name="monitor" size={17} stroke={1.8} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, fontSize: 13, color: "var(--text)" }}>Home Banner</div>
+                <div className="muted" style={{ fontSize: 11 }}>
+                  Promo image
+                </div>
+              </div>
+              <Icon name="chevronR" size={16} stroke={2} />
+            </Link>
           </div>
         )}
 

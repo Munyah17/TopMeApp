@@ -1,29 +1,5 @@
-import type { DataBundle, Service, TvPackage } from "@/types/database";
-
 export function fmt(n: number) {
   return "$" + Math.abs(n).toFixed(2);
-}
-
-export function priceHint(service: Service, bundles: DataBundle[], packages: TvPackage[]) {
-  if (service.amount_mode === "chips" && service.chips && service.chips.length) {
-    return `From $${Math.min(...service.chips)}`;
-  }
-  if (service.amount_mode === "outstanding" && service.outstanding != null) {
-    return `From $${service.outstanding}`;
-  }
-  if (service.amount_mode === "bundles" && bundles.length) {
-    return `From $${Math.min(...bundles.map((b) => b.price))}`;
-  }
-  if (service.amount_mode === "packages" && packages.length) {
-    return `From $${Math.min(...packages.map((p) => p.price))}`;
-  }
-  return "";
-}
-
-export function providerInitials(label: string) {
-  const parts = label.replace("/", " ").split(" ").filter(Boolean);
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-  return label.slice(0, 2).toUpperCase();
 }
 
 export function shade(hex: string, percent: number) {

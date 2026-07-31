@@ -5,6 +5,15 @@ export type FulfillmentStatus = "simulated" | "pending" | "fulfilled" | "failed"
 export type TeamStatus = "invited" | "active" | "disabled";
 export type VoucherStatus = "active" | "redeemed" | "expired";
 
+export interface PromoBanner {
+  id: string;
+  image_url: string;
+  link_url: string | null;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+}
+
 export interface Profile {
   id: string;
   full_name: string | null;
