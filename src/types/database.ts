@@ -21,6 +21,7 @@ export interface Profile {
   email: string | null;
   role: UserRole;
   notifications_enabled: boolean;
+  is_suspended: boolean;
   created_at: string;
 }
 
@@ -33,7 +34,7 @@ export interface Wallet {
 export interface WalletLedgerRow {
   id: string;
   user_id: string;
-  type: "topup" | "debit" | "refund" | "gift_send" | "gift_redeem";
+  type: "topup" | "debit" | "refund" | "gift_send" | "gift_redeem" | "p2p_send" | "p2p_receive";
   amount: number;
   provider: string | null;
   reference: string | null;
@@ -154,6 +155,22 @@ export interface GiftVoucher {
   created_at: string;
   redeemed_at: string | null;
   redeemed_by: string | null;
+}
+
+export interface P2pTransfer {
+  id: string;
+  sender_id: string;
+  receiver_id: string;
+  amount: number;
+  kind: "transfer" | "red_packet";
+  note: string | null;
+  created_at: string;
+}
+
+export interface ProfileLookup {
+  id: string;
+  full_name: string | null;
+  phone: string | null;
 }
 
 export interface TopupIntent {

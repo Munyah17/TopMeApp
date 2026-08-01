@@ -400,9 +400,23 @@ h3 {
 .app-shell {
   display: flex;
   height: 100vh;
+  height: 100dvh;
   width: 100vw;
   background: var(--bg);
   overflow: hidden;
+}
+/* Mobile-only spacer so page content clears the status bar / notch instead
+   of butting straight up against it. Desktop uses .app-header instead. */
+.mobile-topbar {
+  display: block;
+  height: calc(env(safe-area-inset-top) + 14px);
+  flex-shrink: 0;
+  background: var(--bg);
+}
+@media (min-width: 820px) {
+  .mobile-topbar {
+    display: none;
+  }
 }
 .header-logo {
   display: flex;
@@ -444,8 +458,6 @@ h3 {
 
 .app-header {
   display: none;
-  align-items: center;
-  gap: 18px;
   height: 76px;
   flex-shrink: 0;
   padding: 0 32px;
@@ -454,6 +466,12 @@ h3 {
   backdrop-filter: blur(12px);
   position: relative;
   z-index: 30;
+}
+.header-inner {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  height: 100%;
 }
 .header-search {
   flex: 1;
@@ -549,6 +567,7 @@ h3 {
   flex-direction: column;
   min-width: 0;
   height: 100vh;
+  height: 100dvh;
   position: relative;
 }
 .view-area {
@@ -606,14 +625,14 @@ h3 {
 }
 
 .screen-pad {
-  padding-bottom: 110px;
+  padding-bottom: calc(110px + env(safe-area-inset-bottom));
 }
 .px {
   padding-left: 22px;
   padding-right: 22px;
 }
 .content-wrap {
-  max-width: 1180px;
+  max-width: 1400px;
   margin: 0 auto;
   width: 100%;
 }
@@ -643,7 +662,7 @@ h3 {
   position: absolute;
   left: 14px;
   right: 14px;
-  bottom: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom));
   height: 68px;
   background: rgba(255, 255, 255, 0.86);
   backdrop-filter: blur(20px) saturate(180%);
@@ -712,7 +731,7 @@ h3 {
 .fab {
   position: absolute;
   right: 20px;
-  bottom: 96px;
+  bottom: calc(96px + env(safe-area-inset-bottom));
   z-index: 90;
   width: 52px;
   height: 52px;
@@ -843,7 +862,7 @@ h3 {
 }
 @media (min-width: 820px) {
   .cat-section-row {
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(4, 1fr);
   }
   .prod-media {
     height: 190px;

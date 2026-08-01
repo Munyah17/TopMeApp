@@ -63,7 +63,7 @@ export async function startGuestCheckout(input: StartGuestCheckoutInput) {
       reference,
       amount: input.amount,
       authEmail: input.guestEmail,
-      additionalInfo: `TopMe — ${input.serviceName}`,
+      additionalInfo: `TopMe: ${input.serviceName}`,
       returnUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/pay/guest/confirm?reference=${encodeURIComponent(reference)}`,
     });
     if (!result.ok || !result.browserUrl) {

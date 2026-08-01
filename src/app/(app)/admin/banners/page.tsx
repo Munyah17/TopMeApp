@@ -57,7 +57,7 @@ export default async function BannersPage() {
       <div className="px content-wrap">
         <div className="muted mb-3" style={{ lineHeight: 1.5 }}>
           Manage the promotional banner shown on the customer Home page. Only the active banner
-          with the lowest sort order is shown — activate, deactivate or replace it at any time.
+          with the lowest sort order is shown. Activate, deactivate, or replace it anytime.
         </div>
         <BannersClient banners={banners} />
       </div>

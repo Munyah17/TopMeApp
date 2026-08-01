@@ -58,7 +58,7 @@ export default async function ProductsPage() {
         <div className="muted mb-3" style={{ lineHeight: 1.5 }}>
           Add, edit, deactivate or delete anything in the catalog. Deactivated services stay in
           records (transaction history, reports) but disappear from Home/Services for customers
-          immediately. Deleting is only possible for services with no transaction history —
+          immediately. Deleting only works for services with no transaction history, so
           deactivate anything that&apos;s ever been sold instead.
         </div>
         <ProductsClient categories={categories} services={services} />

@@ -34,54 +34,58 @@ export function AppShell({ profile, children }: { profile: Profile | null; child
     <div className="app-shell">
       <div className="app-main">
         <header className="app-header">
-          <Link href="/home" className="header-logo tap" style={{ textDecoration: "none" }}>
-            <BrandMark size={30} />
-            <Wordmark size={16} />
-          </Link>
+          <div className="header-inner content-wrap">
+            <Link href="/home" className="header-logo tap" style={{ textDecoration: "none" }}>
+              <BrandMark size={30} />
+              <Wordmark size={16} />
+            </Link>
 
-          <nav className="header-nav">
-            {NAVTABS.map((t) => (
-              <Link key={t.id} href={t.href} className={`header-nav-item ${isActive(pathname, t.href) ? "active" : ""}`}>
-                <Icon name={t.icon} size={17} stroke={2} />
-                <span>{t.label}</span>
-              </Link>
-            ))}
-          </nav>
+            <nav className="header-nav">
+              {NAVTABS.map((t) => (
+                <Link key={t.id} href={t.href} className={`header-nav-item ${isActive(pathname, t.href) ? "active" : ""}`}>
+                  <Icon name={t.icon} size={17} stroke={2} />
+                  <span>{t.label}</span>
+                </Link>
+              ))}
+            </nav>
 
-          <div className="header-right">
-            {profile ? (
-              <>
-                <Link href="/account" className="header-icon-btn tap" style={{ textDecoration: "none" }}>
-                  <Icon name="bell" size={18} stroke={2} />
-                  <span
-                    style={{
-                      position: "absolute",
-                      top: 8,
-                      right: 9,
-                      width: 6,
-                      height: 6,
-                      background: "var(--error)",
-                      borderRadius: "50%",
-                      border: "1.5px solid var(--surface)",
-                    }}
-                  />
-                </Link>
-                <Link href="/account" className="header-avatar tap" style={{ textDecoration: "none" }}>
-                  {initials(profile.full_name)}
-                </Link>
-              </>
-            ) : (
-              <>
-                <Link href="/login" className="btn btn-secondary tap" style={{ textDecoration: "none", padding: "0 16px", height: 36 }}>
-                  Log in
-                </Link>
-                <Link href="/signup" className="btn btn-primary tap" style={{ textDecoration: "none", padding: "0 16px", height: 36 }}>
-                  Sign Up
-                </Link>
-              </>
-            )}
+            <div className="header-right">
+              {profile ? (
+                <>
+                  <Link href="/account" className="header-icon-btn tap" style={{ textDecoration: "none" }}>
+                    <Icon name="bell" size={18} stroke={2} />
+                    <span
+                      style={{
+                        position: "absolute",
+                        top: 8,
+                        right: 9,
+                        width: 6,
+                        height: 6,
+                        background: "var(--error)",
+                        borderRadius: "50%",
+                        border: "1.5px solid var(--surface)",
+                      }}
+                    />
+                  </Link>
+                  <Link href="/account" className="header-avatar tap" style={{ textDecoration: "none" }}>
+                    {initials(profile.full_name)}
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link href="/login" className="btn btn-secondary tap" style={{ textDecoration: "none", padding: "0 16px", height: 36 }}>
+                    Log in
+                  </Link>
+                  <Link href="/signup" className="btn btn-primary tap" style={{ textDecoration: "none", padding: "0 16px", height: 36 }}>
+                    Sign Up
+                  </Link>
+                </>
+              )}
+            </div>
           </div>
         </header>
+
+        <div className="mobile-topbar" aria-hidden="true" />
 
         <div className="view-area">
           <div className="screen-pad page-enter" key={pathname}>

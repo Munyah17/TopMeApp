@@ -128,8 +128,23 @@ export default async function AdminPage() {
         </span>
       </div>
       <div className="px content-wrap">
+        <div className="row gap-2 mt-1">
+          <Link href="/admin/customers" className="card card-pad tap row gap-2" style={{ flex: 1, textDecoration: "none" }}>
+            <div className="ibadge round" style={{ width: 36, height: 36, background: "#EAF8FF", color: "var(--blue)" }}>
+              <Icon name="users" size={17} stroke={1.8} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: "var(--text)" }}>Customer Accounts</div>
+              <div className="muted" style={{ fontSize: 11 }}>
+                Suspend or reactivate
+              </div>
+            </div>
+            <Icon name="chevronR" size={16} stroke={2} />
+          </Link>
+        </div>
+
         {profile.role === "superadmin" && (
-          <div className="row gap-2 mt-1">
+          <div className="row gap-2 mt-2">
             <Link href="/admin/products" className="card card-pad tap row gap-2" style={{ flex: 1, textDecoration: "none" }}>
               <div className="ibadge round" style={{ width: 36, height: 36, background: "#FEF6E7", color: "var(--warning)" }}>
                 <Icon name="grid" size={17} stroke={1.8} />

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { createService, updateService, type ServiceInput } from "@/lib/actions/admin";
+import { useRef, useState, useTransition } from "react";
+import { createService, updateService, uploadServiceImage, type ServiceInput } from "@/lib/actions/admin";
 import type { Service, ServiceCategory } from "@/types/database";
 
 const AMOUNT_MODES: ServiceInput["amountMode"][] = ["chips", "bundles", "packages", "outstanding"];
@@ -45,7 +45,26 @@ export function ServiceForm({
   const [form, setForm] = useState<ServiceInput>(toInput(existing));
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const isEdit = !!existing;
+
+  async function handleFileSelected(file: File | undefined) {
+    if (!file) return;
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const url = await uploadServiceImage(formData);
+      set("logoUrl", url);
+    } catch (e) {
+      setUploadError(e instanceof Error ? e.message : "Upload failed.");
+    } finally {
+      setUploading(false);
+    }
+  }
 
   function set<K extends keyof ServiceInput>(key: K, value: ServiceInput[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -102,7 +121,29 @@ export function ServiceForm({
       </div>
 
       <div>
-        <label className="field-label">Logo image URL (shown on the customer catalog card)</label>
+        <label className="field-label">Logo image (shown on the customer catalog card)</label>
+        <div className="row gap-2" style={{ alignItems: "center" }}>
+          {form.logoUrl && (
+            /* eslint-disable-next-line @next/next/no-img-element -- admin-uploaded/pasted logo, arbitrary host */
+            <img src={form.logoUrl} alt="" style={{ width: 44, height: 44, borderRadius: 10, objectFit: "contain", border: "1px solid var(--border)", flexShrink: 0 }} />
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: "none" }}
+            onChange={(e) => handleFileSelected(e.target.files?.[0])}
+          />
+          <button type="button" className="btn btn-secondary" style={{ height: 38, padding: "0 14px", fontSize: 13 }} disabled={uploading} onClick={() => fileInputRef.current?.click()}>
+            {uploading ? "Uploading…" : "Upload image"}
+          </button>
+        </div>
+        {uploadError && (
+          <div className="muted mt-1" style={{ color: "var(--error)" }}>
+            {uploadError}
+          </div>
+        )}
+        <label className="field-label mt-2">Or paste an image URL</label>
         <input className="field" placeholder="https://…/econet-logo.png" value={form.logoUrl} onChange={(e) => set("logoUrl", e.target.value)} />
       </div>
 

@@ -33,6 +33,8 @@ const ICO: Record<string, string> = {
   droplet: `<path d="M12 3.5s6.5 7 6.5 11.3a6.5 6.5 0 0 1-13 0C5.5 10.5 12 3.5 12 3.5Z"/>`,
   phone: `<rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 18.3h3"/>`,
   gift: `<rect x="3.5" y="9" width="17" height="4" rx="1"/><rect x="4.5" y="13" width="15" height="8" rx="1.5"/><path d="M12 9v12"/><path d="M12 9c-1-3-3-4.5-4.5-3.5C6 6.5 7.2 9 12 9Zm0 0c1-3 3-4.5 4.5-3.5C18 6.5 16.8 9 12 9Z"/>`,
+  packet: `<rect x="4" y="3.5" width="16" height="17" rx="2.5"/><path d="M4 9.5h16"/><circle cx="12" cy="14" r="2.6"/>`,
+  scan: `<path d="M4 8V6a2 2 0 0 1 2-2h2"/><path d="M16 4h2a2 2 0 0 1 2 2v2"/><path d="M20 16v2a2 2 0 0 1-2 2h-2"/><path d="M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M4 12h16"/>`,
   lock: `<rect x="5" y="10.5" width="14" height="9.5" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/>`,
   qr: `<rect x="3" y="3" width="7" height="7" rx="1.2"/><rect x="14" y="3" width="7" height="7" rx="1.2"/><rect x="3" y="14" width="7" height="7" rx="1.2"/><rect x="14" y="14" width="3" height="3"/><rect x="18" y="18" width="3" height="3"/><rect x="14" y="18" width="3" height="3"/><rect x="18" y="14" width="3" height="3"/>`,
   tv: `<rect x="3" y="5" width="18" height="12.5" rx="2"/><path d="M8.5 21h7"/>`,

@@ -4,15 +4,18 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { getFulfillmentProvider } from "@/lib/fulfillment";
 import { SimulatedProvider } from "@/lib/fulfillment/simulated";
+import { findProfileByPhone } from "@/lib/data/queries";
 import { sendEmail } from "@/lib/email/client";
-import { giftSentEmail, paymentReceiptEmail } from "@/lib/email/templates";
-import type { ApiModuleSafe, Service, Transaction } from "@/types/database";
+import { giftSentEmail, moneyReceivedEmail, moneySentEmail, paymentReceiptEmail } from "@/lib/email/templates";
+import type { ApiModuleSafe, P2pTransfer, Service, Transaction } from "@/types/database";
 
 const FRIENDLY_ERRORS: Record<string, string> = {
   insufficient_funds: "Your wallet balance is too low for this payment. Top up and try again.",
   not_authenticated: "Please log in again to continue.",
   wallet_not_found: "We couldn't find your wallet. Please contact support.",
   invalid_amount: "Enter a valid amount.",
+  recipient_not_found: "No TopMe account found with that phone number.",
+  cannot_pay_self: "You can't send money to your own number.",
 };
 
 function friendlyError(message: string) {
@@ -156,4 +159,54 @@ export async function sendGiftVoucher(receiverPhone: string, amount: number, sen
   }
 
   return data;
+}
+
+// Looks up who a phone number belongs to before money moves, so the sender
+// can confirm "Sending to <name>" rather than typing blind.
+export async function lookupRecipient(phone: string) {
+  return findProfileByPhone(phone.trim());
+}
+
+// Instant wallet-to-wallet transfer between two existing TopMe accounts
+// (unlike a gift voucher, this requires the receiver to already have an
+// account — resolved by phone number via the wallet_transfer RPC).
+export async function sendMoney(receiverPhone: string, amount: number, note?: string, kind: "transfer" | "red_packet" = "transfer") {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error(FRIENDLY_ERRORS.not_authenticated);
+
+  const { data, error } = await supabase.rpc("wallet_transfer", {
+    p_receiver_phone: receiverPhone,
+    p_amount: amount,
+    p_note: note ?? null,
+    p_kind: kind,
+  });
+  if (error) throw new Error(friendlyError(error.message));
+
+  const transfer = data as P2pTransfer;
+
+  revalidatePath("/wallet");
+  revalidatePath("/home");
+
+  // Receiver's email isn't visible under normal RLS from the sender's session
+  // (profiles are owner-select-only) — the admin client bypasses that only
+  // to send a courtesy notification, never exposing it back to the client.
+  const admin = createAdminClient();
+  const [{ data: senderProfile }, { data: receiverProfile }] = await Promise.all([
+    supabase.from("profiles").select("full_name").eq("id", user.id).single(),
+    admin.from("profiles").select("email, full_name").eq("id", transfer.receiver_id).single(),
+  ]);
+
+  if (user.email) {
+    const { subject, html } = moneySentEmail({ amount, receiverName: receiverProfile?.full_name || receiverPhone, kind });
+    void sendEmail({ to: user.email, subject, html });
+  }
+  if (receiverProfile?.email) {
+    const { subject, html } = moneyReceivedEmail({ amount, senderName: senderProfile?.full_name || "A TopMe user", kind });
+    void sendEmail({ to: receiverProfile.email, subject, html });
+  }
+
+  return transfer;
 }

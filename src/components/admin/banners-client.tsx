@@ -44,7 +44,7 @@ function BannerRow({ banner }: { banner: PromoBanner }) {
       )}
       <div
         className={`toggle ${banner.is_active ? "on" : ""} tap`}
-        title={banner.is_active ? "Active — shown on Home" : "Inactive — hidden from Home"}
+        title={banner.is_active ? "Active: shown on Home" : "Inactive: hidden from Home"}
         onClick={() => startTransition(async () => { await togglePromoBannerActive(banner.id, banner.is_active); router.refresh(); })}
       >
         <div className="knob" />
@@ -99,7 +99,7 @@ export function BannersClient({ banners }: { banners: PromoBanner[] }) {
 
       <div className="card" style={{ overflow: "hidden" }}>
         {banners.length === 0 ? (
-          <div className="card-pad muted">No banners yet — add one above.</div>
+          <div className="card-pad muted">No banners yet. Add one above.</div>
         ) : (
           banners.map((b) => <BannerRow key={b.id} banner={b} />)
         )}

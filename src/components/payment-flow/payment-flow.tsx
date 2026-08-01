@@ -713,7 +713,7 @@ function ReviewStep({
       {isGuest && (
         <div className="mt-3">
           <div className="muted mb-2" style={{ fontSize: 13 }}>
-            No account needed — pay directly and we&apos;ll email your receipt.
+            No account needed. Pay directly and we&apos;ll email your receipt.
           </div>
           <label className="field-label">Email for receipt</label>
           <input
@@ -863,9 +863,9 @@ function ReceiptStep({
           style={{ flex: 1 }}
           onClick={() => {
             if (navigator.share) {
-              navigator.share({ title: "TopMe receipt", text: `TopMe payment ${result.reference} — $${result.amount.toFixed(2)}` }).catch(() => {});
+              navigator.share({ title: "TopMe receipt", text: `TopMe payment ${result.reference}: $${result.amount.toFixed(2)}` }).catch(() => {});
             } else {
-              navigator.clipboard.writeText(`TopMe payment ${result.reference} — $${result.amount.toFixed(2)}`);
+              navigator.clipboard.writeText(`TopMe payment ${result.reference}: $${result.amount.toFixed(2)}`);
             }
           }}
         >

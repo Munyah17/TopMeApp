@@ -10,6 +10,8 @@ const LEDGER_LABEL: Record<string, string> = {
   refund: "Refund",
   gift_send: "Gift voucher sent",
   gift_redeem: "Gift voucher redeemed",
+  p2p_send: "Money sent",
+  p2p_receive: "Money received",
 };
 
 export default async function WalletPage() {
@@ -29,9 +31,17 @@ export default async function WalletPage() {
               Available balance
             </div>
             <div style={{ color: "#fff", fontSize: 32, fontWeight: 800, marginTop: 4 }}>{fmt(wallet?.balance ?? 0)}</div>
-            <Link href="/pay/gift" className="btn wallet-action-btn mt-3" style={{ background: "rgba(255,255,255,0.12)", color: "#fff", textDecoration: "none", display: "inline-flex" }}>
-              <Icon name="gift" size={15} stroke={2.4} /> <span>Send a Gift</span>
-            </Link>
+            <div className="row gap-2 mt-3" style={{ flexWrap: "wrap" }}>
+              <Link href="/pay/send" className="btn wallet-action-btn" style={{ background: "rgba(255,255,255,0.12)", color: "#fff", textDecoration: "none", display: "inline-flex" }}>
+                <Icon name="arrowUpR" size={15} stroke={2.4} /> <span>Send Money</span>
+              </Link>
+              <Link href="/pay/receive" className="btn wallet-action-btn" style={{ background: "rgba(255,255,255,0.12)", color: "#fff", textDecoration: "none", display: "inline-flex" }}>
+                <Icon name="qr" size={15} stroke={2.4} /> <span>Receive</span>
+              </Link>
+              <Link href="/pay/gift" className="btn wallet-action-btn" style={{ background: "rgba(255,255,255,0.12)", color: "#fff", textDecoration: "none", display: "inline-flex" }}>
+                <Icon name="gift" size={15} stroke={2.4} /> <span>Send a Gift</span>
+              </Link>
+            </div>
           </div>
 
           <div className="row between mt-3 mb-2">

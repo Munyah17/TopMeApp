@@ -9,7 +9,7 @@ const WRAP_OPEN = `
 const WRAP_CLOSE = `
     </div>
     <div style="padding:18px 28px;background:#F8FAFC;border-top:1px solid #E7ECF3;">
-      <p style="margin:0;font-size:12px;color:#94A3B8;">TopMe · Top up. Pay easy. This is an automated notification — please don't reply to this email.</p>
+      <p style="margin:0;font-size:12px;color:#94A3B8;">TopMe · Top up. Pay easy. This is an automated notification, so please don't reply to this email.</p>
     </div>
   </div>
 </div>`;
@@ -29,7 +29,7 @@ export function paymentReceiptEmail(opts: {
   date: string;
 }) {
   return {
-    subject: `Payment successful — $${opts.amount.toFixed(2)} · ${opts.serviceName}`,
+    subject: `Payment successful: $${opts.amount.toFixed(2)} for ${opts.serviceName}`,
     html: `${WRAP_OPEN}
       <h2 style="margin:0 0 4px;font-size:18px;color:#111827;">Payment successful</h2>
       <p style="margin:0 0 20px;font-size:13.5px;color:#64748B;">Your ${opts.serviceName} payment went through.</p>
@@ -46,7 +46,7 @@ export function paymentReceiptEmail(opts: {
 
 export function topupConfirmationEmail(opts: { amount: number; provider: string; reference: string; balance: number }) {
   return {
-    subject: `Wallet top up successful — $${opts.amount.toFixed(2)}`,
+    subject: `Wallet top up successful: $${opts.amount.toFixed(2)}`,
     html: `${WRAP_OPEN}
       <h2 style="margin:0 0 4px;font-size:18px;color:#111827;">Wallet topped up</h2>
       <p style="margin:0 0 20px;font-size:13.5px;color:#64748B;">Your TopMe wallet has been credited.</p>
@@ -62,7 +62,7 @@ export function topupConfirmationEmail(opts: { amount: number; provider: string;
 
 export function giftSentEmail(opts: { amount: number; receiverPhone: string; code: string }) {
   return {
-    subject: `Gift voucher sent — $${opts.amount.toFixed(2)}`,
+    subject: `Gift voucher sent: $${opts.amount.toFixed(2)}`,
     html: `${WRAP_OPEN}
       <h2 style="margin:0 0 4px;font-size:18px;color:#111827;">Gift voucher sent</h2>
       <p style="margin:0 0 20px;font-size:13.5px;color:#64748B;">Share this code with ${opts.receiverPhone} so they can redeem it.</p>
@@ -77,7 +77,7 @@ export function giftSentEmail(opts: { amount: number; receiverPhone: string; cod
 
 export function giftRedeemedEmail(opts: { amount: number; code: string; balance: number }) {
   return {
-    subject: `Gift voucher redeemed — $${opts.amount.toFixed(2)}`,
+    subject: `Gift voucher redeemed: $${opts.amount.toFixed(2)}`,
     html: `${WRAP_OPEN}
       <h2 style="margin:0 0 4px;font-size:18px;color:#111827;">Gift voucher redeemed</h2>
       <p style="margin:0 0 20px;font-size:13.5px;color:#64748B;">The voucher has been added to your wallet.</p>
@@ -90,19 +90,49 @@ export function giftRedeemedEmail(opts: { amount: number; code: string; balance:
   };
 }
 
+export function moneySentEmail(opts: { amount: number; receiverName: string; kind: "transfer" | "red_packet" }) {
+  const label = opts.kind === "red_packet" ? "Red packet" : "Money";
+  return {
+    subject: `${label} sent: $${opts.amount.toFixed(2)}`,
+    html: `${WRAP_OPEN}
+      <h2 style="margin:0 0 4px;font-size:18px;color:#111827;">${label} sent</h2>
+      <p style="margin:0 0 20px;font-size:13.5px;color:#64748B;">Your transfer to ${opts.receiverName} went through instantly.</p>
+      <table width="100%" cellpadding="0" cellspacing="0">
+        ${row("Amount", `$${opts.amount.toFixed(2)}`)}
+        ${row("Sent to", opts.receiverName)}
+      </table>
+    ${WRAP_CLOSE}`,
+  };
+}
+
+export function moneyReceivedEmail(opts: { amount: number; senderName: string; kind: "transfer" | "red_packet" }) {
+  const label = opts.kind === "red_packet" ? "red packet" : "money transfer";
+  return {
+    subject: `You received $${opts.amount.toFixed(2)} on TopMe`,
+    html: `${WRAP_OPEN}
+      <h2 style="margin:0 0 4px;font-size:18px;color:#111827;">You've been sent a ${label}!</h2>
+      <p style="margin:0 0 20px;font-size:13.5px;color:#64748B;">${opts.senderName} sent you money, and it's already in your TopMe wallet.</p>
+      <table width="100%" cellpadding="0" cellspacing="0">
+        ${row("Amount", `$${opts.amount.toFixed(2)}`)}
+        ${row("From", opts.senderName)}
+      </table>
+    ${WRAP_CLOSE}`,
+  };
+}
+
 export function topupFailedEmail(opts: { amount: number; provider: string }) {
   return {
     subject: `Wallet top up didn't go through`,
     html: `${WRAP_OPEN}
       <h2 style="margin:0 0 4px;font-size:18px;color:#EF4444;">Top up didn't go through</h2>
-      <p style="margin:0 0 20px;font-size:13.5px;color:#64748B;">Your $${opts.amount.toFixed(2)} top up via ${opts.provider} was not completed. Your wallet was not charged — you can try again anytime.</p>
+      <p style="margin:0 0 20px;font-size:13.5px;color:#64748B;">Your $${opts.amount.toFixed(2)} top up via ${opts.provider} wasn't completed. Your wallet wasn't charged, so you can try again anytime.</p>
     ${WRAP_CLOSE}`,
   };
 }
 
 export function paymentFailedEmail(opts: { serviceName: string; amount: number; reason: string }) {
   return {
-    subject: `Payment failed — ${opts.serviceName}`,
+    subject: `Payment failed: ${opts.serviceName}`,
     html: `${WRAP_OPEN}
       <h2 style="margin:0 0 4px;font-size:18px;color:#EF4444;">Payment failed</h2>
       <p style="margin:0 0 20px;font-size:13.5px;color:#64748B;">Your $${opts.amount.toFixed(2)} payment for ${opts.serviceName} couldn't be completed. ${opts.reason}</p>

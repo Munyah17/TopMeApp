@@ -7,6 +7,7 @@ import type {
   Favorite,
   Network,
   Profile,
+  ProfileLookup,
   PromoBanner,
   Service,
   ServiceCategory,
@@ -140,6 +141,19 @@ export async function getWalletLedger(userId: string, limit = 10) {
   return (data as import("@/types/database").WalletLedgerRow[]) ?? [];
 }
 
+// Admin/superadmin-only listing of customer accounts (RLS's profiles_select_admin
+// policy is what actually gates this — a non-staff caller just gets their own row back).
+export async function getAllProfiles(search?: string): Promise<Profile[]> {
+  const supabase = await createClient();
+  let query = supabase.from("profiles").select("*").order("created_at", { ascending: false }).limit(200);
+  if (search) {
+    const term = search.trim().replace(/[%,]/g, "");
+    query = query.or(`full_name.ilike.%${term}%,phone.ilike.%${term}%,email.ilike.%${term}%`);
+  }
+  const { data } = await query;
+  return (data as Profile[]) ?? [];
+}
+
 export async function getBeneficiaries(userId: string): Promise<Beneficiary[]> {
   const supabase = await createClient();
   const { data } = await supabase
@@ -148,6 +162,17 @@ export async function getBeneficiaries(userId: string): Promise<Beneficiary[]> {
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
   return (data as Beneficiary[]) ?? [];
+}
+
+// Resolves a phone number to the minimal public profile info needed for a
+// "Sending to <name>" confirmation, via the find_profile_by_phone RPC (a
+// security definer function — profiles' own RLS is owner-only, so a plain
+// select can't see another user's row).
+export async function findProfileByPhone(phone: string): Promise<ProfileLookup | null> {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("find_profile_by_phone", { p_phone: phone });
+  const row = (data as ProfileLookup[] | null)?.[0];
+  return row ?? null;
 }
 
 export function shuffle<T>(arr: T[]): T[] {

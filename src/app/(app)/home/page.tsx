@@ -46,28 +46,28 @@ export default async function HomePage() {
               style={{
                 background: "linear-gradient(120deg, var(--navy) 0%, #16324f 60%, #0f4c3a 130%)",
                 borderRadius: 20,
-                padding: 24,
+                padding: "20px 22px",
                 position: "relative",
                 overflow: "hidden",
               }}
             >
               <div style={{ position: "absolute", right: -30, top: -30, width: 130, height: 130, borderRadius: "50%", background: "rgba(0,200,83,0.18)" }} />
               <div style={{ position: "absolute", right: 30, bottom: -40, width: 90, height: 90, borderRadius: "50%", background: "rgba(56,189,248,0.14)" }} />
-              <div className="eyebrow" style={{ color: "#7CF2AE", position: "relative", textAlign: "center" }}>
+              <div className="eyebrow" style={{ color: "#7CF2AE", position: "relative" }}>
                 New
               </div>
-              <div style={{ color: "#fff", fontWeight: 800, fontSize: 23, marginTop: 6, position: "relative", textAlign: "center" }}>
+              <div style={{ color: "#fff", fontWeight: 800, fontSize: 22, marginTop: 6, position: "relative" }}>
                 Send a Gift Voucher
               </div>
-              <div className="muted" style={{ color: "rgba(255,255,255,0.65)", marginTop: 8, fontSize: 14, position: "relative", textAlign: "center", maxWidth: 340, marginLeft: "auto", marginRight: "auto" }}>
-                Top up anyone&apos;s TopMe wallet in seconds — perfect for birthdays, school fees
+              <div className="muted" style={{ color: "rgba(255,255,255,0.65)", marginTop: 8, fontSize: 13.5, position: "relative", maxWidth: 460 }}>
+                Top up anyone&apos;s TopMe wallet in seconds. Perfect for birthdays, school fees,
                 or just helping a friend out. No account needed on their end, just their number.
               </div>
-              <div className="row gap-2 mt-4" style={{ position: "relative", justifyContent: "center" }}>
+              <div className="row gap-2 mt-4" style={{ position: "relative", flexWrap: "wrap" }}>
                 <Link
                   href={profile ? "/wallet" : "/login"}
                   className="btn btn-primary tap"
-                  style={{ width: 140, height: 44, fontSize: 14, padding: "0 14px", gap: 8, textDecoration: "none" }}
+                  style={{ flex: "1 1 120px", height: 44, fontSize: 13.5, padding: "0 12px", gap: 7, textDecoration: "none" }}
                 >
                   <Icon name="wallet" size={16} stroke={2} /> Top Up
                 </Link>
@@ -75,18 +75,35 @@ export default async function HomePage() {
                   href={profile ? "/pay/gift" : "/login"}
                   className="btn tap"
                   style={{
-                    width: 140,
+                    flex: "1 1 120px",
                     height: 44,
-                    fontSize: 14,
-                    padding: "0 14px",
-                    gap: 8,
+                    fontSize: 13.5,
+                    padding: "0 12px",
+                    gap: 7,
                     textDecoration: "none",
                     background: "rgba(255,255,255,0.14)",
                     color: "#fff",
                     border: "1px solid rgba(255,255,255,0.24)",
                   }}
                 >
-                  <Icon name="gift" size={16} stroke={2} /> Send a Gift
+                  <Icon name="gift" size={16} stroke={2} /> Gift Voucher
+                </Link>
+                <Link
+                  href={profile ? "/pay/send?kind=red_packet" : "/login"}
+                  className="btn tap"
+                  style={{
+                    flex: "1 1 120px",
+                    height: 44,
+                    fontSize: 13.5,
+                    padding: "0 12px",
+                    gap: 7,
+                    textDecoration: "none",
+                    background: "rgba(255,255,255,0.14)",
+                    color: "#fff",
+                    border: "1px solid rgba(255,255,255,0.24)",
+                  }}
+                >
+                  <Icon name="packet" size={16} stroke={2} /> Red Packet
                 </Link>
               </div>
             </div>
@@ -162,7 +179,7 @@ export default async function HomePage() {
           {!profile ? (
             <GuestRecent />
           ) : recent.length === 0 ? (
-            <div className="card card-pad muted">No transactions yet — your recent activity will show up here.</div>
+            <div className="card card-pad muted">No transactions yet. Your recent activity will show up here.</div>
           ) : (
             <div className="card" style={{ overflow: "hidden" }}>
               {recent.map((t, i) => {

@@ -49,7 +49,7 @@ function ServiceRow({ service, categoryColor, categories }: { service: Service; 
       )}
       <div
         className={`toggle ${service.is_active ? "on" : ""} tap`}
-        title={service.is_active ? "Active — visible to customers" : "Inactive — hidden from customers"}
+        title={service.is_active ? "Active: visible to customers" : "Inactive: hidden from customers"}
         onClick={() => startTransition(async () => { await toggleServiceActive(service.id, service.is_active); router.refresh(); })}
       >
         <div className="knob" />

@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { encryptSecret } from "@/lib/crypto";
@@ -13,6 +14,36 @@ async function requireSuperadmin() {
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
   if (profile?.role !== "superadmin") throw new Error("forbidden");
   return { supabase, user };
+}
+
+async function requireStaff() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("not_authenticated");
+  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+  if (profile?.role !== "admin" && profile?.role !== "superadmin") throw new Error("forbidden");
+  return { supabase, user };
+}
+
+// Uploads a product/service logo to the public "product-images" storage
+// bucket and returns its public URL, ready to save on the service row.
+export async function uploadServiceImage(formData: FormData) {
+  await requireSuperadmin();
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) throw new Error("Choose an image to upload.");
+  if (!file.type.startsWith("image/")) throw new Error("Please choose an image file.");
+  if (file.size > 5 * 1024 * 1024) throw new Error("Images must be under 5MB.");
+
+  const admin = createAdminClient();
+  const ext = file.name.split(".").pop()?.toLowerCase() || "png";
+  const path = `services/${randomUUID()}.${ext}`;
+  const { error } = await admin.storage.from("product-images").upload(path, file, { contentType: file.type });
+  if (error) throw new Error(error.message);
+
+  const { data } = admin.storage.from("product-images").getPublicUrl(path);
+  return data.publicUrl;
 }
 
 export async function createApiModule(input: {
@@ -78,6 +109,28 @@ export async function togglePermission(memberId: string, permission: string, cur
     : [...currentPermissions, permission];
   await admin.from("team_members").update({ permissions: next }).eq("id", memberId);
   revalidatePath("/admin/team");
+}
+
+// Suspends or reactivates a customer account: blocks sign-in via Supabase
+// Auth's own ban_duration (a 100-year ban reads as "suspended", "none" lifts
+// it) and mirrors the flag onto profiles so the admin list can show it
+// without a separate auth.admin.listUsers() call per row.
+export async function toggleAccountSuspension(userId: string, currentlySuspended: boolean) {
+  const { user: actingUser } = await requireStaff();
+  if (userId === actingUser.id) throw new Error("You can't suspend your own account.");
+
+  const admin = createAdminClient();
+  const { data: target } = await admin.from("profiles").select("role").eq("id", userId).single();
+  if (target?.role === "superadmin") throw new Error("Super Admin accounts can't be suspended.");
+
+  const nextSuspended = !currentlySuspended;
+  const { error: authError } = await admin.auth.admin.updateUserById(userId, {
+    ban_duration: nextSuspended ? "876000h" : "none",
+  });
+  if (authError) throw new Error(authError.message);
+
+  await admin.from("profiles").update({ is_suspended: nextSuspended }).eq("id", userId);
+  revalidatePath("/admin/customers");
 }
 
 function revalidateCatalog() {
@@ -212,7 +265,7 @@ export async function deleteService(id: string) {
   if (error) {
     throw new Error(
       error.code === "23503"
-        ? "This service has transaction history and can't be deleted — deactivate it instead."
+        ? "This service has transaction history and can't be deleted. Deactivate it instead."
         : error.message
     );
   }

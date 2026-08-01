@@ -40,7 +40,7 @@ export function BannerForm({ existing, onDone }: { existing?: PromoBanner; onDon
         />
       </div>
       <div>
-        <label className="field-label">Link URL (optional — where tapping the banner goes)</label>
+        <label className="field-label">Link URL (where tapping the banner goes, optional)</label>
         <input
           className="field"
           placeholder="/services/gadgets"
