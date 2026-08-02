@@ -60,8 +60,9 @@ export default async function HomePage() {
                 Send a Gift Voucher
               </div>
               <div className="muted" style={{ color: "rgba(255,255,255,0.65)", marginTop: 8, fontSize: 13.5, position: "relative", maxWidth: 460 }}>
-                Top up anyone&apos;s TopMe wallet in seconds. Perfect for birthdays, school fees,
-                or just helping a friend out. No account needed on their end, just their number.
+                Send money straight to your family and friends&apos; TopMe wallets in seconds.
+                Perfect for birthdays, school fees, or just helping someone out. They&apos;ll
+                need a TopMe account to receive it, so make sure they&apos;re signed up.
               </div>
               <div className="row gap-2 mt-4" style={{ position: "relative", flexWrap: "wrap" }}>
                 <Link

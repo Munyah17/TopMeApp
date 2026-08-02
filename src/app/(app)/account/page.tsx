@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { AuthRequired } from "@/components/auth-required";
 import { Icon } from "@/components/icons";
 import { NotificationsToggle } from "@/components/wallet/notifications-toggle";
 import { signOut } from "@/lib/actions/account";
@@ -20,7 +21,17 @@ function initials(name: string | null) {
 
 export default async function AccountPage() {
   const profile = await getCurrentProfile();
-  if (!profile) return null;
+  if (!profile) {
+    return (
+      <div className="px content-narrow" style={{ paddingTop: 6 }}>
+        <h2 style={{ fontSize: 20 }}>Account</h2>
+        <AuthRequired
+          title="Log in to view your account"
+          message="Manage your profile, wallet, beneficiaries, and settings once you're signed in."
+        />
+      </div>
+    );
+  }
   const beneficiaries = await getBeneficiaries(profile.id);
 
   const roleColor = profile.role === "superadmin" ? "#8B5CF6" : profile.role === "admin" ? "#38BDF8" : "var(--green)";
@@ -92,6 +103,22 @@ export default async function AccountPage() {
           </div>
           <NotificationsToggle initial={profile.notifications_enabled} />
         </div>
+      </div>
+
+      <div className="eyebrow mt-3 mb-1" style={{ paddingLeft: 2 }}>
+        Wallet
+      </div>
+      <div className="card" style={{ overflow: "hidden" }}>
+        <Link href="/wallet" className="row gap-2 tap" style={{ padding: "14px 16px", textDecoration: "none" }}>
+          <div className="ibadge round" style={{ width: 38, height: 38, background: "var(--green-50)", color: "var(--green)" }}>
+            <Icon name="wallet" size={17} stroke={1.8} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 700, fontSize: 13.5, color: "var(--text)" }}>Wallet & Top Up</div>
+            <div className="muted">Balance, top up, send money</div>
+          </div>
+          <Icon name="chevronR" size={17} stroke={2} />
+        </Link>
       </div>
 
       <div className="eyebrow mt-3 mb-1" style={{ paddingLeft: 2 }}>

@@ -30,9 +30,11 @@ export async function updateSession(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
 
-  // /home, /services and /pay are browsable as a guest — login is a choice, not
-  // a gate. Only routes tied to an actual account stay protected.
-  const protectedPrefixes = ["/wallet", "/history", "/account", "/admin"];
+  // Only /admin hard-redirects at the edge. /wallet, /history and /account are
+  // guest-reachable too now — each page renders its own in-shell "log in"
+  // prompt (or, for /history, cached guest activity) so the app shell and its
+  // navigation stay visible instead of bouncing the visitor to a bare /login.
+  const protectedPrefixes = ["/admin"];
   const authPrefixes = ["/login", "/signup"];
 
   const isProtected = protectedPrefixes.some((p) => pathname.startsWith(p));

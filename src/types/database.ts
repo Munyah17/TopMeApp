@@ -173,6 +173,28 @@ export interface ProfileLookup {
   phone: string | null;
 }
 
+export interface Conversation {
+  id: string;
+  user_a: string;
+  user_b: string;
+  last_message: string | null;
+  last_message_at: string;
+  created_at: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  kind: "text" | "image" | "p2p_transfer";
+  body: string | null;
+  image_url: string | null;
+  p2p_transfer_id: string | null;
+  created_at: string;
+  // Joined in when kind === "p2p_transfer".
+  p2p_transfer?: P2pTransfer | null;
+}
+
 export interface TopupIntent {
   id: string;
   user_id: string;

@@ -104,6 +104,7 @@ export async function payService(input: PayServiceInput) {
       provider: provider.name,
       providerRef: fulfillmentResult.providerRef ?? null,
       message: fulfillmentResult.message ?? null,
+      ...(fulfillmentResult.extra ?? {}),
     },
   });
 

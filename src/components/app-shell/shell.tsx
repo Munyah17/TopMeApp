@@ -10,7 +10,7 @@ import type { Profile } from "@/types/database";
 const NAVTABS = [
   { id: "home", href: "/home", label: "Home", icon: "home" },
   { id: "services", href: "/services", label: "Services", icon: "grid" },
-  { id: "wallet", href: "/wallet", label: "Wallet", icon: "wallet" },
+  { id: "chat", href: "/chat", label: "Chat", icon: "chat" },
   { id: "history", href: "/history", label: "History", icon: "clock" },
   { id: "account", href: "/account", label: "Account", icon: "user" },
 ];
@@ -25,7 +25,15 @@ function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
-export function AppShell({ profile, children }: { profile: Profile | null; children: React.ReactNode }) {
+export function AppShell({
+  profile,
+  unreadChatCount = 0,
+  children,
+}: {
+  profile: Profile | null;
+  unreadChatCount?: number;
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const showFab = pathname === "/home";
@@ -42,9 +50,23 @@ export function AppShell({ profile, children }: { profile: Profile | null; child
 
             <nav className="header-nav">
               {NAVTABS.map((t) => (
-                <Link key={t.id} href={t.href} className={`header-nav-item ${isActive(pathname, t.href) ? "active" : ""}`}>
+                <Link key={t.id} href={t.href} className={`header-nav-item ${isActive(pathname, t.href) ? "active" : ""}`} style={{ position: "relative" }}>
                   <Icon name={t.icon} size={17} stroke={2} />
                   <span>{t.label}</span>
+                  {t.id === "chat" && unreadChatCount > 0 && (
+                    <span
+                      style={{
+                        position: "absolute",
+                        top: 5,
+                        right: 6,
+                        width: 6,
+                        height: 6,
+                        background: "var(--error)",
+                        borderRadius: "50%",
+                        border: "1.5px solid var(--surface)",
+                      }}
+                    />
+                  )}
                 </Link>
               ))}
             </nav>
@@ -103,7 +125,23 @@ export function AppShell({ profile, children }: { profile: Profile | null; child
         <nav className="bottom-nav">
           {NAVTABS.map((t) => (
             <Link key={t.id} href={t.href} className={`nav-item ${isActive(pathname, t.href) ? "active" : ""}`}>
-              <Icon name={t.icon} size={22} stroke={2} />
+              <span style={{ position: "relative", display: "inline-flex" }}>
+                <Icon name={t.icon} size={22} stroke={2} />
+                {t.id === "chat" && unreadChatCount > 0 && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: -1,
+                      right: -3,
+                      width: 7,
+                      height: 7,
+                      background: "var(--error)",
+                      borderRadius: "50%",
+                      border: "1.5px solid var(--surface)",
+                    }}
+                  />
+                )}
+              </span>
               <span className="nav-label">{t.label}</span>
             </Link>
           ))}

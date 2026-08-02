@@ -843,6 +843,14 @@ function ReceiptStep({
         </div>
         <div className="dashed" />
         <ReviewRow label="Reference" value={result.reference} />
+        {service.shows_token && Array.isArray(result.receipt?.token_pieces) && result.receipt.token_pieces.length > 0 && (
+          <>
+            <ReviewRow label="Token" value={(result.receipt.token_pieces as string[]).join(" ")} />
+            {typeof result.receipt.units === "number" && (
+              <ReviewRow label="Units" value={`${result.receipt.units} ${(result.receipt.unit as string) ?? "kWh"}`} />
+            )}
+          </>
+        )}
         <ReviewRow label="Service" value={service.name} />
         <ReviewRow label={service.id_label} value={identifier || "—"} />
         <ReviewRow

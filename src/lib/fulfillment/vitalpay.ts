@@ -68,6 +68,10 @@ const BILLERS: Record<string, { billerCode: string; billType: string }> = {
   dstv: { billerCode: "dstv_zw", billType: "tv" },
   zol: { billerCode: "zol_zw", billType: "internet" },
   telone: { billerCode: "telone_zw", billType: "telecom" },
+  // Bulawayo is the only one of the 26 councils in our catalog VitalPay
+  // actually carries a biller for (confirmed 2026-08-01) — the rest stay on
+  // the simulated provider until VitalPay (or another aggregator) adds them.
+  bulawayo_city_council: { billerCode: "bulawayo_city_zw", billType: "municipal" },
 };
 
 function toPendingOrFulfilled(status: string, reference: string): FulfillmentResult {
@@ -110,14 +114,41 @@ for (const [serviceId, { billerCode, billType }] of Object.entries(BILLERS)) {
   };
 }
 
+// Electricity is its own category (not /bills/pay): confirmed live to cover
+// ZW/ZESA (2026-08-01). Often resolves synchronously with the token in the
+// response, unlike airtime/bills which are always async-via-webhook. The
+// docs show a `token_pieces` array, but the real sandbox response returns a
+// single `token` string (confirmed by an actual test call) — handle both
+// shapes rather than trust the docs' example literally.
+SERVICE_HANDLERS.zesa = async (input) => {
+  const data = await vitalpayRequest<{
+    reference: string;
+    status: string;
+    token?: string;
+    token_pieces?: string[];
+    units?: number;
+    unit?: string;
+  }>("/electricity/purchase", {
+    method: "POST",
+    body: { meter_number: input.recipient, amount: input.amount, currency: "USD", country: "ZW", reference: input.transactionId },
+  });
+  const result = toPendingOrFulfilled(data.status, data.reference);
+  const tokenPieces = data.token_pieces?.length ? data.token_pieces : data.token ? [data.token] : [];
+  if (tokenPieces.length) {
+    result.extra = { token_pieces: tokenPieces, units: data.units, unit: data.unit };
+    result.message = `Token: ${tokenPieces.join(" ")}${data.units ? ` · ${data.units} ${data.unit ?? "kWh"}` : ""}`;
+  }
+  return result;
+};
+
 async function notMapped(serviceId: string): Promise<FulfillmentResult> {
   throw new Error(`No VitalPay endpoint mapped for service "${serviceId}" — see vitalpayCoverageNotes().`);
 }
 
 export class VitalPayProvider implements FulfillmentProvider {
   readonly name = "vitalpay";
-  // Airtime (Econet/NetOne only) + the 3 confirmed billers. Everything else
-  // in the catalog is routed elsewhere — see VITALPAY_GAPS below.
+  // Airtime (Econet/NetOne), the 4 confirmed billers, and ZESA electricity.
+  // Everything else in the catalog is routed elsewhere — see VITALPAY_GAPS below.
   readonly coverage = Object.keys(SERVICE_HANDLERS);
 
   async fulfil(input: FulfillmentInput): Promise<FulfillmentResult> {
@@ -129,17 +160,17 @@ export class VitalPayProvider implements FulfillmentProvider {
 }
 
 /**
- * Confirmed by calling the live sandbox catalog (2026-07-25) — not guessed.
- * Services in our catalog that VitalPay does NOT currently cover, and why.
- * Kept here (rather than only in chat/memory) so it stays visible in the
- * codebase for whoever wires up the next provider.
+ * Confirmed by calling the live sandbox catalog (2026-08-01, re-checked
+ * against VitalPay's full API docs) — not guessed. Services in our catalog
+ * that VitalPay does NOT currently cover, and why. Kept here (rather than
+ * only in chat/memory) so it stays visible in the codebase for whoever wires
+ * up the next provider.
  */
 export const VITALPAY_GAPS = {
-  data: "GET /data/operators?country_iso=ZW returned zero operators — no Zimbabwean data bundle catalog yet.",
+  data: "GET /data/operators?country_iso=ZW returned zero operators — no Zimbabwean data bundle catalog yet, despite the endpoint existing generally.",
   telecel: "Not in GET /airtime/operators?country_iso=ZW (only econet_zw, netone_zw) — Telecel airtime unmapped.",
-  zesa: "The 'electricity' API category is enabled on this account but no endpoint reference was supplied yet (docs jumped from Bill Payments straight to Gift Cards) — need the Electricity page from VitalPay before this can be wired up.",
-  council: "Only bulawayo_city_zw exists in GET /bills/billers — our catalog's Council Bills service is generic (any municipality), so it's left unmapped until either more councils are added or the UI lets the customer pick a specific council.",
-  schoolfees: "No 'education' billers appear in GET /bills/billers despite the category description mentioning education — VitalPay's bills API is pre-registered billers, not arbitrary institutions, so 'pay any school' doesn't fit as-is.",
+  council: "Of the 26 councils/municipalities/town councils in our catalog, only bulawayo_city_zw exists in GET /bills/billers (wired up as bulawayo_city_council) — the other 25 stay simulated until VitalPay adds more.",
+  schoolfees: "No education-type billers appear in GET /bills/billers despite the bills category description mentioning education generally — none of our 5 university services (msu/uz/nust/cut/hit) map to a real biller.",
   netflix_spotify_vouchers: "GET /gift-cards/products?country=ZW only returns 3 generic 'Sandbox ...' placeholder SKUs, not real branded cards (no Netflix/Spotify) — needs VitalPay to confirm real ZW gift card SKUs, or another provider.",
   govfees: "No ZIMRA/national government biller in the catalog — outside VitalPay's bills/VAS scope.",
   fuel: "No fuel voucher product in airtime, bills, or gift-card catalogs.",

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AuthRequired } from "@/components/auth-required";
 import { Icon } from "@/components/icons";
 import { TopupPanel } from "@/components/wallet/topup-panel";
 import { fmt } from "@/lib/data/catalog-helpers";
@@ -16,7 +17,17 @@ const LEDGER_LABEL: Record<string, string> = {
 
 export default async function WalletPage() {
   const profile = await getCurrentProfile();
-  if (!profile) return null;
+  if (!profile) {
+    return (
+      <div className="px content-wrap" style={{ paddingTop: 6 }}>
+        <h2 style={{ fontSize: 20 }}>Wallet</h2>
+        <AuthRequired
+          title="Log in to view your wallet"
+          message="Top up, send money, and track your balance once you're signed in."
+        />
+      </div>
+    );
+  }
   const [wallet, ledger] = await Promise.all([getWallet(profile.id), getWalletLedger(profile.id, 10)]);
 
   return (

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Icon } from "@/components/icons";
+import { GuestHistory } from "@/components/history/guest-history";
 import { fmt } from "@/lib/data/catalog-helpers";
 import { getAllServices, getCurrentProfile, getRecentTransactions } from "@/lib/data/queries";
 import type { Service, Transaction } from "@/types/database";
@@ -23,7 +24,14 @@ export default async function HistoryPage({
 }) {
   const { q = "", filter = "All" } = await searchParams;
   const profile = await getCurrentProfile();
-  if (!profile) return null;
+  if (!profile) {
+    return (
+      <div className="px content-wrap" style={{ paddingTop: 6 }}>
+        <h2 style={{ fontSize: 20 }}>History</h2>
+        <GuestHistory />
+      </div>
+    );
+  }
 
   const [transactions, services] = await Promise.all([getRecentTransactions(profile.id, 200), getAllServices()]);
   const serviceById = new Map(services.map((s) => [s.id, s]));

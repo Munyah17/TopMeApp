@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/app-shell/shell";
+import { getUnreadChatCount } from "@/lib/data/chat-queries";
 import { getCurrentProfile } from "@/lib/data/queries";
 
 // Browsing is open to everyone — login is a choice, not a gate. Routes that
@@ -6,5 +7,10 @@ import { getCurrentProfile } from "@/lib/data/queries";
 // own auth requirement (see src/lib/supabase/middleware.ts + each page).
 export default async function AppGroupLayout({ children }: { children: React.ReactNode }) {
   const profile = await getCurrentProfile();
-  return <AppShell profile={profile}>{children}</AppShell>;
+  const unreadChatCount = profile ? await getUnreadChatCount(profile.id) : 0;
+  return (
+    <AppShell profile={profile} unreadChatCount={unreadChatCount}>
+      {children}
+    </AppShell>
+  );
 }

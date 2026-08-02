@@ -5,7 +5,14 @@ export function Footer() {
         © {new Date().getFullYear()} TopMe. Top up. Pay easy.
       </div>
       <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
-        Developed &amp; Powered By Global Space Web
+        <a
+          href="https://globalspaceweb.co.zw"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ color: "inherit", textDecoration: "none" }}
+        >
+          Developed &amp; Powered By Global Space Web · +263773909307
+        </a>
       </div>
     </footer>
   );
