@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
-import { getFulfillmentProvider } from "@/lib/fulfillment";
+import { getFulfillmentProvider, hasRealCoverage } from "@/lib/fulfillment";
 import { SimulatedProvider } from "@/lib/fulfillment/simulated";
 import { findProfileByPhone } from "@/lib/data/queries";
 import { sendEmail } from "@/lib/email/client";
@@ -16,6 +16,7 @@ const FRIENDLY_ERRORS: Record<string, string> = {
   invalid_amount: "Enter a valid amount.",
   recipient_not_found: "No TopMe account found with that phone number.",
   cannot_pay_self: "You can't send money to your own number.",
+  service_unavailable: "This service isn't available right now. Please check back soon.",
 };
 
 function friendlyError(message: string) {
@@ -57,6 +58,15 @@ export async function payService(input: PayServiceInput) {
   } = await supabase.auth.getUser();
   if (!user) throw new Error(FRIENDLY_ERRORS.not_authenticated);
 
+  // Never debit a wallet for a service with no real provider behind it —
+  // this must run before wallet_pay, not after (see /pay/[serviceId]/page.tsx
+  // for the same check gating the checkout UI itself).
+  const admin = createAdminClient();
+  const { data: activeModules } = await admin.from("api_modules_safe").select("*").eq("status", "active");
+  if (!hasRealCoverage(input.serviceId, (activeModules as ApiModuleSafe[]) ?? [])) {
+    throw new Error(FRIENDLY_ERRORS.service_unavailable);
+  }
+
   const { data: txData, error } = await supabase.rpc("wallet_pay", {
     p_service_id: input.serviceId,
     p_amount: input.amount,
@@ -72,12 +82,9 @@ export async function payService(input: PayServiceInput) {
 
   const tx = txData as Transaction;
 
-  // Resolve fulfillment: first active aggregator that covers this service,
-  // simulated otherwise (see src/lib/fulfillment for the provider registry).
-  const admin = createAdminClient();
-  const { data: apiModules } = await admin.from("api_modules_safe").select("*").eq("status", "active");
-
-  const provider = getFulfillmentProvider(input.serviceId, (apiModules as ApiModuleSafe[]) ?? []);
+  // Resolve fulfillment: first active aggregator that covers this service
+  // (already confirmed to exist by the coverage check above).
+  const provider = getFulfillmentProvider(input.serviceId, (activeModules as ApiModuleSafe[]) ?? []);
   const fulfillmentInput = {
     transactionId: tx.id,
     serviceId: input.serviceId,

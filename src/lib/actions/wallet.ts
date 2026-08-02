@@ -58,7 +58,7 @@ export async function startEcocashTopup(amount: number, phone: string) {
   }
   await supabase
     .from("topup_intents")
-    .update({ meta: { phone, sourceReference: result.sourceReference } })
+    .update({ meta: { phone, endUserId: result.endUserId } })
     .eq("reference", reference);
   return { reference };
 }

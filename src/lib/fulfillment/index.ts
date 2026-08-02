@@ -37,3 +37,23 @@ export function getFulfillmentProvider(serviceId: string, activeModules: ApiModu
   }
   return new SimulatedProvider();
 }
+
+/**
+ * Whether a service has an actual active, working provider behind it right
+ * now — used to decline a purchase upfront ("Temporarily Not Available")
+ * instead of ever letting SimulatedProvider fake a successful outcome for
+ * something we can't really deliver. Deliberately does NOT special-case
+ * providers like InsuranceProvider that register coverage but always throw —
+ * this only trusts what's genuinely marked `active` in `api_modules`, which
+ * is already false for anything without a real integration wired up.
+ */
+export function hasRealCoverage(serviceId: string, activeModules: ApiModuleSafe[]): boolean {
+  for (const apiModule of activeModules) {
+    if (apiModule.status !== "active") continue;
+    const factory = PROVIDER_REGISTRY[apiModule.provider];
+    if (!factory) continue;
+    const provider = factory();
+    if (provider.coverage.includes(serviceId) || provider.coverage.includes("*")) return true;
+  }
+  return false;
+}

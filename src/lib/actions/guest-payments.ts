@@ -1,15 +1,18 @@
 "use server";
 
 import { randomUUID } from "crypto";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { initiatePaynowPayment } from "@/lib/payments/paynow";
 import { createGuestCheckoutSession } from "@/lib/payments/stripe";
 import { initiateEcocashPush } from "@/lib/payments/ecocash";
 import { failGuestCheckout } from "@/lib/payments/guest-checkout";
+import { hasRealCoverage } from "@/lib/fulfillment";
+import type { ApiModuleSafe } from "@/types/database";
 
 const FRIENDLY_ERRORS: Record<string, string> = {
   invalid_amount: "Enter a valid amount.",
   not_found_or_processed: "This payment has already been processed or expired.",
+  service_unavailable: "This service isn't available right now. Please check back soon.",
 };
 
 function friendlyError(message: string) {
@@ -40,6 +43,14 @@ export async function startGuestCheckout(input: StartGuestCheckoutInput) {
   if (!input.guestEmail?.trim()) throw new Error("Enter your email so we can send your receipt.");
   if (input.gateway === "ecocash" && !input.guestPhone?.trim()) {
     throw new Error("Enter your EcoCash number.");
+  }
+
+  // Never take a real card/mobile-money payment for a service with no
+  // working provider behind it.
+  const admin = createAdminClient();
+  const { data: activeModules } = await admin.from("api_modules_safe").select("*").eq("status", "active");
+  if (!hasRealCoverage(input.serviceId, (activeModules as ApiModuleSafe[]) ?? [])) {
+    throw new Error(FRIENDLY_ERRORS.service_unavailable);
   }
 
   const supabase = await createClient();
@@ -95,7 +106,7 @@ export async function startGuestCheckout(input: StartGuestCheckoutInput) {
   }
   await supabase
     .from("guest_checkout_intents")
-    .update({ meta: { sourceReference: result.sourceReference } })
+    .update({ meta: { endUserId: result.endUserId } })
     .eq("reference", reference);
   return { gateway: "ecocash" as const, reference };
 }

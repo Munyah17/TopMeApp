@@ -4,7 +4,11 @@ import { BroadbandFlow } from "@/components/payment-flow/broadband-flow";
 import { CouncilFlow } from "@/components/payment-flow/council-flow";
 import { PaymentFlow } from "@/components/payment-flow/payment-flow";
 import { ZesaFlow } from "@/components/payment-flow/zesa-flow";
+import { ServiceUnavailable } from "@/components/service-unavailable";
+import { hasRealCoverage } from "@/lib/fulfillment";
 import { getCurrentProfile, getDataBundles, getNetworks, getService, getTvPackages, getWallet } from "@/lib/data/queries";
+import { createAdminClient } from "@/lib/supabase/server";
+import type { ApiModuleSafe } from "@/types/database";
 
 // Services with a bespoke, hand-built flow (see the reference UX brief) —
 // each service family gets its own step sequence rather than one generic
@@ -20,6 +24,18 @@ export default async function PayPage({ params }: { params: Promise<{ serviceId:
   const { serviceId } = await params;
   const [service, profile] = await Promise.all([getService(serviceId), getCurrentProfile()]);
   if (!service) notFound();
+
+  // Gift vouchers are a self-contained wallet feature (debit + redeemable
+  // code) — they never touch a fulfillment provider, so they're exempt from
+  // this check. Everything else must have a real, active provider behind it
+  // or it gets declined here instead of ever reaching SimulatedProvider.
+  if (!service.is_gift) {
+    const admin = createAdminClient();
+    const { data: apiModules } = await admin.from("api_modules_safe").select("*").eq("status", "active");
+    if (!hasRealCoverage(service.id, (apiModules as ApiModuleSafe[]) ?? [])) {
+      return <ServiceUnavailable service={service} />;
+    }
+  }
 
   const [bundles, packages, networks, wallet] = await Promise.all([
     service.amount_mode === "bundles" ? getDataBundles() : Promise.resolve([]),
@@ -41,10 +57,10 @@ export default async function PayPage({ params }: { params: Promise<{ serviceId:
     return <ZesaFlow service={service} walletBalance={walletBalance} isGuest={isGuest} guestEmail={guestEmail} guestPhone={guestPhone} />;
   }
 
-  // All 26 councils/municipalities/town councils share the same "account
-  // number -> owner lookup -> arbitrary payment amount" shape (confirmed
-  // against the Bulawayo reference flow), regardless of whether VitalPay
-  // actually fulfils this specific one or it falls back to simulated.
+  // Councils share the same "account number -> arbitrary payment amount"
+  // shape (confirmed against the Bulawayo reference flow). Only Bulawayo
+  // actually clears the coverage check above today — the other 25 stop at
+  // ServiceUnavailable before ever reaching this branch.
   if (service.category_id === "government") {
     return <CouncilFlow service={service} walletBalance={walletBalance} isGuest={isGuest} guestEmail={guestEmail} guestPhone={guestPhone} />;
   }

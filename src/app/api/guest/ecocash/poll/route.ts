@@ -21,8 +21,9 @@ export async function POST(request: NextRequest) {
   if (!intent) return NextResponse.json({ error: "not_found" }, { status: 404 });
   if (intent.status !== "pending") return NextResponse.json({ status: intent.status });
 
-  const sourceReference = (intent.meta as { sourceReference?: string })?.sourceReference || reference;
-  const providerStatus = await getEcocashStatus(sourceReference);
+  const endUserId = (intent.meta as { endUserId?: string })?.endUserId;
+  if (!endUserId) return NextResponse.json({ status: "pending" });
+  const providerStatus = await getEcocashStatus(endUserId, reference);
 
   if (providerStatus === "completed") {
     const tx = await finalizeGuestCheckout(reference);
