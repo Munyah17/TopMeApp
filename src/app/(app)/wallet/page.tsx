@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AuthRequired } from "@/components/auth-required";
 import { Icon } from "@/components/icons";
+import { PaynowTopupStatus } from "@/components/wallet/paynow-topup-status";
 import { TopupPanel } from "@/components/wallet/topup-panel";
 import { fmt } from "@/lib/data/catalog-helpers";
 import { getCurrentProfile, getWallet, getWalletLedger } from "@/lib/data/queries";
@@ -15,7 +16,8 @@ const LEDGER_LABEL: Record<string, string> = {
   p2p_receive: "Money received",
 };
 
-export default async function WalletPage() {
+export default async function WalletPage({ searchParams }: { searchParams: Promise<{ paynow_ref?: string }> }) {
+  const { paynow_ref: paynowRef } = await searchParams;
   const profile = await getCurrentProfile();
   if (!profile) {
     return (
@@ -34,6 +36,8 @@ export default async function WalletPage() {
     <div className="px content-wrap" style={{ paddingTop: 6 }}>
       <h2 style={{ fontSize: 20 }}>Wallet</h2>
       <div className="muted mb-3">Top up once, pay for anything instantly</div>
+
+      {paynowRef && <PaynowTopupStatus reference={paynowRef} />}
 
       <div className="wallet-grid">
         <div className="col-main">

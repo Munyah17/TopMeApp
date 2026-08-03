@@ -2,7 +2,8 @@
 
 import { randomUUID } from "crypto";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
-import { initiatePaynowPayment } from "@/lib/payments/paynow";
+import { checkPaynowStatus, initiatePaynowPayment } from "@/lib/payments/paynow";
+import { applyPaynowResult } from "@/lib/payments/paynow-result";
 import { createGuestCheckoutSession } from "@/lib/payments/stripe";
 import { initiateEcocashPush } from "@/lib/payments/ecocash";
 import { failGuestCheckout } from "@/lib/payments/guest-checkout";
@@ -81,6 +82,9 @@ export async function startGuestCheckout(input: StartGuestCheckoutInput) {
       await failGuestCheckout(reference);
       throw new Error(result.error || "Could not start Paynow payment.");
     }
+    if (result.pollUrl) {
+      await supabase.from("guest_checkout_intents").update({ meta: { pollUrl: result.pollUrl } }).eq("reference", reference);
+    }
     return { gateway: "paynow" as const, redirectUrl: result.browserUrl, reference };
   }
 
@@ -109,6 +113,30 @@ export async function startGuestCheckout(input: StartGuestCheckoutInput) {
     .update({ meta: { endUserId: result.endUserId } })
     .eq("reference", reference);
   return { gateway: "ecocash" as const, reference };
+}
+
+// Forces an immediate Paynow status check instead of waiting for their
+// result_url webhook, which can be slow or (confirmed against a real
+// transaction) never arrive at all. Powers the "Check Payment" button.
+export async function checkGuestPaymentNow(reference: string): Promise<{ checked: boolean; error?: string }> {
+  const admin = createAdminClient();
+  const { data: intent } = await admin
+    .from("guest_checkout_intents")
+    .select("status, provider, meta")
+    .eq("reference", reference)
+    .single();
+  if (!intent) return { checked: false, error: "We couldn't find that payment." };
+  if (intent.status !== "pending") return { checked: true };
+  if (intent.provider !== "paynow") return { checked: false, error: "Manual check is only available for Paynow payments." };
+
+  const pollUrl = (intent.meta as { pollUrl?: string } | null)?.pollUrl;
+  if (!pollUrl) return { checked: false, error: "This payment doesn't have a status handle yet — try again in a moment." };
+
+  const result = await checkPaynowStatus(pollUrl);
+  if (!result.ok || !result.status) return { checked: false, error: result.error || "Paynow didn't respond. Try again shortly." };
+
+  await applyPaynowResult(reference, result.status, result.fields);
+  return { checked: true };
 }
 
 export async function getGuestCheckoutStatus(reference: string) {

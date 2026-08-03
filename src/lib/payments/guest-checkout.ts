@@ -1,6 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { getFulfillmentProvider } from "@/lib/fulfillment";
-import { SimulatedProvider } from "@/lib/fulfillment/simulated";
 import { sendEmail } from "@/lib/email/client";
 import { paymentReceiptEmail } from "@/lib/email/templates";
 import type { ApiModuleSafe, Transaction } from "@/types/database";
@@ -39,8 +38,13 @@ export async function finalizeGuestCheckout(reference: string): Promise<Transact
   try {
     fulfillmentResult = await provider.fulfil(fulfillmentInput);
   } catch (e) {
-    fulfillmentResult = await new SimulatedProvider().fulfil(fulfillmentInput);
-    fulfillmentResult.message = e instanceof Error ? `${provider.name} unavailable: ${e.message}` : `${provider.name} unavailable.`;
+    // Payment is already captured at this point — the honest thing to do is
+    // record a real failure so it's visible for a manual retry/refund, not
+    // fake a "simulated" success that hides that nothing was delivered.
+    fulfillmentResult = {
+      status: "failed" as const,
+      message: e instanceof Error ? `${provider.name} error: ${e.message}` : `${provider.name} failed to fulfil this order.`,
+    };
   }
 
   const { data: updatedTx } = await admin.rpc("set_fulfillment_result", {

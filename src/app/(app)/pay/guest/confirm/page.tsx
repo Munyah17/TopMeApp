@@ -4,7 +4,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Icon } from "@/components/icons";
-import { getGuestCheckoutStatus } from "@/lib/actions/guest-payments";
+import { checkGuestPaymentNow, getGuestCheckoutStatus } from "@/lib/actions/guest-payments";
 import { addGuestActivity } from "@/lib/guest-activity";
 
 type GuestReceipt = {
@@ -25,7 +25,10 @@ function ConfirmContent() {
     cancelled ? "failed" : "checking"
   );
   const [receipt, setReceipt] = useState<GuestReceipt | null>(null);
+  const [checkingNow, setCheckingNow] = useState(false);
+  const [checkError, setCheckError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const checkRef = useRef<() => Promise<void>>(async () => {});
 
   useEffect(() => {
     if (!reference || cancelled) return;
@@ -52,6 +55,7 @@ function ConfirmContent() {
         setStatus("pending");
       }
     }
+    checkRef.current = check;
     check();
     pollRef.current = setInterval(check, 3000);
     return () => {
@@ -59,6 +63,19 @@ function ConfirmContent() {
       if (pollRef.current) clearInterval(pollRef.current);
     };
   }, [reference, cancelled]);
+
+  async function handleCheckPayment() {
+    if (!reference) return;
+    setCheckingNow(true);
+    setCheckError(null);
+    try {
+      const result = await checkGuestPaymentNow(reference);
+      if (!result.checked && result.error) setCheckError(result.error);
+      await checkRef.current();
+    } finally {
+      setCheckingNow(false);
+    }
+  }
 
   if (!reference) {
     return (
@@ -73,10 +90,20 @@ function ConfirmContent() {
 
   if (status === "checking" || status === "pending") {
     return (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: 480, textAlign: "center" }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 480, textAlign: "center", paddingTop: 40, paddingBottom: 24 }}>
         <div className="spinner-ring" />
         <div style={{ fontWeight: 700, marginTop: 24, fontSize: 15.5 }}>Confirming your payment…</div>
-        <div className="muted mt-1">This usually takes a few seconds</div>
+        <div className="muted mt-1" style={{ maxWidth: 280 }}>
+          Paynow can take a moment to confirm. If it&apos;s taking too long, tap below to check directly.
+        </div>
+        <button className="btn btn-secondary btn-block mt-4" disabled={checkingNow} onClick={handleCheckPayment}>
+          {checkingNow ? "Checking…" : "Check Payment"}
+        </button>
+        {checkError && (
+          <div className="muted mt-2" style={{ color: "var(--error)" }}>
+            {checkError}
+          </div>
+        )}
       </div>
     );
   }
@@ -114,13 +141,28 @@ function ConfirmContent() {
               <span style={{ fontWeight: 700, fontSize: 13.5 }}>{receipt.recipient}</span>
             </div>
             <div className="row between" style={{ padding: "12px 0" }}>
-              <span className="muted">Status</span>
-              <span style={{ fontWeight: 700, fontSize: 13.5 }}>
-                {receipt.fulfillment_status === "fulfilled" ? "Delivered" : "Processing"}
+              <span className="muted">Delivery status</span>
+              <span
+                style={{
+                  fontWeight: 700,
+                  fontSize: 13.5,
+                  color: receipt.fulfillment_status === "failed" ? "var(--error)" : undefined,
+                }}
+              >
+                {receipt.fulfillment_status === "fulfilled"
+                  ? "Delivered"
+                  : receipt.fulfillment_status === "failed"
+                    ? "Delivery failed"
+                    : "Processing"}
               </span>
             </div>
           </div>
         </div>
+        {receipt.fulfillment_status === "failed" && (
+          <div className="muted mt-2" style={{ color: "var(--error)", maxWidth: 280 }}>
+            Your payment went through but delivery failed on our side. Contact support with reference {receipt.reference} for a refund or retry.
+          </div>
+        )}
         <Link href="/home" className="btn btn-primary btn-block mt-4" style={{ textDecoration: "none" }}>
           Done
         </Link>

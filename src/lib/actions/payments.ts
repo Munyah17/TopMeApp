@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { getFulfillmentProvider, hasRealCoverage } from "@/lib/fulfillment";
-import { SimulatedProvider } from "@/lib/fulfillment/simulated";
 import { findProfileByPhone } from "@/lib/data/queries";
 import { sendEmail } from "@/lib/email/client";
 import { giftSentEmail, moneyReceivedEmail, moneySentEmail, paymentReceiptEmail } from "@/lib/email/templates";
@@ -97,11 +96,13 @@ export async function payService(input: PayServiceInput) {
   try {
     fulfillmentResult = await provider.fulfil(fulfillmentInput);
   } catch (e) {
-    // A configured-but-not-yet-working aggregator call (e.g. an endpoint not
-    // mapped yet) shouldn't strand the customer's payment — fall back to the
-    // simulated provider so the transaction still completes, clearly tagged.
-    fulfillmentResult = await new SimulatedProvider().fulfil(fulfillmentInput);
-    fulfillmentResult.message = e instanceof Error ? `${provider.name} unavailable: ${e.message}` : `${provider.name} unavailable.`;
+    // Wallet is already debited at this point — the honest thing to do is
+    // record a real failure so it's visible for a manual refund/retry, not
+    // fake a "simulated" success that hides that nothing was delivered.
+    fulfillmentResult = {
+      status: "failed" as const,
+      message: e instanceof Error ? `${provider.name} error: ${e.message}` : `${provider.name} failed to fulfil this order.`,
+    };
   }
 
   const { data: updatedTx } = await admin.rpc("set_fulfillment_result", {

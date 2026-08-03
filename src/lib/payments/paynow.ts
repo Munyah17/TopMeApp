@@ -70,3 +70,27 @@ export function verifyPaynowCallback(fields: Record<string, string>): boolean {
   const { hash: receivedHash, ...rest } = fields;
   return hash(rest, key) === receivedHash;
 }
+
+export interface PaynowPollResult {
+  ok: boolean;
+  status?: string;
+  fields?: Record<string, string>;
+  error?: string;
+}
+
+// Paynow's result_url webhook is not reliable — it can arrive late or never
+// arrive at all (confirmed against a real transaction that stayed "pending"
+// forever). The pollUrl returned by initiatetransaction lets us ask Paynow
+// directly instead of only waiting on their callback — this is what powers
+// the manual "Check Payment" button.
+export async function checkPaynowStatus(pollUrl: string): Promise<PaynowPollResult> {
+  try {
+    const res = await fetch(pollUrl, { method: "POST" });
+    if (!res.ok) return { ok: false, error: `Paynow returned HTTP ${res.status}.` };
+    const fields = parseKeyValues(await res.text());
+    if (!fields.status) return { ok: false, error: "Paynow did not return a status." };
+    return { ok: true, status: fields.status.toLowerCase(), fields };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Could not reach Paynow." };
+  }
+}
