@@ -6,7 +6,7 @@ import { getFulfillmentProvider, hasRealCoverage } from "@/lib/fulfillment";
 import { findProfileByPhone } from "@/lib/data/queries";
 import { sendEmail } from "@/lib/email/client";
 import { giftSentEmail, moneyReceivedEmail, moneySentEmail, paymentReceiptEmail } from "@/lib/email/templates";
-import type { ApiModuleSafe, P2pTransfer, Service, Transaction } from "@/types/database";
+import type { ApiModuleSafe, P2pTransfer, Transaction } from "@/types/database";
 
 const FRIENDLY_ERRORS: Record<string, string> = {
   insufficient_funds: "Your wallet balance is too low for this payment. Top up and try again.",
@@ -21,22 +21,6 @@ const FRIENDLY_ERRORS: Record<string, string> = {
 function friendlyError(message: string) {
   const key = Object.keys(FRIENDLY_ERRORS).find((k) => message.includes(k));
   return key ? FRIENDLY_ERRORS[key] : "Something went wrong processing that payment. Please try again.";
-}
-
-export async function validateRecipient(serviceId: string, identifier: string) {
-  const supabase = await createClient();
-  const { data: service } = await supabase.from("services").select("*").eq("id", serviceId).single();
-  const svc = service as Service | null;
-  if (!svc) return { valid: false, message: "Unknown service." };
-
-  const trimmed = identifier.trim();
-  if (trimmed.length < 3) {
-    return { valid: false, message: `Enter a valid ${svc.id_label.toLowerCase()}.` };
-  }
-
-  // Simulated provider lookup — no live biller connected yet (see src/lib/fulfillment).
-  await new Promise((resolve) => setTimeout(resolve, 250));
-  return { valid: true, name: svc.mock_name, sub: svc.mock_sub };
 }
 
 export interface PayServiceInput {

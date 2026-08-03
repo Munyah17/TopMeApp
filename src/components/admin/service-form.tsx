@@ -25,9 +25,6 @@ function toInput(s: Service | undefined): ServiceInput {
     extraFieldLabel: s?.extra_field_label ?? "",
     extraFieldPlaceholder: s?.extra_field_placeholder ?? "",
     isGift: s?.is_gift ?? false,
-    validateMsg: s?.validate_msg ?? "Validating",
-    mockName: s?.mock_name ?? "",
-    mockSub: s?.mock_sub ?? "",
     sortOrder: s?.sort_order ?? 0,
     costPercentage: s?.cost_percentage ?? 0,
   };
@@ -202,17 +199,6 @@ export function ServiceForm({
         <div style={{ flex: 1 }}>
           <label className="field-label">Extra field placeholder</label>
           <input className="field" value={form.extraFieldPlaceholder} onChange={(e) => set("extraFieldPlaceholder", e.target.value)} />
-        </div>
-      </div>
-
-      <div className="row gap-2">
-        <div style={{ flex: 1 }}>
-          <label className="field-label">Mock recipient name (shown after validation)</label>
-          <input className="field" value={form.mockName} onChange={(e) => set("mockName", e.target.value)} />
-        </div>
-        <div style={{ flex: 1 }}>
-          <label className="field-label">Mock recipient sub-label</label>
-          <input className="field" value={form.mockSub} onChange={(e) => set("mockSub", e.target.value)} />
         </div>
       </div>
 

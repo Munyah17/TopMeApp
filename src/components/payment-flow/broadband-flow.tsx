@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
 import { Icon } from "@/components/icons";
 import { hexA } from "@/lib/data/catalog-helpers";
+import { calculatePlatformFee } from "@/lib/fees";
 import { payService } from "@/lib/actions/payments";
 import { startGuestCheckout, type GuestGateway } from "@/lib/actions/guest-payments";
 import { addGuestActivity } from "@/lib/guest-activity";
@@ -154,7 +155,9 @@ export function BroadbandFlow({
 
   const stepIndex = ["account", "amount", "review"].indexOf(step);
   const showTop = !["processing", "guest-ecocash", "success"].includes(step);
-  const insufficient = !isGuest && amount > walletBalance;
+  const fee = calculatePlatformFee(service.id, amount);
+  const total = amount + fee;
+  const insufficient = !isGuest && total > walletBalance;
   const guestMissingInfo = isGuest && (!guestEmail.trim() || (gateway === "ecocash" && !guestPhone.trim()));
 
   return (
@@ -297,13 +300,15 @@ export function BroadbandFlow({
             <div className="card" style={{ overflow: "hidden" }}>
               <div className="card-pad" style={{ textAlign: "center", borderBottom: "1px dashed var(--border)", background: `linear-gradient(135deg, var(--navy), ${service.color})` }}>
                 <div className="muted" style={{ color: "rgba(255,255,255,0.75)" }}>You&apos;re paying</div>
-                <div style={{ fontSize: 34, fontWeight: 800, marginTop: 4, color: "#fff" }}>${amount.toFixed(2)}</div>
+                <div style={{ fontSize: 34, fontWeight: 800, marginTop: 4, color: "#fff" }}>${total.toFixed(2)}</div>
                 {usesPackages && packageIdx !== null && (
                   <div className="muted" style={{ color: "rgba(255,255,255,0.75)", marginTop: 2 }}>{TELONE_PACKAGES[packageIdx].name}</div>
                 )}
               </div>
               <div style={{ padding: "6px 18px" }}>
                 <EditableRow label={service.id_label} value={account} onSave={setAccount} placeholder={service.id_placeholder ?? ""} />
+                <ReviewRow label="Amount" value={`$${amount.toFixed(2)}`} />
+                <ReviewRow label="Processing fee" value={`$${fee.toFixed(2)}`} />
                 {!isGuest && (
                   <>
                     <ReviewRow label="Payment method" value="TopMe Wallet" />
@@ -329,7 +334,7 @@ export function BroadbandFlow({
               disabled={busy || insufficient || guestMissingInfo}
               onClick={() => { if (!isGuest) setStep("processing"); submit(); }}
             >
-              {busy ? "Processing…" : `Pay $${amount.toFixed(2)}`}
+              {busy ? "Processing…" : `Pay $${total.toFixed(2)}`}
             </button>
           </>
         )}
@@ -347,7 +352,7 @@ export function BroadbandFlow({
             <div className="spinner-ring" />
             <div style={{ fontWeight: 700, marginTop: 24, fontSize: 15.5 }}>Approve on your phone</div>
             <div className="muted mt-1" style={{ maxWidth: 280 }}>
-              We sent a USSD prompt to {guestPhone}. Enter your EcoCash PIN to approve the ${amount.toFixed(2)} payment.
+              We sent a USSD prompt to {guestPhone}. Enter your EcoCash PIN to approve the ${total.toFixed(2)} payment.
             </div>
           </div>
         )}
@@ -359,6 +364,7 @@ export function BroadbandFlow({
             </div>
             <h2 style={{ fontSize: 21, marginTop: 20 }}>Payment successful</h2>
             <div className="muted mt-1">${result.amount.toFixed(2)} paid to {service.name}</div>
+            {result.fee > 0 && <div className="muted">+ ${result.fee.toFixed(2)} processing fee</div>}
             <button className="btn btn-primary btn-block mt-4" onClick={() => setStep("receipt")}>View receipt</button>
             <Link href="/home" className="btn btn-ghost btn-block" style={{ textDecoration: "none" }}>Done</Link>
           </div>
@@ -374,7 +380,7 @@ export function BroadbandFlow({
               <div style={{ display: "flex", justifyContent: "center", margin: "6px 0 14px" }}>
                 <canvas ref={qrRef} width={132} height={132} />
               </div>
-              <div style={{ textAlign: "center", fontWeight: 800, fontSize: 26 }}>${result.amount.toFixed(2)}</div>
+              <div style={{ textAlign: "center", fontWeight: 800, fontSize: 26 }}>${(result.amount + result.fee).toFixed(2)}</div>
               <div style={{ textAlign: "center", marginBottom: 14 }}>
                 <span style={{ background: "var(--green-50)", color: "var(--success)", fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 8 }}>✓ Successful</span>
                 {result.fulfillment_status === "simulated" && (
@@ -387,6 +393,8 @@ export function BroadbandFlow({
               <div className="dashed" />
               <ReviewRow label="Reference" value={result.reference} />
               <ReviewRow label={service.id_label} value={account} />
+              <ReviewRow label="Amount" value={`$${result.amount.toFixed(2)}`} />
+              {result.fee > 0 && <ReviewRow label="Processing fee" value={`$${result.fee.toFixed(2)}`} />}
               <ReviewRow label="Paid via" value={result.user_id ? "TopMe Wallet" : "Guest checkout"} />
             </div>
             <Link href="/home" className="btn btn-primary btn-block mt-3" style={{ textDecoration: "none" }}>Done</Link>

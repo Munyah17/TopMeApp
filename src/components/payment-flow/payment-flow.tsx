@@ -6,12 +6,13 @@ import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
 import { Icon } from "@/components/icons";
 import { hexA } from "@/lib/data/catalog-helpers";
-import { payService, sendGiftVoucher, validateRecipient } from "@/lib/actions/payments";
+import { calculatePlatformFee } from "@/lib/fees";
+import { payService, sendGiftVoucher } from "@/lib/actions/payments";
 import { startGuestCheckout, type GuestGateway } from "@/lib/actions/guest-payments";
 import { addGuestActivity } from "@/lib/guest-activity";
 import type { DataBundle, Network, Service, Transaction, TvPackage } from "@/types/database";
 
-type Step = "details" | "validating" | "amount" | "review" | "processing" | "guest-ecocash" | "success" | "receipt" | "error";
+type Step = "details" | "amount" | "review" | "processing" | "guest-ecocash" | "success" | "receipt" | "error";
 
 export function PaymentFlow({
   service,
@@ -41,7 +42,6 @@ export function PaymentFlow({
   const [customAmount, setCustomAmount] = useState("");
   const [bundleId, setBundleId] = useState<string | null>(null);
   const [pkgId, setPkgId] = useState<string | null>(null);
-  const [validated, setValidated] = useState<{ name: string | null; sub: string | null } | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [saveBeneficiary, setSaveBeneficiary] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -60,24 +60,6 @@ export function PaymentFlow({
     if (service.amount_mode === "outstanding") return service.outstanding ?? 0;
     return 0;
   };
-
-  useEffect(() => {
-    if (step !== "validating") return;
-    let cancelled = false;
-    validateRecipient(service.id, identifier).then((res) => {
-      if (cancelled) return;
-      if (!res.valid) {
-        setErrorMsg(res.message || "We couldn't verify those details.");
-        setStep("error");
-        return;
-      }
-      setValidated({ name: res.name ?? null, sub: res.sub ?? null });
-      setStep("amount");
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [step, service.id, identifier]);
 
   useEffect(() => {
     if (step === "receipt" && result && qrRef.current) {
@@ -236,16 +218,8 @@ export function PaymentFlow({
             setIdentifier={setIdentifier}
             extra={extra}
             setExtra={setExtra}
-            onContinue={() => setStep("validating")}
+            onContinue={() => setStep("amount")}
           />
-        )}
-
-        {step === "validating" && (
-          <div className="mt-4" style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 40 }}>
-            <div className="skel" style={{ width: 64, height: 64, borderRadius: 20 }} />
-            <div style={{ fontWeight: 700, marginTop: 20, fontSize: 15 }}>{service.validate_msg || "Validating"}…</div>
-            <div className="muted mt-1">Checking your details</div>
-          </div>
         )}
 
         {step === "error" && (
@@ -282,7 +256,7 @@ export function PaymentFlow({
             service={service}
             bundles={bundles}
             packages={packages}
-            validated={validated}
+            identifier={identifier}
             amount={amount}
             setAmount={setAmount}
             customAmount={customAmount}
@@ -305,7 +279,6 @@ export function PaymentFlow({
             pkgId={pkgId}
             identifier={identifier}
             extra={extra}
-            validated={validated}
             amount={currentAmount()}
             walletBalance={walletBalance}
             saveBeneficiary={saveBeneficiary}
@@ -467,7 +440,7 @@ function AmountStep({
   service,
   bundles,
   packages,
-  validated,
+  identifier,
   amount,
   setAmount,
   customAmount,
@@ -482,7 +455,7 @@ function AmountStep({
   service: Service;
   bundles: DataBundle[];
   packages: TvPackage[];
-  validated: { name: string | null; sub: string | null } | null;
+  identifier: string;
   amount: number | null;
   setAmount: (v: number | null) => void;
   customAmount: string;
@@ -499,14 +472,11 @@ function AmountStep({
     <>
       <div className="card card-pad row gap-2" style={{ marginBottom: 18 }}>
         <div className="ibadge round" style={{ background: hexA(service.color, 0.12), color: service.color }}>
-          <Icon name="check" size={20} stroke={2.2} />
+          <Icon name={service.icon} size={20} stroke={1.8} />
         </div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 700, fontSize: 14.5 }}>{validated?.name || service.mock_name}</div>
-          <div className="muted">{validated?.sub || service.mock_sub}</div>
-        </div>
-        <div style={{ background: "var(--green-50)", color: "var(--success)", fontSize: 11, fontWeight: 700, padding: "4px 9px", borderRadius: 8 }}>
-          Verified
+          <div style={{ fontWeight: 700, fontSize: 14.5 }}>{identifier}</div>
+          <div className="muted">{service.name}</div>
         </div>
       </div>
 
@@ -631,7 +601,6 @@ function ReviewStep({
   pkgId,
   identifier,
   extra,
-  validated,
   amount,
   walletBalance,
   saveBeneficiary,
@@ -653,7 +622,6 @@ function ReviewStep({
   pkgId: string | null;
   identifier: string;
   extra: string;
-  validated: { name: string | null; sub: string | null } | null;
   amount: number;
   walletBalance: number;
   saveBeneficiary: boolean;
@@ -676,7 +644,9 @@ function ReviewStep({
     const p = packages.find((x) => x.id === pkgId);
     if (p) detailLabel = `${p.name} Package`;
   }
-  const insufficient = !isGuest && amount > walletBalance;
+  const fee = service.is_gift ? 0 : calculatePlatformFee(service.id, amount);
+  const total = amount + fee;
+  const insufficient = !isGuest && total > walletBalance;
   const guestMissingInfo = isGuest && (!guestEmail.trim() || (gateway === "ecocash" && !guestPhone.trim()));
 
   return (
@@ -686,14 +656,14 @@ function ReviewStep({
       <div className="card" style={{ overflow: "hidden" }}>
         <div className="card-pad" style={{ textAlign: "center", borderBottom: "1px dashed var(--border)" }}>
           <div className="muted">You&apos;re paying</div>
-          <div style={{ fontSize: 34, fontWeight: 800, marginTop: 4 }}>${amount.toFixed(2)}</div>
+          <div style={{ fontSize: 34, fontWeight: 800, marginTop: 4 }}>${total.toFixed(2)}</div>
         </div>
         <div style={{ padding: "6px 18px" }}>
           <ReviewRow label="Service" value={detailLabel} />
           <ReviewRow label={service.id_label} value={identifier || "—"} />
           {service.is_gift && extra && <ReviewRow label="Sender Number" value={extra} />}
-          {(validated?.name || service.mock_name) && <ReviewRow label="Recipient" value={validated?.name || service.mock_name || ""} />}
-          <ReviewRow label="Fee" value="$0.00" />
+          <ReviewRow label="Amount" value={`$${amount.toFixed(2)}`} />
+          <ReviewRow label="Processing fee" value={`$${fee.toFixed(2)}`} />
           {!isGuest && (
             <>
               <ReviewRow label="Payment method" value="TopMe Wallet" />
@@ -773,7 +743,7 @@ function ReviewStep({
       )}
 
       <button className="btn btn-primary btn-block mt-4" disabled={busy || insufficient || guestMissingInfo} onClick={onPay}>
-        {busy ? "Processing…" : `Pay $${amount.toFixed(2)}`}
+        {busy ? "Processing…" : `Pay $${total.toFixed(2)}`}
       </button>
     </>
   );
@@ -805,7 +775,7 @@ function ReceiptStep({
         <div style={{ display: "flex", justifyContent: "center", margin: "6px 0 14px" }}>
           <canvas ref={qrRef} width={132} height={132} />
         </div>
-        <div style={{ textAlign: "center", fontWeight: 800, fontSize: 26 }}>${result.amount.toFixed(2)}</div>
+        <div style={{ textAlign: "center", fontWeight: 800, fontSize: 26 }}>${(result.amount + result.fee).toFixed(2)}</div>
         <div style={{ textAlign: "center", marginBottom: 14 }}>
           <span style={{ background: "var(--green-50)", color: "var(--success)", fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 8 }}>
             ✓ Successful
@@ -853,6 +823,8 @@ function ReceiptStep({
         )}
         <ReviewRow label="Service" value={service.name} />
         <ReviewRow label={service.id_label} value={identifier || "—"} />
+        <ReviewRow label="Amount" value={`$${result.amount.toFixed(2)}`} />
+        {result.fee > 0 && <ReviewRow label="Processing fee" value={`$${result.fee.toFixed(2)}`} />}
         <ReviewRow
           label="Date"
           value={
@@ -871,9 +843,9 @@ function ReceiptStep({
           style={{ flex: 1 }}
           onClick={() => {
             if (navigator.share) {
-              navigator.share({ title: "TopMe receipt", text: `TopMe payment ${result.reference}: $${result.amount.toFixed(2)}` }).catch(() => {});
+              navigator.share({ title: "TopMe receipt", text: `TopMe payment ${result.reference}: $${(result.amount + result.fee).toFixed(2)}` }).catch(() => {});
             } else {
-              navigator.clipboard.writeText(`TopMe payment ${result.reference}: $${result.amount.toFixed(2)}`);
+              navigator.clipboard.writeText(`TopMe payment ${result.reference}: $${(result.amount + result.fee).toFixed(2)}`);
             }
           }}
         >

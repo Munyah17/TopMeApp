@@ -202,9 +202,6 @@ export interface ServiceInput {
   extraFieldLabel: string;
   extraFieldPlaceholder: string;
   isGift: boolean;
-  validateMsg: string;
-  mockName: string;
-  mockSub: string;
   sortOrder: number;
   costPercentage: number;
 }
@@ -227,9 +224,6 @@ function serviceRow(input: ServiceInput) {
     extra_field_label: input.extraFieldLabel || null,
     extra_field_placeholder: input.extraFieldPlaceholder || null,
     is_gift: input.isGift,
-    validate_msg: input.validateMsg || null,
-    mock_name: input.mockName || null,
-    mock_sub: input.mockSub || null,
     sort_order: input.sortOrder,
     cost_percentage: input.costPercentage,
   };

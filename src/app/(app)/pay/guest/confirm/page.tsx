@@ -10,6 +10,7 @@ import { addGuestActivity } from "@/lib/guest-activity";
 type GuestReceipt = {
   reference: string;
   amount: number;
+  fee: number;
   service_name: string;
   recipient: string;
   fulfillment_status: string;
@@ -128,7 +129,7 @@ function ConfirmContent() {
         </div>
         <h2 style={{ fontSize: 21, marginTop: 20 }}>Payment successful</h2>
         <div className="muted mt-1">
-          ${receipt.amount.toFixed(2)} paid for {receipt.service_name}
+          ${(receipt.amount + receipt.fee).toFixed(2)} paid for {receipt.service_name}
         </div>
         <div className="card" style={{ overflow: "hidden", width: "100%", marginTop: 24, textAlign: "left" }}>
           <div style={{ padding: "6px 18px" }}>
@@ -140,6 +141,16 @@ function ConfirmContent() {
               <span className="muted">Recipient</span>
               <span style={{ fontWeight: 700, fontSize: 13.5 }}>{receipt.recipient}</span>
             </div>
+            <div className="row between" style={{ padding: "12px 0", borderBottom: "1px solid var(--border)" }}>
+              <span className="muted">Amount</span>
+              <span style={{ fontWeight: 700, fontSize: 13.5 }}>${receipt.amount.toFixed(2)}</span>
+            </div>
+            {receipt.fee > 0 && (
+              <div className="row between" style={{ padding: "12px 0", borderBottom: "1px solid var(--border)" }}>
+                <span className="muted">Processing fee</span>
+                <span style={{ fontWeight: 700, fontSize: 13.5 }}>${receipt.fee.toFixed(2)}</span>
+              </div>
+            )}
             <div className="row between" style={{ padding: "12px 0" }}>
               <span className="muted">Delivery status</span>
               <span

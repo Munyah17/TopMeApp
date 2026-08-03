@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { AirtimeFlow } from "@/components/payment-flow/airtime-flow";
+import { AuthRequired } from "@/components/auth-required";
 import { BroadbandFlow } from "@/components/payment-flow/broadband-flow";
 import { CouncilFlow } from "@/components/payment-flow/council-flow";
 import { PaymentFlow } from "@/components/payment-flow/payment-flow";
@@ -25,11 +26,20 @@ export default async function PayPage({ params }: { params: Promise<{ serviceId:
   const [service, profile] = await Promise.all([getService(serviceId), getCurrentProfile()]);
   if (!service) notFound();
 
-  // Gift vouchers are a self-contained wallet feature (debit + redeemable
-  // code) — they never touch a fulfillment provider, so they're exempt from
-  // this check. Everything else must have a real, active provider behind it
-  // or it gets declined here instead of ever reaching SimulatedProvider.
-  if (!service.is_gift) {
+  // Gift vouchers are wallet-to-wallet only (debit sender, mint a redeemable
+  // code) — there's no gateway path that can produce a voucher for someone
+  // with no wallet, so a guest reaching this URL directly (nav already sends
+  // guests to /login for this link) gets a real login prompt instead of a
+  // checkout flow that would take their money and deliver nothing.
+  if (service.is_gift) {
+    if (!profile) {
+      return (
+        <div className="px content-wrap">
+          <AuthRequired title="Log in to send a gift voucher" message="Gift vouchers are sent from your TopMe wallet, so you'll need an account first." />
+        </div>
+      );
+    }
+  } else {
     const admin = createAdminClient();
     const { data: apiModules } = await admin.from("api_modules_safe").select("*").eq("status", "active");
     if (!hasRealCoverage(service.id, (apiModules as ApiModuleSafe[]) ?? [])) {

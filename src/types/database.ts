@@ -78,9 +78,6 @@ export interface Service {
   extra_field_label: string | null;
   extra_field_placeholder: string | null;
   is_gift: boolean;
-  validate_msg: string | null;
-  mock_name: string | null;
-  mock_sub: string | null;
   sort_order: number;
   is_active: boolean;
   /** % of the customer amount the fulfilling provider charges us. 0 until an owner sets a real figure. */

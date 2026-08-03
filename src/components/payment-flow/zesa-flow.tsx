@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icons";
 import { hexA } from "@/lib/data/catalog-helpers";
+import { calculatePlatformFee } from "@/lib/fees";
 import { payService } from "@/lib/actions/payments";
 import { startGuestCheckout, type GuestGateway } from "@/lib/actions/guest-payments";
 import { addGuestActivity } from "@/lib/guest-activity";
@@ -114,7 +115,9 @@ export function ZesaFlow({
 
   const stepIndex = ["meter", "amount", "review"].indexOf(step);
   const showTop = !["processing", "guest-ecocash", "success"].includes(step);
-  const insufficient = !isGuest && amount > walletBalance;
+  const fee = calculatePlatformFee(service.id, amount);
+  const total = amount + fee;
+  const insufficient = !isGuest && total > walletBalance;
   const guestMissingInfo = isGuest && (!guestEmail.trim() || (gateway === "ecocash" && !guestPhone.trim()));
   const tokenPieces = Array.isArray(result?.receipt?.token_pieces) ? (result.receipt.token_pieces as string[]) : [];
 
@@ -219,10 +222,12 @@ export function ZesaFlow({
             <div className="card" style={{ overflow: "hidden" }}>
               <div className="card-pad" style={{ textAlign: "center", borderBottom: "1px dashed var(--border)", background: `linear-gradient(135deg, var(--navy), ${service.color})` }}>
                 <div className="muted" style={{ color: "rgba(255,255,255,0.75)" }}>You&apos;re buying</div>
-                <div style={{ fontSize: 34, fontWeight: 800, marginTop: 4, color: "#fff" }}>${amount.toFixed(2)}</div>
+                <div style={{ fontSize: 34, fontWeight: 800, marginTop: 4, color: "#fff" }}>${total.toFixed(2)}</div>
               </div>
               <div style={{ padding: "6px 18px" }}>
                 <EditableRow label="Meter Number" value={meter} onSave={setMeter} placeholder={service.id_placeholder ?? ""} />
+                <ReviewRow label="Amount" value={`$${amount.toFixed(2)}`} />
+                <ReviewRow label="Processing fee" value={`$${fee.toFixed(2)}`} />
                 {!isGuest && (
                   <>
                     <ReviewRow label="Payment method" value="TopMe Wallet" />
@@ -248,7 +253,7 @@ export function ZesaFlow({
               disabled={busy || insufficient || guestMissingInfo}
               onClick={() => { if (!isGuest) setStep("processing"); submit(); }}
             >
-              {busy ? "Processing…" : `Pay $${amount.toFixed(2)}`}
+              {busy ? "Processing…" : `Pay $${total.toFixed(2)}`}
             </button>
           </>
         )}
@@ -266,7 +271,7 @@ export function ZesaFlow({
             <div className="spinner-ring" />
             <div style={{ fontWeight: 700, marginTop: 24, fontSize: 15.5 }}>Approve on your phone</div>
             <div className="muted mt-1" style={{ maxWidth: 280 }}>
-              We sent a USSD prompt to {guestPhone}. Enter your EcoCash PIN to approve the ${amount.toFixed(2)} payment.
+              We sent a USSD prompt to {guestPhone}. Enter your EcoCash PIN to approve the ${total.toFixed(2)} payment.
             </div>
           </div>
         )}
@@ -278,6 +283,7 @@ export function ZesaFlow({
             </div>
             <h2 style={{ fontSize: 21, marginTop: 18 }}>Token ready</h2>
             <div className="muted mt-1">${result.amount.toFixed(2)} for meter {meter}</div>
+            {result.fee > 0 && <div className="muted">+ ${result.fee.toFixed(2)} processing fee</div>}
 
             {tokenPieces.length > 0 ? (
               <div className="receipt-card mt-3" style={{ width: "100%" }}>
@@ -318,6 +324,8 @@ export function ZesaFlow({
             )}
 
             <ReviewRow label="Reference" value={result.reference} />
+            <ReviewRow label="Amount" value={`$${result.amount.toFixed(2)}`} />
+            {result.fee > 0 && <ReviewRow label="Processing fee" value={`$${result.fee.toFixed(2)}`} />}
             <Link href="/home" className="btn btn-primary btn-block mt-3" style={{ textDecoration: "none" }}>Done</Link>
           </div>
         )}

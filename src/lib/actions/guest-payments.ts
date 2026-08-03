@@ -8,6 +8,7 @@ import { createGuestCheckoutSession } from "@/lib/payments/stripe";
 import { initiateEcocashPush } from "@/lib/payments/ecocash";
 import { failGuestCheckout } from "@/lib/payments/guest-checkout";
 import { hasRealCoverage } from "@/lib/fulfillment";
+import { calculatePlatformFee } from "@/lib/fees";
 import type { ApiModuleSafe } from "@/types/database";
 
 const FRIENDLY_ERRORS: Record<string, string> = {
@@ -56,6 +57,13 @@ export async function startGuestCheckout(input: StartGuestCheckoutInput) {
 
   const supabase = await createClient();
   const reference = newReference();
+  // Platform processing fee, absorbed by the guest on top of the service
+  // amount — charged to the gateway as part of the same payment, and
+  // remembered here so finalize_guest_payment can split it back out onto
+  // the transaction without recomputing (it must always match what the
+  // gateway actually collected).
+  const fee = calculatePlatformFee(input.serviceId, input.amount);
+  const totalCharge = input.amount + fee;
 
   const { error: insertError } = await supabase.from("guest_checkout_intents").insert({
     reference,
@@ -64,6 +72,7 @@ export async function startGuestCheckout(input: StartGuestCheckoutInput) {
     recipient_identifier: input.recipient,
     extra_value: input.extraValue ?? null,
     amount: input.amount,
+    fee,
     guest_email: input.guestEmail,
     guest_phone: input.guestPhone ?? null,
     provider: input.gateway,
@@ -73,7 +82,7 @@ export async function startGuestCheckout(input: StartGuestCheckoutInput) {
   if (input.gateway === "paynow") {
     const result = await initiatePaynowPayment({
       reference,
-      amount: input.amount,
+      amount: totalCharge,
       authEmail: input.guestEmail,
       additionalInfo: `TopMe: ${input.serviceName}`,
       returnUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/pay/guest/confirm?reference=${encodeURIComponent(reference)}`,
@@ -90,7 +99,7 @@ export async function startGuestCheckout(input: StartGuestCheckoutInput) {
 
   if (input.gateway === "stripe") {
     const session = await createGuestCheckoutSession({
-      amount: input.amount,
+      amount: totalCharge,
       reference,
       serviceName: input.serviceName,
       guestEmail: input.guestEmail,
@@ -103,7 +112,7 @@ export async function startGuestCheckout(input: StartGuestCheckoutInput) {
   }
 
   // ecocash
-  const result = await initiateEcocashPush({ phone: input.guestPhone!, amount: input.amount, reference });
+  const result = await initiateEcocashPush({ phone: input.guestPhone!, amount: totalCharge, reference });
   if (!result.ok) {
     await failGuestCheckout(reference);
     throw new Error(result.error || "Could not start EcoCash payment.");
@@ -150,6 +159,7 @@ export async function getGuestCheckoutStatus(reference: string) {
         transaction: {
           reference: string;
           amount: number;
+          fee: number;
           service_name: string;
           recipient: string;
           fulfillment_status: string;
