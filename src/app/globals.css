@@ -455,6 +455,14 @@ h3 {
   color: var(--green);
   background: var(--green-50);
 }
+.header-nav-item-chat {
+  color: #fff !important;
+  background: var(--green) !important;
+  font-weight: 700;
+}
+.header-nav-item-chat:hover {
+  background: #009e44 !important;
+}
 
 .app-header {
   display: none;
@@ -726,6 +734,51 @@ h3 {
   background: var(--green-50);
   border-radius: 14px;
   z-index: -1;
+}
+
+/* Chat sits center of the 5-tab bar — raised, always-green, larger tap
+   target so it reads as the app's signature action, not just another tab. */
+.nav-item-chat {
+  width: 64px;
+}
+.nav-item-chat.active::before {
+  display: none;
+}
+.nav-chat-badge {
+  position: absolute;
+  top: -22px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--green), #009e44);
+  box-shadow: 0 10px 22px -6px rgba(0, 200, 83, 0.55), 0 0 0 4px var(--bg);
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+}
+.nav-item-chat.active .nav-chat-badge {
+  transform: translateX(-50%) scale(1.08);
+  box-shadow: 0 12px 26px -6px rgba(0, 200, 83, 0.65), 0 0 0 4px var(--bg);
+}
+.nav-item-chat .nav-label {
+  margin-top: 24px;
+  opacity: 1;
+  transform: none;
+  color: var(--green);
+  font-weight: 700;
+}
+.nav-chat-dot {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--error);
+  border: 2px solid var(--bg);
 }
 
 /* ---------- FAB ---------- */

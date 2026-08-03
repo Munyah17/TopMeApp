@@ -127,7 +127,15 @@ export function ChatThread({
         <div style={{ flex: 1, fontWeight: 700, fontSize: 15 }}>{counterpart?.full_name || counterpart?.phone || "TopMe user"}</div>
       </div>
 
-      <div className="px content-narrow" style={{ paddingTop: 10, paddingBottom: 90 }}>
+      <div
+        className="px content-narrow"
+        style={{
+          paddingTop: 10,
+          paddingBottom: 90,
+          minHeight: "calc(100vh - 160px)",
+          background: "linear-gradient(180deg, var(--green-50) 0%, var(--bg) 220px)",
+        }}
+      >
         {messages.length === 0 && (
           <div className="muted" style={{ textAlign: "center", padding: "30px 0" }}>
             Say hello 👋
@@ -180,9 +188,10 @@ export function ChatThread({
               <div
                 style={{
                   maxWidth: 260,
-                  borderRadius: 16,
+                  borderRadius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
                   padding: "10px 14px",
                   fontSize: 14,
+                  boxShadow: "0 1px 2px rgba(15,23,42,0.06)",
                   background: mine ? "var(--green)" : "var(--surface)",
                   color: mine ? "#fff" : "var(--text)",
                   border: mine ? "none" : "1px solid var(--border)",

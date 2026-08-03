@@ -50,7 +50,12 @@ export function AppShell({
 
             <nav className="header-nav">
               {NAVTABS.map((t) => (
-                <Link key={t.id} href={t.href} className={`header-nav-item ${isActive(pathname, t.href) ? "active" : ""}`} style={{ position: "relative" }}>
+                <Link
+                  key={t.id}
+                  href={t.href}
+                  className={`header-nav-item ${t.id === "chat" ? "header-nav-item-chat" : ""} ${isActive(pathname, t.href) ? "active" : ""}`}
+                  style={{ position: "relative" }}
+                >
                   <Icon name={t.icon} size={17} stroke={2} />
                   <span>{t.label}</span>
                   {t.id === "chat" && unreadChatCount > 0 && (
@@ -123,28 +128,24 @@ export function AppShell({
         )}
 
         <nav className="bottom-nav">
-          {NAVTABS.map((t) => (
-            <Link key={t.id} href={t.href} className={`nav-item ${isActive(pathname, t.href) ? "active" : ""}`}>
-              <span style={{ position: "relative", display: "inline-flex" }}>
-                <Icon name={t.icon} size={22} stroke={2} />
-                {t.id === "chat" && unreadChatCount > 0 && (
-                  <span
-                    style={{
-                      position: "absolute",
-                      top: -1,
-                      right: -3,
-                      width: 7,
-                      height: 7,
-                      background: "var(--error)",
-                      borderRadius: "50%",
-                      border: "1.5px solid var(--surface)",
-                    }}
-                  />
-                )}
-              </span>
-              <span className="nav-label">{t.label}</span>
-            </Link>
-          ))}
+          {NAVTABS.map((t) =>
+            t.id === "chat" ? (
+              <Link key={t.id} href={t.href} className={`nav-item nav-item-chat ${isActive(pathname, t.href) ? "active" : ""}`}>
+                <span className="nav-chat-badge">
+                  <Icon name={t.icon} size={23} stroke={2.2} className="text-white" />
+                  {unreadChatCount > 0 && <span className="nav-chat-dot" />}
+                </span>
+                <span className="nav-label">{t.label}</span>
+              </Link>
+            ) : (
+              <Link key={t.id} href={t.href} className={`nav-item ${isActive(pathname, t.href) ? "active" : ""}`}>
+                <span style={{ position: "relative", display: "inline-flex" }}>
+                  <Icon name={t.icon} size={22} stroke={2} />
+                </span>
+                <span className="nav-label">{t.label}</span>
+              </Link>
+            )
+          )}
         </nav>
       </div>
     </div>
