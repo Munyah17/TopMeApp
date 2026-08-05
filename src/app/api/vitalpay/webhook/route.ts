@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
+import { recordIntegrationHealth } from "@/lib/integrations/health";
 
 /**
  * Receives VitalPay's async fulfillment webhooks (service.completed /
@@ -31,8 +32,12 @@ export async function POST(request: NextRequest) {
   const signature = request.headers.get("x-vitalpay-signature");
 
   if (!verifySignature(rawBody, signature)) {
+    void recordIntegrationHealth(createAdminClient(), "vitalpay", { success: false, error: "invalid_signature" });
     return NextResponse.json({ error: "invalid_signature" }, { status: 401 });
   }
+
+  const admin = createAdminClient();
+  void recordIntegrationHealth(admin, "vitalpay", { success: true });
 
   const payload = JSON.parse(rawBody) as {
     event: string;
@@ -44,7 +49,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true }); // acknowledge, nothing to do
   }
 
-  const admin = createAdminClient();
   const { data: tx } = await admin.from("transactions").select("id").eq("reference", reference).maybeSingle();
   if (!tx) return NextResponse.json({ ok: true });
 

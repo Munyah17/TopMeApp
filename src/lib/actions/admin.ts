@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { encryptSecret } from "@/lib/crypto";
+import { logAdminAction } from "@/lib/actions/audit";
 
 async function requireSuperadmin() {
   const supabase = await createClient();
@@ -98,7 +99,7 @@ export async function inviteTeamMember(input: { name: string; email: string; rol
     status: "invited",
   });
 
-  revalidatePath("/admin/team");
+  revalidatePath("/admin/staff");
 }
 
 export async function togglePermission(memberId: string, permission: string, currentPermissions: string[]) {
@@ -108,7 +109,77 @@ export async function togglePermission(memberId: string, permission: string, cur
     ? currentPermissions.filter((p) => p !== permission)
     : [...currentPermissions, permission];
   await admin.from("team_members").update({ permissions: next }).eq("id", memberId);
-  revalidatePath("/admin/team");
+  revalidatePath("/admin/staff");
+}
+
+// Activates an invited team member: this is the actual moment they gain
+// /admin access. Inviting alone only creates the auth user + team_members
+// row — profiles.role stays 'customer' (handle_new_user's default) until
+// this runs. Both writes go through the admin client because
+// prevent_role_self_escalation blocks any non-service-role change to
+// profiles.role, not just self-updates.
+export async function activateTeamMember(memberId: string) {
+  const { user: actingUser } = await requireSuperadmin();
+  const admin = createAdminClient();
+
+  const { data: member, error: memberError } = await admin.from("team_members").select("*").eq("id", memberId).single();
+  if (memberError || !member) throw new Error("Team member not found.");
+  if (!member.user_id) throw new Error("This invite hasn't been accepted yet — the person needs to complete signup first.");
+
+  const { error: statusError } = await admin.from("team_members").update({ status: "active" }).eq("id", memberId);
+  if (statusError) throw new Error(statusError.message);
+
+  const { data: updatedProfile, error: roleError } = await admin.from("profiles").update({ role: "admin" }).eq("id", member.user_id).select("role").single();
+  if (roleError) throw new Error(roleError.message);
+  if (updatedProfile?.role !== "admin") throw new Error("Role change didn't take — please try again or check the account isn't already superadmin.");
+
+  await logAdminAction(admin, { actorId: actingUser.id, action: "staff.activate", targetTable: "team_members", targetId: memberId, meta: { user_id: member.user_id } });
+
+  revalidatePath("/admin/staff");
+}
+
+// Offboards a team member: disables their team_members row and drops their
+// role back to customer, revoking /admin access immediately.
+export async function deactivateTeamMember(memberId: string) {
+  const { user: actingUser } = await requireSuperadmin();
+  const admin = createAdminClient();
+
+  const { data: member, error: memberError } = await admin.from("team_members").select("*").eq("id", memberId).single();
+  if (memberError || !member) throw new Error("Team member not found.");
+
+  await admin.from("team_members").update({ status: "disabled" }).eq("id", memberId);
+  if (member.user_id) {
+    const { data: target } = await admin.from("profiles").select("role").eq("id", member.user_id).single();
+    if (target?.role === "admin") {
+      await admin.from("profiles").update({ role: "customer" }).eq("id", member.user_id);
+    }
+  }
+
+  await logAdminAction(admin, { actorId: actingUser.id, action: "staff.deactivate", targetTable: "team_members", targetId: memberId, meta: { user_id: member.user_id } });
+
+  revalidatePath("/admin/staff");
+}
+
+// The highest-privilege, hardest-to-undo action in the system — deliberately
+// requires re-typing the target's email as a confirmation, not just a click.
+export async function promoteToSuperadmin(userId: string, confirmEmail: string) {
+  const { user: actingUser } = await requireSuperadmin();
+  const admin = createAdminClient();
+
+  const { data: target, error: targetError } = await admin.from("profiles").select("email, role").eq("id", userId).single();
+  if (targetError || !target) throw new Error("Account not found.");
+  if ((target.email || "").trim().toLowerCase() !== confirmEmail.trim().toLowerCase()) {
+    throw new Error("That email doesn't match — please retype it exactly to confirm.");
+  }
+
+  const { data: updated, error: roleError } = await admin.from("profiles").update({ role: "superadmin" }).eq("id", userId).select("role").single();
+  if (roleError) throw new Error(roleError.message);
+  if (updated?.role !== "superadmin") throw new Error("Role change didn't take — please try again.");
+
+  await logAdminAction(admin, { actorId: actingUser.id, action: "staff.promote_superadmin", targetTable: "profiles", targetId: userId });
+
+  revalidatePath("/admin/staff");
+  revalidatePath("/admin/users");
 }
 
 // Suspends or reactivates a customer account: blocks sign-in via Supabase
@@ -130,7 +201,13 @@ export async function toggleAccountSuspension(userId: string, currentlySuspended
   if (authError) throw new Error(authError.message);
 
   await admin.from("profiles").update({ is_suspended: nextSuspended }).eq("id", userId);
-  revalidatePath("/admin/customers");
+  await logAdminAction(admin, {
+    actorId: actingUser.id,
+    action: nextSuspended ? "user.suspend" : "user.reactivate",
+    targetTable: "profiles",
+    targetId: userId,
+  });
+  revalidatePath("/admin/users");
 }
 
 function revalidateCatalog() {
@@ -253,7 +330,7 @@ export async function toggleServiceActive(id: string, currentlyActive: boolean) 
 }
 
 export async function deleteService(id: string) {
-  await requireSuperadmin();
+  const { user } = await requireSuperadmin();
   const admin = createAdminClient();
   const { error } = await admin.from("services").delete().eq("id", id);
   if (error) {
@@ -263,28 +340,41 @@ export async function deleteService(id: string) {
         : error.message
     );
   }
+  await logAdminAction(admin, { actorId: user.id, action: "catalog.delete_service", targetTable: "services", targetId: id });
   revalidateCatalog();
 }
 
 function revalidateBanners() {
-  revalidatePath("/admin/banners");
+  revalidatePath("/admin/announcements");
   revalidatePath("/home");
 }
 
 export interface PromoBannerInput {
+  kind: "image" | "announcement";
   imageUrl: string;
   linkUrl: string;
+  title: string;
+  body: string;
+  audience: "customers" | "staff" | "all";
   sortOrder: number;
+}
+
+function promoBannerRow(input: PromoBannerInput) {
+  return {
+    kind: input.kind,
+    image_url: input.kind === "image" ? input.imageUrl : null,
+    link_url: input.linkUrl || null,
+    title: input.kind === "announcement" ? input.title || null : null,
+    body: input.kind === "announcement" ? input.body || null : null,
+    audience: input.audience,
+    sort_order: input.sortOrder,
+  };
 }
 
 export async function createPromoBanner(input: PromoBannerInput) {
   await requireSuperadmin();
   const admin = createAdminClient();
-  const { error } = await admin.from("promo_banners").insert({
-    image_url: input.imageUrl,
-    link_url: input.linkUrl || null,
-    sort_order: input.sortOrder,
-  });
+  const { error } = await admin.from("promo_banners").insert(promoBannerRow(input));
   if (error) throw new Error(error.message);
   revalidateBanners();
 }
@@ -292,10 +382,7 @@ export async function createPromoBanner(input: PromoBannerInput) {
 export async function updatePromoBanner(id: string, input: PromoBannerInput) {
   await requireSuperadmin();
   const admin = createAdminClient();
-  const { error } = await admin
-    .from("promo_banners")
-    .update({ image_url: input.imageUrl, link_url: input.linkUrl || null, sort_order: input.sortOrder })
-    .eq("id", id);
+  const { error } = await admin.from("promo_banners").update(promoBannerRow(input)).eq("id", id);
   if (error) throw new Error(error.message);
   revalidateBanners();
 }

@@ -65,10 +65,25 @@ export async function getActivePromoBanner(): Promise<PromoBanner | null> {
     .from("promo_banners")
     .select("*")
     .eq("is_active", true)
+    .eq("kind", "image")
     .order("sort_order")
     .limit(1)
     .maybeSingle();
   return (data as PromoBanner) ?? null;
+}
+
+// Text announcements (audience 'customers'|'staff'|'all') — separate from
+// the single image carousel banner above, can show several at once.
+export async function getActiveAnnouncements(audience: "customers" | "staff"): Promise<PromoBanner[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("promo_banners")
+    .select("*")
+    .eq("is_active", true)
+    .eq("kind", "announcement")
+    .in("audience", [audience, "all"])
+    .order("sort_order");
+  return (data as PromoBanner[]) ?? [];
 }
 
 export async function getAllPromoBanners(): Promise<PromoBanner[]> {

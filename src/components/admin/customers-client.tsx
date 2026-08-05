@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icons";
 import { toggleAccountSuspension } from "@/lib/actions/admin";
@@ -19,12 +20,12 @@ function CustomerRow({ customer }: { customer: Profile }) {
       <div className="ibadge round" style={{ width: 36, height: 36, background: "#F1F4F9", color: "var(--text-soft)", fontSize: 12, fontWeight: 700 }}>
         {(customer.full_name || customer.phone || customer.email || "?").slice(0, 2).toUpperCase()}
       </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <Link href={`/admin/users/${customer.id}`} style={{ flex: 1, minWidth: 0, textDecoration: "none", color: "inherit" }}>
         <div style={{ fontWeight: 700, fontSize: 13.5 }}>{customer.full_name || "Unnamed"}</div>
         <div className="muted" style={{ fontSize: 11.5 }}>
           {customer.phone || "No phone"} · {customer.email || "No email"} · {ROLE_LABEL[customer.role]}
         </div>
-      </div>
+      </Link>
       {error && (
         <div className="muted" style={{ color: "var(--error)", fontSize: 11 }}>
           {error}

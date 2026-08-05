@@ -248,12 +248,12 @@ export default async function HomePage() {
                   promoBanner.link_url ? (
                     <Link href={promoBanner.link_url} className="mt-3 tap" style={{ display: "block", borderRadius: 20, overflow: "hidden" }}>
                       {/* eslint-disable-next-line @next/next/no-img-element -- admin-managed banner, arbitrary host */}
-                      <img src={promoBanner.image_url} alt="Promotion" style={{ width: "100%", display: "block" }} />
+                      <img src={promoBanner.image_url ?? ""} alt="Promotion" style={{ width: "100%", display: "block" }} />
                     </Link>
                   ) : (
                     <div className="mt-3" style={{ borderRadius: 20, overflow: "hidden" }}>
                       {/* eslint-disable-next-line @next/next/no-img-element -- admin-managed banner, arbitrary host */}
-                      <img src={promoBanner.image_url} alt="Promotion" style={{ width: "100%", display: "block" }} />
+                      <img src={promoBanner.image_url ?? ""} alt="Promotion" style={{ width: "100%", display: "block" }} />
                     </div>
                   )
                 )}

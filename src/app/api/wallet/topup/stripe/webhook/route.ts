@@ -3,6 +3,7 @@ import { getStripe } from "@/lib/payments/stripe";
 import { createAdminClient } from "@/lib/supabase/server";
 import { notifyTopupResult } from "@/lib/email/notify";
 import { finalizeGuestCheckout } from "@/lib/payments/guest-checkout";
+import { recordIntegrationHealth } from "@/lib/integrations/health";
 import type Stripe from "stripe";
 
 export async function POST(request: NextRequest) {
@@ -16,9 +17,11 @@ export async function POST(request: NextRequest) {
   let event: Stripe.Event;
   try {
     event = getStripe().webhooks.constructEvent(rawBody, signature, webhookSecret);
-  } catch {
+  } catch (e) {
+    void recordIntegrationHealth(createAdminClient(), "stripe", { success: false, error: e instanceof Error ? e.message : "invalid_signature" });
     return NextResponse.json({ error: "invalid_signature" }, { status: 400 });
   }
+  void recordIntegrationHealth(createAdminClient(), "stripe", { success: true });
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;

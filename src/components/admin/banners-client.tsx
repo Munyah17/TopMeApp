@@ -27,14 +27,20 @@ function BannerRow({ banner }: { banner: PromoBanner }) {
 
   return (
     <div className="row gap-2" style={{ padding: "12px 16px", borderBottom: "1px solid var(--border)", opacity: banner.is_active ? 1 : 0.5 }}>
-      {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary admin-supplied banner URL */}
-      <img src={banner.image_url} alt="" style={{ width: 64, height: 40, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />
+      {banner.kind === "image" ? (
+        // eslint-disable-next-line @next/next/no-img-element -- arbitrary admin-supplied banner URL
+        <img src={banner.image_url ?? ""} alt="" style={{ width: 64, height: 40, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />
+      ) : (
+        <div className="ibadge round" style={{ width: 40, height: 40, background: "var(--blue-50)", color: "var(--blue)", flexShrink: 0 }}>
+          <Icon name="monitor" size={17} stroke={1.8} />
+        </div>
+      )}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontWeight: 700, fontSize: 13.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {banner.image_url}
+          {banner.kind === "image" ? banner.image_url : banner.title}
         </div>
         <div className="muted" style={{ fontSize: 11.5 }}>
-          {banner.link_url || "No link"} · sort {banner.sort_order}
+          {banner.kind === "image" ? banner.link_url || "No link" : `${banner.audience} · ${banner.body}`} · sort {banner.sort_order}
         </div>
       </div>
       {error && (

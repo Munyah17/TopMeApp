@@ -1209,3 +1209,113 @@ h3 {
 .chat-send-btn:not(:disabled):active {
   transform: scale(0.92);
 }
+
+/* ---------- Admin command center shell ---------- */
+.admin-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+.admin-sidebar {
+  display: none;
+}
+.admin-tabstrip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  -webkit-overflow-scrolling: touch;
+}
+.admin-tabstrip::-webkit-scrollbar {
+  display: none;
+}
+.admin-tabstrip-item {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.admin-content {
+  flex: 1;
+  min-width: 0;
+}
+@media (min-width: 900px) {
+  .admin-shell {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 24px;
+  }
+  .admin-tabstrip {
+    display: none;
+  }
+  .admin-sidebar {
+    display: flex;
+    flex-direction: column;
+    width: 232px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 84px;
+    max-height: calc(100vh - 100px);
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 14px;
+    gap: 2px;
+  }
+  .admin-sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 8px 12px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 8px;
+  }
+  .admin-nav-group {
+    margin-bottom: 6px;
+  }
+  .admin-nav-group-label {
+    font-size: 10.5px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-faint);
+    padding: 10px 8px 4px;
+  }
+  .admin-sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    border-radius: 10px;
+    color: var(--text-soft);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+    transition: background 0.15s, color 0.15s;
+  }
+  .admin-sidebar-item:hover {
+    background: var(--bg);
+  }
+  .admin-sidebar-item.active {
+    background: var(--green-50);
+    color: var(--green);
+    font-weight: 700;
+  }
+  .admin-sidebar-exit {
+    margin-top: 10px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    color: var(--text-faint);
+  }
+  .admin-content {
+    padding-top: 2px;
+  }
+}

@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { notifyTopupResult } from "@/lib/email/notify";
 import { finalizeGuestCheckout, failGuestCheckout } from "@/lib/payments/guest-checkout";
+import { recordIntegrationHealth } from "@/lib/integrations/health";
 import type { TopupIntent } from "@/types/database";
 
 // Shared by the Paynow result_url webhook and the manual "Check Payment"
@@ -10,6 +11,11 @@ export async function applyPaynowResult(reference: string, status: string, meta?
   const admin = createAdminClient();
   const success = status === "paid" || status === "awaiting delivery" || status === "delivered";
   const failed = status === "cancelled" || status === "disputed";
+  // A real status came back from Paynow either way — that's what "healthy"
+  // means here, not whether the payment itself succeeded.
+  if (success || failed) {
+    void recordIntegrationHealth(admin, "paynow", { success: true });
+  }
 
   const { data: intent } = await admin
     .from("topup_intents")

@@ -28,15 +28,21 @@ function isActive(pathname: string, href: string) {
 export function AppShell({
   profile,
   unreadChatCount = 0,
+  chatEnabled = true,
+  announcements,
   children,
 }: {
   profile: Profile | null;
   unreadChatCount?: number;
+  chatEnabled?: boolean;
+  announcements?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
   const router = useRouter();
   const showFab = pathname === "/home";
+  const isAdminSection = pathname.startsWith("/admin");
+  const navTabs = chatEnabled ? NAVTABS : NAVTABS.filter((t) => t.id !== "chat");
 
   return (
     <div className="app-shell">
@@ -49,7 +55,7 @@ export function AppShell({
             </Link>
 
             <nav className="header-nav">
-              {NAVTABS.map((t) => (
+              {navTabs.map((t) => (
                 <Link
                   key={t.id}
                   href={t.href}
@@ -116,6 +122,7 @@ export function AppShell({
 
         <div className="view-area">
           <div className="screen-pad page-enter" key={pathname}>
+            {!isAdminSection && announcements}
             {children}
           </div>
           <Footer />
@@ -128,7 +135,7 @@ export function AppShell({
         )}
 
         <nav className="bottom-nav">
-          {NAVTABS.map((t) =>
+          {navTabs.map((t) =>
             t.id === "chat" ? (
               <Link key={t.id} href={t.href} className={`nav-item nav-item-chat ${isActive(pathname, t.href) ? "active" : ""}`}>
                 <span className="nav-chat-badge">

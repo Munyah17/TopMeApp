@@ -1,50 +1,14 @@
 import Link from "next/link";
 import { Icon } from "@/components/icons";
-import { createClient } from "@/lib/supabase/server";
 import { fmt } from "@/lib/data/catalog-helpers";
 import { getAllServices, getCurrentProfile } from "@/lib/data/queries";
-import type { Transaction } from "@/types/database";
-
-const ROLE_LABEL: Record<string, string> = { superadmin: "Super Admin", admin: "Admin", customer: "Customer" };
+import { getAttentionCount } from "@/lib/data/admin-queries";
+import { createClient } from "@/lib/supabase/server";
+import type { IntegrationHealth, Transaction } from "@/types/database";
 
 export default async function AdminPage() {
   const profile = await getCurrentProfile();
   if (!profile) return null;
-
-  if (profile.role === "customer") {
-    return (
-      <div>
-        <div className="topbar">
-          <Link href="/account" className="backbtn tap" style={{ textDecoration: "none" }}>
-            <Icon name="chevronL" size={18} stroke={2.2} />
-          </Link>
-          <div style={{ fontWeight: 700, fontSize: 15.5 }}>Admin Dashboard</div>
-        </div>
-        <div className="px content-wrap">
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "50px 20px" }}>
-            <div
-              style={{
-                width: 74,
-                height: 74,
-                borderRadius: 22,
-                background: "#F1F4F9",
-                color: "var(--text-faint)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Icon name="lock" size={32} stroke={1.6} />
-            </div>
-            <div style={{ fontWeight: 700, fontSize: 15, marginTop: 16 }}>Access restricted</div>
-            <div className="muted mt-1" style={{ maxWidth: 260 }}>
-              This area is for TopMe staff accounts only.
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   const supabase = await createClient();
   const since7dDate = new Date();
@@ -53,10 +17,13 @@ export default async function AdminPage() {
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
 
-  const [{ data: recentTx }, services] = await Promise.all([
+  const [{ data: recentTx }, services, attentionCount, { data: healthData }] = await Promise.all([
     supabase.from("transactions").select("*").gte("created_at", since7d).order("created_at", { ascending: false }),
     getAllServices(true),
+    getAttentionCount(),
+    supabase.from("integration_health").select("*").order("id"),
   ]);
+  const health = (healthData as IntegrationHealth[]) ?? [];
   const tx = (recentTx as Transaction[]) ?? [];
   const serviceById = new Map(services.map((s) => [s.id, s]));
 
@@ -105,99 +72,44 @@ export default async function AdminPage() {
 
   return (
     <div>
-      <div className="topbar">
-        <Link href="/account" className="backbtn tap" style={{ textDecoration: "none" }}>
-          <Icon name="chevronL" size={18} stroke={2.2} />
-        </Link>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 700, fontSize: 15.5 }}>Admin Dashboard</div>
-        </div>
-        <span
-          style={{
-            background: profile.role === "superadmin" ? "#F3EEFE" : "#EAF8FF",
-            color: profile.role === "superadmin" ? "#8B5CF6" : "#38BDF8",
-            fontSize: 10,
-            fontWeight: 800,
-            padding: "4px 9px",
-            borderRadius: 7,
-            textTransform: "uppercase",
-            letterSpacing: "0.04em",
-          }}
+      <h2 style={{ fontSize: 19 }}>Main Instruments</h2>
+      <div className="muted mb-3">Today&apos;s snapshot — see Reports for the full picture.</div>
+
+      {attentionCount > 0 && (
+        <Link
+          href="/admin/operations"
+          className="card card-pad tap row gap-2 mb-2"
+          style={{ textDecoration: "none", borderColor: "var(--warning)", background: "#FEF6E7" }}
         >
-          {ROLE_LABEL[profile.role]}
-        </span>
-      </div>
-      <div className="px content-wrap">
-        <div className="row gap-2 mt-1">
-          <Link href="/admin/customers" className="card card-pad tap row gap-2" style={{ flex: 1, textDecoration: "none" }}>
-            <div className="ibadge round" style={{ width: 36, height: 36, background: "#EAF8FF", color: "var(--blue)" }}>
-              <Icon name="users" size={17} stroke={1.8} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: "var(--text)" }}>Customer Accounts</div>
-              <div className="muted" style={{ fontSize: 11 }}>
-                Suspend or reactivate
-              </div>
-            </div>
-            <Icon name="chevronR" size={16} stroke={2} />
-          </Link>
-        </div>
-
-        {profile.role === "superadmin" && (
-          <div className="row gap-2 mt-2">
-            <Link href="/admin/products" className="card card-pad tap row gap-2" style={{ flex: 1, textDecoration: "none" }}>
-              <div className="ibadge round" style={{ width: 36, height: 36, background: "#FEF6E7", color: "var(--warning)" }}>
-                <Icon name="grid" size={17} stroke={1.8} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, fontSize: 13, color: "var(--text)" }}>Products & Services</div>
-                <div className="muted" style={{ fontSize: 11 }}>
-                  Catalog
-                </div>
-              </div>
-              <Icon name="chevronR" size={16} stroke={2} />
-            </Link>
-            <Link href="/admin/apis" className="card card-pad tap row gap-2" style={{ flex: 1, textDecoration: "none" }}>
-              <div className="ibadge round" style={{ width: 36, height: 36, background: "var(--green-50)", color: "var(--green)" }}>
-                <Icon name="plug" size={17} stroke={1.8} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, fontSize: 13, color: "var(--text)" }}>APIs Management</div>
-                <div className="muted" style={{ fontSize: 11 }}>
-                  Integrations
-                </div>
-              </div>
-              <Icon name="chevronR" size={16} stroke={2} />
-            </Link>
-            <Link href="/admin/team" className="card card-pad tap row gap-2" style={{ flex: 1, textDecoration: "none" }}>
-              <div className="ibadge round" style={{ width: 36, height: 36, background: "#F3EEFE", color: "#8B5CF6" }}>
-                <Icon name="users" size={17} stroke={1.8} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, fontSize: 13, color: "var(--text)" }}>Team & Roles</div>
-                <div className="muted" style={{ fontSize: 11 }}>
-                  Staff & permissions
-                </div>
-              </div>
-              <Icon name="chevronR" size={16} stroke={2} />
-            </Link>
-            <Link href="/admin/banners" className="card card-pad tap row gap-2" style={{ flex: 1, textDecoration: "none" }}>
-              <div className="ibadge round" style={{ width: 36, height: 36, background: "var(--blue-50)", color: "var(--blue)" }}>
-                <Icon name="monitor" size={17} stroke={1.8} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, fontSize: 13, color: "var(--text)" }}>Home Banner</div>
-                <div className="muted" style={{ fontSize: 11 }}>
-                  Promo image
-                </div>
-              </div>
-              <Icon name="chevronR" size={16} stroke={2} />
-            </Link>
+          <div className="ibadge round" style={{ width: 34, height: 34, background: "#fff", color: "var(--warning)" }}>
+            <Icon name="alert" size={17} stroke={2} />
           </div>
-        )}
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 700, fontSize: 13.5 }}>{attentionCount} item{attentionCount === 1 ? "" : "s"} need attention</div>
+            <div className="muted" style={{ fontSize: 11.5 }}>Stuck payments or top-ups — open Operations Center</div>
+          </div>
+          <Icon name="chevronR" size={16} stroke={2} />
+        </Link>
+      )}
 
-        <div className="row gap-2 mt-2">
-          <div className="card card-pad" style={{ flex: 1 }}>
+      <div className="row gap-2" style={{ flexWrap: "wrap" }}>
+        {health.map((h) => {
+          const healthy = h.consecutive_failures === 0 && !!h.last_success_at;
+          const neverHeard = !h.last_success_at && !h.last_failure_at;
+          const color = neverHeard ? "var(--text-faint)" : healthy ? "var(--success)" : "var(--error)";
+          return (
+            <div key={h.id} className="card card-pad" style={{ flex: "1 1 100px", textAlign: "center" }}>
+              <div className="muted" style={{ fontSize: 11 }}>{h.label}</div>
+              <div style={{ fontWeight: 800, fontSize: 13, marginTop: 4, color }}>
+                {neverHeard ? "Unknown" : healthy ? "Healthy" : "Failing"}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="row gap-2 mt-2">
+        <div className="card card-pad" style={{ flex: 1 }}>
             <div className="muted">Today&apos;s gross volume</div>
             <div style={{ fontWeight: 800, fontSize: 19, marginTop: 2 }}>{fmt(todayGross)}</div>
           </div>
@@ -290,7 +202,6 @@ export default async function AdminPage() {
             ))
           )}
         </div>
-      </div>
     </div>
   );
 }

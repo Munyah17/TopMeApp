@@ -176,7 +176,7 @@ export default async function AccountPage() {
                   </div>
                   <Icon name="chevronR" size={17} stroke={2} />
                 </Link>
-                <Link href="/admin/team" className="row gap-2 tap" style={{ padding: "14px 16px", textDecoration: "none" }}>
+                <Link href="/admin/staff" className="row gap-2 tap" style={{ padding: "14px 16px", textDecoration: "none" }}>
                   <div className="ibadge round" style={{ width: 38, height: 38, background: "#F1F4F9", color: "var(--text-soft)" }}>
                     <Icon name="users" size={17} stroke={1.8} />
                   </div>

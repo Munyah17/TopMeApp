@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { getEcocashStatus } from "@/lib/payments/ecocash";
 import { notifyTopupResult } from "@/lib/email/notify";
+import { recordIntegrationHealth } from "@/lib/integrations/health";
 import type { TopupIntent } from "@/types/database";
 
 // Called from the client while showing "Approve on your phone". Uses the
@@ -28,6 +29,7 @@ export async function POST(request: NextRequest) {
 
   if (providerStatus === "completed") {
     const admin = createAdminClient();
+    void recordIntegrationHealth(admin, "ecocash", { success: true });
     await admin.rpc("wallet_topup", {
       p_user_id: intent.user_id,
       p_amount: intent.amount,

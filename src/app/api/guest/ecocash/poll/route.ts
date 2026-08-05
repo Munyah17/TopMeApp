@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import { getEcocashStatus } from "@/lib/payments/ecocash";
 import { finalizeGuestCheckout, failGuestCheckout } from "@/lib/payments/guest-checkout";
+import { recordIntegrationHealth } from "@/lib/integrations/health";
 
 // Called from the client while showing "Approve on your phone" during a
 // guest checkout. There is no session to scope by (the payer has no
@@ -26,6 +27,7 @@ export async function POST(request: NextRequest) {
   const providerStatus = await getEcocashStatus(endUserId, reference);
 
   if (providerStatus === "completed") {
+    void recordIntegrationHealth(admin, "ecocash", { success: true });
     const tx = await finalizeGuestCheckout(reference);
     return NextResponse.json({ status: "completed", transaction: tx });
   }

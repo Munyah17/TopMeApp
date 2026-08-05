@@ -53,5 +53,24 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Maintenance mode: blocks everyone except staff, and never blocks /admin
+  // itself or the maintenance page (so it can always be turned back off).
+  const exemptFromMaintenance = pathname.startsWith("/admin") || pathname.startsWith("/maintenance") || pathname.startsWith("/api");
+  if (!exemptFromMaintenance) {
+    const { data: maintenanceOn } = await supabase.rpc("get_public_setting", { p_key: "maintenance_mode" });
+    if (maintenanceOn === true) {
+      let isStaff = false;
+      if (user) {
+        const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+        isStaff = profile?.role === "admin" || profile?.role === "superadmin";
+      }
+      if (!isStaff) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/maintenance";
+        return NextResponse.redirect(url);
+      }
+    }
+  }
+
   return supabaseResponse;
 }

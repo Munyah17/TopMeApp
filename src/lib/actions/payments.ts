@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { getFulfillmentProvider, hasRealCoverage } from "@/lib/fulfillment";
+import { isFeatureEnabled } from "@/lib/data/flags";
 import { findProfileByPhone } from "@/lib/data/queries";
 import { sendEmail } from "@/lib/email/client";
 import { giftSentEmail, moneyReceivedEmail, moneySentEmail, paymentReceiptEmail } from "@/lib/email/templates";
@@ -16,6 +17,7 @@ const FRIENDLY_ERRORS: Record<string, string> = {
   recipient_not_found: "No TopMe account found with that phone number.",
   cannot_pay_self: "You can't send money to your own number.",
   service_unavailable: "This service isn't available right now. Please check back soon.",
+  feature_disabled: "This feature is temporarily turned off. Please check back soon.",
 };
 
 function friendlyError(message: string) {
@@ -131,6 +133,8 @@ export async function payService(input: PayServiceInput) {
 }
 
 export async function sendGiftVoucher(receiverPhone: string, amount: number, senderPhone?: string) {
+  if (!(await isFeatureEnabled("gift_vouchers_enabled"))) throw new Error(FRIENDLY_ERRORS.feature_disabled);
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -164,6 +168,8 @@ export async function lookupRecipient(phone: string) {
 // (unlike a gift voucher, this requires the receiver to already have an
 // account — resolved by phone number via the wallet_transfer RPC).
 export async function sendMoney(receiverPhone: string, amount: number, note?: string, kind: "transfer" | "red_packet" = "transfer") {
+  if (!(await isFeatureEnabled("p2p_transfers_enabled"))) throw new Error(FRIENDLY_ERRORS.feature_disabled);
+
   const supabase = await createClient();
   const {
     data: { user },

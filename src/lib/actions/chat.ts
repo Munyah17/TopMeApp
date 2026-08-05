@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { findProfileByPhone } from "@/lib/data/queries";
+import { isFeatureEnabled } from "@/lib/data/flags";
 import { sendMoney } from "@/lib/actions/payments";
 import type { Conversation } from "@/types/database";
 
@@ -11,6 +12,7 @@ const FRIENDLY_ERRORS: Record<string, string> = {
   recipient_not_found: "No TopMe account found with that phone number.",
   cannot_chat_self: "You can't start a chat with your own number.",
   not_authenticated: "Please log in again to continue.",
+  feature_disabled: "Chat is temporarily turned off. Please check back soon.",
 };
 
 function friendlyError(message: string) {
@@ -28,6 +30,8 @@ async function requireUser() {
 }
 
 export async function startConversation(phone: string) {
+  if (!(await isFeatureEnabled("chat_enabled"))) throw new Error(FRIENDLY_ERRORS.feature_disabled);
+
   const { supabase } = await requireUser();
 
   const profile = await findProfileByPhone(phone.trim());

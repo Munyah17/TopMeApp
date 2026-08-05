@@ -7,8 +7,12 @@ export type VoucherStatus = "active" | "redeemed" | "expired";
 
 export interface PromoBanner {
   id: string;
-  image_url: string;
+  kind: "image" | "announcement";
+  image_url: string | null;
   link_url: string | null;
+  title: string | null;
+  body: string | null;
+  audience: "customers" | "staff" | "all";
   is_active: boolean;
   sort_order: number;
   created_at: string;
@@ -34,7 +38,7 @@ export interface Wallet {
 export interface WalletLedgerRow {
   id: string;
   user_id: string;
-  type: "topup" | "debit" | "refund" | "gift_send" | "gift_redeem" | "p2p_send" | "p2p_receive";
+  type: "topup" | "debit" | "refund" | "gift_send" | "gift_redeem" | "p2p_send" | "p2p_receive" | "adjustment";
   amount: number;
   provider: string | null;
   reference: string | null;
@@ -201,6 +205,105 @@ export interface TopupIntent {
   status: "pending" | "completed" | "failed";
   meta: Record<string, unknown>;
   created_at: string;
+}
+
+export interface GuestCheckoutIntent {
+  id: string;
+  reference: string;
+  service_id: string;
+  network_id: string | null;
+  recipient_identifier: string;
+  extra_value: string | null;
+  amount: number;
+  fee: number;
+  guest_email: string | null;
+  guest_phone: string | null;
+  provider: "paynow" | "stripe" | "ecocash";
+  status: "pending" | "completed" | "failed";
+  transaction_id: string | null;
+  meta: Record<string, unknown>;
+  created_at: string;
+}
+
+export type DisputeStatus = "open" | "investigating" | "resolved" | "rejected";
+export interface Dispute {
+  id: string;
+  raised_by: string | null;
+  transaction_id: string | null;
+  assigned_to: string | null;
+  status: DisputeStatus;
+  subject: string;
+  description: string | null;
+  resolution_note: string | null;
+  created_at: string;
+  updated_at: string;
+  resolved_at: string | null;
+}
+export interface DisputeMessage {
+  id: string;
+  dispute_id: string;
+  sender_id: string;
+  body: string;
+  created_at: string;
+}
+
+export type TicketStatus = "open" | "in_progress" | "resolved" | "closed";
+export type TicketPriority = "low" | "normal" | "high" | "urgent";
+export interface SupportTicket {
+  id: string;
+  user_id: string | null;
+  guest_email: string | null;
+  guest_phone: string | null;
+  subject: string;
+  status: TicketStatus;
+  priority: TicketPriority;
+  assigned_to: string | null;
+  created_at: string;
+  updated_at: string;
+}
+export interface SupportTicketMessage {
+  id: string;
+  ticket_id: string;
+  sender_id: string | null;
+  body: string;
+  created_at: string;
+}
+
+export type TaskStatus = "todo" | "in_progress" | "done" | "cancelled";
+export interface AdminTask {
+  id: string;
+  title: string;
+  description: string | null;
+  status: TaskStatus;
+  priority: TicketPriority;
+  assigned_to: string | null;
+  created_by: string | null;
+  related_table: string | null;
+  related_id: string | null;
+  due_at: string | null;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+}
+
+export interface AdminAuditLogRow {
+  id: string;
+  actor_id: string | null;
+  action: string;
+  target_table: string | null;
+  target_id: string | null;
+  meta: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface IntegrationHealth {
+  id: string;
+  label: string;
+  last_success_at: string | null;
+  last_failure_at: string | null;
+  last_error: string | null;
+  consecutive_failures: number;
+  updated_at: string;
 }
 
 export interface ApiModuleSafe {
