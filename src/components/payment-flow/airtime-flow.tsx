@@ -301,6 +301,11 @@ export function AirtimeFlow({
                 <Link href="/wallet" style={{ color: "var(--error)", fontWeight: 700 }}>Top up now</Link>
               </div>
             )}
+            {guestMissingInfo && (
+              <div className="muted mt-2" style={{ color: "var(--warning)" }}>
+                {!guestEmail.trim() ? "Enter your email above to continue." : "Enter your EcoCash number above to continue."}
+              </div>
+            )}
 
             <button
               className="btn btn-primary btn-block mt-4"

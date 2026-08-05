@@ -695,7 +695,7 @@ function ReviewStep({
           />
 
           <label className="field-label mt-2">Pay with</label>
-          <div className="row gap-2">
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {(
               [
                 { id: "paynow", label: "Paynow" },
@@ -703,14 +703,14 @@ function ReviewStep({
                 { id: "ecocash", label: "EcoCash" },
               ] as { id: GuestGateway; label: string }[]
             ).map((g) => (
-              <div
+              <label
                 key={g.id}
-                className={`chip tap ${gateway === g.id ? "selected" : ""}`}
-                style={{ flex: 1, textAlign: "center" }}
-                onClick={() => setGateway(g.id)}
+                className="card tap row gap-2"
+                style={{ padding: "12px 14px", cursor: "pointer", borderColor: gateway === g.id ? "var(--green)" : "var(--border)" }}
               >
-                {g.label}
-              </div>
+                <input type="radio" checked={gateway === g.id} onChange={() => setGateway(g.id)} />
+                <span style={{ flex: 1, fontWeight: 700, fontSize: 13.5 }}>{g.label}</span>
+              </label>
             ))}
           </div>
 
@@ -739,6 +739,11 @@ function ReviewStep({
           <Link href="/wallet" style={{ color: "var(--error)", fontWeight: 700 }}>
             Top up now
           </Link>
+        </div>
+      )}
+      {guestMissingInfo && (
+        <div className="muted mt-2" style={{ color: "var(--warning)" }}>
+          {!guestEmail.trim() ? "Enter your email above to continue." : "Enter your EcoCash number above to continue."}
         </div>
       )}
 

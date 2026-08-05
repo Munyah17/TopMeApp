@@ -176,7 +176,7 @@ export function GuestPaySection({
       <input className="field" type="email" placeholder="you@example.com" value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} />
 
       <label className="field-label mt-2">Pay with</label>
-      <div className="row gap-2">
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {(
           [
             { id: "paynow", label: "Paynow" },
@@ -184,9 +184,14 @@ export function GuestPaySection({
             { id: "ecocash", label: "EcoCash" },
           ] as { id: GuestGateway; label: string }[]
         ).map((g) => (
-          <div key={g.id} className={`chip tap ${gateway === g.id ? "selected" : ""}`} style={{ flex: 1, textAlign: "center" }} onClick={() => setGateway(g.id)}>
-            {g.label}
-          </div>
+          <label
+            key={g.id}
+            className="card tap row gap-2"
+            style={{ padding: "12px 14px", cursor: "pointer", borderColor: gateway === g.id ? "var(--green)" : "var(--border)" }}
+          >
+            <input type="radio" checked={gateway === g.id} onChange={() => setGateway(g.id)} />
+            <span style={{ flex: 1, fontWeight: 700, fontSize: 13.5 }}>{g.label}</span>
+          </label>
         ))}
       </div>
 
