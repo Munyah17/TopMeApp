@@ -157,16 +157,22 @@ const METHOD_STYLES: Record<PaymentMethod, { label: string; background: string; 
   stripe: { label: "Pay With Stripe", background: "#635BFF", color: "#fff", icon: "smartphone" },
 };
 
+export type PaymentBanners = Partial<Record<GuestGateway, string>>;
+
 // Payment method picker: wallet balance, Paynow, EcoCash Instant, and
 // Stripe are four equal options — none pre-selected, none the "default"
 // with the others as fallbacks. A logged-in user picking a gateway still
 // gets attributed to their account (not treated as an anonymous guest —
-// see startGuestCheckout); a guest only ever sees the 3 gateways. Kept as
-// its own component so bespoke flows don't have to duplicate the gateway
-// logic, while payment handling itself never changes per-service.
+// see startGuestCheckout); a guest only ever sees the 3 gateways. Wallet is
+// always the plain styled button (there's nothing to brand); the 3
+// gateways use an admin-uploaded banner image when one is set (see
+// /admin/settings), falling back to the styled button until one is.
+// Kept as its own component so bespoke flows don't have to duplicate the
+// gateway logic, while payment handling itself never changes per-service.
 export function PaymentMethodSection({
   showWallet,
   walletBalance,
+  banners,
   method,
   setMethod,
   guestEmail,
@@ -176,6 +182,7 @@ export function PaymentMethodSection({
 }: {
   showWallet: boolean;
   walletBalance?: number;
+  banners?: PaymentBanners;
   method: PaymentMethod | null;
   setMethod: (v: PaymentMethod) => void;
   guestEmail: string;
@@ -193,6 +200,32 @@ export function PaymentMethodSection({
         {methods.map((m) => {
           const style = METHOD_STYLES[m];
           const selected = method === m;
+          const bannerUrl = m !== "wallet" ? banners?.[m] : undefined;
+
+          if (bannerUrl) {
+            return (
+              <button
+                key={m}
+                type="button"
+                className="tap"
+                onClick={() => setMethod(m)}
+                style={{
+                  display: "block",
+                  padding: 0,
+                  border: "none",
+                  borderRadius: 14,
+                  overflow: "hidden",
+                  cursor: "pointer",
+                  boxShadow: selected ? "0 0 0 3px var(--green)" : "0 0 0 1px var(--border)",
+                  lineHeight: 0,
+                }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element -- admin-uploaded banner, arbitrary host */}
+                <img src={bannerUrl} alt={style.label} style={{ width: "100%", display: "block" }} />
+              </button>
+            );
+          }
+
           return (
             <button
               key={m}
@@ -229,17 +262,13 @@ export function PaymentMethodSection({
       {isGateway && (
         <>
           <div className="muted mt-3 mb-2" style={{ fontSize: 13 }}>
-            {showWallet ? "We'll email your receipt." : "No account needed. Pay directly and we'll email your receipt."}
+            {showWallet ? "We'll email and SMS your receipt." : "No account needed. Pay directly and we'll email and SMS your receipt."}
           </div>
           <label className="field-label">Email for receipt</label>
           <input className="field" type="email" placeholder="you@example.com" value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} />
 
-          {method === "ecocash" && (
-            <>
-              <label className="field-label mt-2">EcoCash Number</label>
-              <input className="field" placeholder="077 123 4567" value={guestPhone} onChange={(e) => setGuestPhone(e.target.value)} />
-            </>
-          )}
+          <label className="field-label mt-2">{method === "ecocash" ? "EcoCash Number" : "Phone (for SMS receipt)"}</label>
+          <input className="field" placeholder="077 123 4567" value={guestPhone} onChange={(e) => setGuestPhone(e.target.value)} />
 
           <div className="muted mt-2" style={{ fontSize: 11.5, display: "flex", alignItems: "center", gap: 6 }}>
             <Icon name="lock" size={13} stroke={2} /> Secured by {method === "paynow" ? "Paynow Zimbabwe" : method === "stripe" ? "Stripe" : "EcoCash"}

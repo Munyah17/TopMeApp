@@ -10,7 +10,7 @@ import { calculatePlatformFee } from "@/lib/fees";
 import { payService } from "@/lib/actions/payments";
 import { startGuestCheckout, type GuestGateway } from "@/lib/actions/guest-payments";
 import { addGuestActivity } from "@/lib/guest-activity";
-import { DenomTile, NetworkTile, PaymentMethodSection, ReviewRow, EditableRow, type PaymentMethod } from "./flow-shared";
+import { DenomTile, NetworkTile, PaymentMethodSection, ReviewRow, EditableRow, type PaymentBanners, type PaymentMethod } from "./flow-shared";
 import type { Network, Service, Transaction } from "@/types/database";
 
 type Step = "operator" | "recipient" | "amount" | "review" | "processing" | "guest-ecocash" | "success" | "receipt" | "error";
@@ -31,6 +31,7 @@ export function AirtimeFlow({
   isGuest = false,
   guestEmail: initialGuestEmail = "",
   guestPhone: initialGuestPhone = "",
+  banners,
 }: {
   service: Service;
   networks: Network[];
@@ -38,6 +39,7 @@ export function AirtimeFlow({
   isGuest?: boolean;
   guestEmail?: string;
   guestPhone?: string;
+  banners?: PaymentBanners;
 }) {
   const router = useRouter();
   const [step, setStep] = useState<Step>("operator");
@@ -298,6 +300,7 @@ export function AirtimeFlow({
             <PaymentMethodSection
               showWallet={!isGuest}
               walletBalance={walletBalance}
+              banners={banners}
               method={method}
               setMethod={setMethod}
               guestEmail={guestEmail}
@@ -306,6 +309,11 @@ export function AirtimeFlow({
               setGuestPhone={setGuestPhone}
             />
 
+            {noMethodChosen && (
+              <div className="muted mt-2" style={{ color: "var(--warning)" }}>
+                Choose a payment method above to continue.
+              </div>
+            )}
             {insufficient && (
               <div className="muted mt-2" style={{ color: "var(--error)" }}>
                 Your wallet balance is too low for this.{" "}
@@ -317,18 +325,13 @@ export function AirtimeFlow({
                 {!guestEmail.trim() ? "Enter your email above to continue." : "Enter your EcoCash number above to continue."}
               </div>
             )}
-            {noMethodChosen && (
-              <div className="muted mt-2" style={{ color: "var(--warning)" }}>
-                Choose a payment method above to continue.
-              </div>
-            )}
 
             <button
               className="btn btn-primary btn-block mt-4"
               disabled={busy || insufficient || guestMissingInfo || noMethodChosen}
               onClick={() => { if (method === "wallet") setStep("processing"); submit(); }}
             >
-              {busy ? "Processing…" : `Pay $${total.toFixed(2)}`}
+              {busy ? "Processing…" : method ? `Pay With ${PAY_VIA_LABEL[method]} ($${total.toFixed(2)})` : `Pay $${total.toFixed(2)}`}
             </button>
           </>
         )}

@@ -7,6 +7,7 @@ import { PaymentFlow } from "@/components/payment-flow/payment-flow";
 import { ZesaFlow } from "@/components/payment-flow/zesa-flow";
 import { ServiceUnavailable } from "@/components/service-unavailable";
 import { hasRealCoverage } from "@/lib/fulfillment";
+import { getPublicSetting } from "@/lib/data/flags";
 import { getCurrentProfile, getDataBundles, getNetworks, getService, getTvPackages, getWallet } from "@/lib/data/queries";
 import { createAdminClient } from "@/lib/supabase/server";
 import type { ApiModuleSafe } from "@/types/database";
@@ -47,24 +48,26 @@ export default async function PayPage({ params }: { params: Promise<{ serviceId:
     }
   }
 
-  const [bundles, packages, networks, wallet] = await Promise.all([
+  const [bundles, packages, networks, wallet, paymentBanners] = await Promise.all([
     service.amount_mode === "bundles" ? getDataBundles() : Promise.resolve([]),
     service.amount_mode === "packages" ? getTvPackages() : Promise.resolve([]),
     service.needs_network ? getNetworks() : Promise.resolve([]),
     profile ? getWallet(profile.id) : Promise.resolve(null),
+    getPublicSetting<Record<string, string>>("payment_method_banners"),
   ]);
 
   const isGuest = !profile;
   const walletBalance = wallet?.balance ?? 0;
   const guestEmail = profile?.email ?? "";
   const guestPhone = profile?.phone ?? "";
+  const banners = paymentBanners ?? {};
 
   if (AIRTIME_FLOW_SERVICES.has(service.id)) {
-    return <AirtimeFlow service={service} networks={networks} walletBalance={walletBalance} isGuest={isGuest} guestEmail={guestEmail} guestPhone={guestPhone} />;
+    return <AirtimeFlow service={service} networks={networks} walletBalance={walletBalance} isGuest={isGuest} guestEmail={guestEmail} guestPhone={guestPhone} banners={banners} />;
   }
 
   if (service.id === "zesa") {
-    return <ZesaFlow service={service} walletBalance={walletBalance} isGuest={isGuest} guestEmail={guestEmail} guestPhone={guestPhone} />;
+    return <ZesaFlow service={service} walletBalance={walletBalance} isGuest={isGuest} guestEmail={guestEmail} guestPhone={guestPhone} banners={banners} />;
   }
 
   // Councils share the same "account number -> arbitrary payment amount"
@@ -72,11 +75,11 @@ export default async function PayPage({ params }: { params: Promise<{ serviceId:
   // actually clears the coverage check above today — the other 25 stop at
   // ServiceUnavailable before ever reaching this branch.
   if (service.category_id === "government") {
-    return <CouncilFlow service={service} walletBalance={walletBalance} isGuest={isGuest} guestEmail={guestEmail} guestPhone={guestPhone} />;
+    return <CouncilFlow service={service} walletBalance={walletBalance} isGuest={isGuest} guestEmail={guestEmail} guestPhone={guestPhone} banners={banners} />;
   }
 
   if (BROADBAND_FLOW_SERVICES.has(service.id)) {
-    return <BroadbandFlow service={service} walletBalance={walletBalance} isGuest={isGuest} guestEmail={guestEmail} guestPhone={guestPhone} />;
+    return <BroadbandFlow service={service} walletBalance={walletBalance} isGuest={isGuest} guestEmail={guestEmail} guestPhone={guestPhone} banners={banners} />;
   }
 
   return (
@@ -89,6 +92,7 @@ export default async function PayPage({ params }: { params: Promise<{ serviceId:
       isGuest={isGuest}
       guestEmail={guestEmail}
       guestPhone={guestPhone}
+      banners={banners}
     />
   );
 }

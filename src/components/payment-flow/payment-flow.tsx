@@ -10,7 +10,7 @@ import { calculatePlatformFee } from "@/lib/fees";
 import { payService, sendGiftVoucher } from "@/lib/actions/payments";
 import { startGuestCheckout, type GuestGateway } from "@/lib/actions/guest-payments";
 import { addGuestActivity } from "@/lib/guest-activity";
-import { PaymentMethodSection, type PaymentMethod } from "./flow-shared";
+import { PaymentMethodSection, type PaymentBanners, type PaymentMethod } from "./flow-shared";
 import type { DataBundle, Network, Service, Transaction, TvPackage } from "@/types/database";
 
 type Step = "details" | "amount" | "review" | "processing" | "guest-ecocash" | "success" | "receipt" | "error";
@@ -31,6 +31,7 @@ export function PaymentFlow({
   isGuest = false,
   guestEmail: initialGuestEmail = "",
   guestPhone: initialGuestPhone = "",
+  banners,
 }: {
   service: Service;
   bundles: DataBundle[];
@@ -40,6 +41,7 @@ export function PaymentFlow({
   isGuest?: boolean;
   guestEmail?: string;
   guestPhone?: string;
+  banners?: PaymentBanners;
 }) {
   const router = useRouter();
   const [step, setStep] = useState<Step>("details");
@@ -303,6 +305,7 @@ export function PaymentFlow({
             setGuestPhone={setGuestPhone}
             method={method}
             setMethod={setMethod}
+            banners={banners}
             onPay={() => {
               if (method === "wallet") setStep("processing");
               submitPayment();
@@ -625,6 +628,7 @@ function ReviewStep({
   setGuestPhone,
   method,
   setMethod,
+  banners,
   onPay,
 }: {
   service: Service;
@@ -646,6 +650,7 @@ function ReviewStep({
   setGuestPhone: (v: string) => void;
   method: PaymentMethod | null;
   setMethod: (v: PaymentMethod) => void;
+  banners?: PaymentBanners;
   onPay: () => void;
 }) {
   let detailLabel = service.name;
@@ -696,6 +701,7 @@ function ReviewStep({
         <PaymentMethodSection
           showWallet={!isGuest}
           walletBalance={walletBalance}
+          banners={banners}
           method={method}
           setMethod={setMethod}
           guestEmail={guestEmail}
@@ -705,6 +711,11 @@ function ReviewStep({
         />
       )}
 
+      {noMethodChosen && (
+        <div className="muted mt-2" style={{ color: "var(--warning)" }}>
+          Choose a payment method above to continue.
+        </div>
+      )}
       {insufficient && (
         <div className="muted mt-2" style={{ color: "var(--error)" }}>
           Your wallet balance is too low for this payment.{" "}
@@ -718,14 +729,9 @@ function ReviewStep({
           {!guestEmail.trim() ? "Enter your email above to continue." : "Enter your EcoCash number above to continue."}
         </div>
       )}
-      {noMethodChosen && (
-        <div className="muted mt-2" style={{ color: "var(--warning)" }}>
-          Choose a payment method above to continue.
-        </div>
-      )}
 
       <button className="btn btn-primary btn-block mt-4" disabled={busy || insufficient || guestMissingInfo || noMethodChosen} onClick={onPay}>
-        {busy ? "Processing…" : `Pay $${total.toFixed(2)}`}
+        {busy ? "Processing…" : method ? `Pay With ${PAY_VIA_LABEL[method]} ($${total.toFixed(2)})` : `Pay $${total.toFixed(2)}`}
       </button>
     </>
   );
