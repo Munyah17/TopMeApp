@@ -10,10 +10,17 @@ import { calculatePlatformFee } from "@/lib/fees";
 import { payService } from "@/lib/actions/payments";
 import { startGuestCheckout, type GuestGateway } from "@/lib/actions/guest-payments";
 import { addGuestActivity } from "@/lib/guest-activity";
-import { EditableRow, GuestPaySection, ReviewRow } from "./flow-shared";
+import { EditableRow, PaymentMethodSection, ReviewRow, type PaymentMethod } from "./flow-shared";
 import type { Service, Transaction } from "@/types/database";
 
 type Step = "account" | "amount" | "review" | "processing" | "guest-ecocash" | "success" | "receipt" | "error";
+
+const PAY_VIA_LABEL: Record<PaymentMethod, string> = {
+  wallet: "TopMe Wallet",
+  paynow: "Paynow",
+  ecocash: "Ecocash Instant",
+  stripe: "Stripe",
+};
 
 export function CouncilFlow({
   service,
@@ -37,7 +44,7 @@ export function CouncilFlow({
   const [result, setResult] = useState<Transaction | null>(null);
   const [guestEmail, setGuestEmail] = useState(initialGuestEmail);
   const [guestPhone, setGuestPhone] = useState(initialGuestPhone);
-  const [gateway, setGateway] = useState<GuestGateway>("paynow");
+  const [method, setMethod] = useState<PaymentMethod>(isGuest ? "paynow" : "wallet");
   const qrRef = useRef<HTMLCanvasElement>(null);
 
   const amount = parseFloat(customAmount) || 0;
@@ -48,7 +55,7 @@ export function CouncilFlow({
     }
   }, [step, result]);
 
-  async function submitGuest() {
+  async function submitGateway() {
     setBusy(true);
     setErrorMsg(null);
     try {
@@ -59,7 +66,7 @@ export function CouncilFlow({
         recipient: account,
         guestEmail,
         guestPhone: guestPhone || undefined,
-        gateway,
+        gateway: method as GuestGateway,
       });
       if (res.gateway === "ecocash") {
         setStep("guest-ecocash");
@@ -99,7 +106,7 @@ export function CouncilFlow({
   }
 
   async function submit() {
-    if (isGuest) return submitGuest();
+    if (method !== "wallet") return submitGateway();
     setBusy(true);
     setErrorMsg(null);
     try {
@@ -124,8 +131,8 @@ export function CouncilFlow({
   const showTop = !["processing", "guest-ecocash", "success"].includes(step);
   const fee = calculatePlatformFee(service.id, amount);
   const total = amount + fee;
-  const insufficient = !isGuest && total > walletBalance;
-  const guestMissingInfo = isGuest && (!guestEmail.trim() || (gateway === "ecocash" && !guestPhone.trim()));
+  const insufficient = method === "wallet" && total > walletBalance;
+  const guestMissingInfo = method !== "wallet" && (!guestEmail.trim() || (method === "ecocash" && !guestPhone.trim()));
 
   return (
     <div>
@@ -229,18 +236,20 @@ export function CouncilFlow({
                 <EditableRow label={service.id_label} value={account} onSave={setAccount} placeholder={service.id_placeholder ?? ""} />
                 <ReviewRow label="Amount" value={`$${amount.toFixed(2)}`} />
                 <ReviewRow label="Processing fee" value={`$${fee.toFixed(2)}`} />
-                {!isGuest && (
-                  <>
-                    <ReviewRow label="Payment method" value="TopMe Wallet" />
-                    <ReviewRow label="Wallet balance" value={`$${walletBalance.toFixed(2)}`} />
-                  </>
-                )}
+                {method === "wallet" && <ReviewRow label="Wallet balance" value={`$${walletBalance.toFixed(2)}`} />}
               </div>
             </div>
 
-            {isGuest && (
-              <GuestPaySection guestEmail={guestEmail} setGuestEmail={setGuestEmail} guestPhone={guestPhone} setGuestPhone={setGuestPhone} gateway={gateway} setGateway={setGateway} />
-            )}
+            <PaymentMethodSection
+              showWallet={!isGuest}
+              walletBalance={walletBalance}
+              method={method}
+              setMethod={setMethod}
+              guestEmail={guestEmail}
+              setGuestEmail={setGuestEmail}
+              guestPhone={guestPhone}
+              setGuestPhone={setGuestPhone}
+            />
 
             {insufficient && (
               <div className="muted mt-2" style={{ color: "var(--error)" }}>
@@ -257,7 +266,7 @@ export function CouncilFlow({
             <button
               className="btn btn-primary btn-block mt-4"
               disabled={busy || insufficient || guestMissingInfo}
-              onClick={() => { if (!isGuest) setStep("processing"); submit(); }}
+              onClick={() => { if (method === "wallet") setStep("processing"); submit(); }}
             >
               {busy ? "Processing…" : `Pay $${total.toFixed(2)}`}
             </button>
@@ -320,7 +329,7 @@ export function CouncilFlow({
               <ReviewRow label={service.id_label} value={account} />
               <ReviewRow label="Amount" value={`$${result.amount.toFixed(2)}`} />
               {result.fee > 0 && <ReviewRow label="Processing fee" value={`$${result.fee.toFixed(2)}`} />}
-              <ReviewRow label="Paid via" value={result.user_id ? "TopMe Wallet" : "Guest checkout"} />
+              <ReviewRow label="Paid via" value={PAY_VIA_LABEL[method]} />
             </div>
             <Link href="/home" className="btn btn-primary btn-block mt-3" style={{ textDecoration: "none" }}>Done</Link>
           </div>

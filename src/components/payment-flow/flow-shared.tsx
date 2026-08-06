@@ -148,63 +148,103 @@ export function NetworkTile({ network, selected, onClick }: { network: Network; 
   );
 }
 
-// Guest checkout method picker — identical mechanics to the generic
-// PaymentFlow's guest step (same gateways, same fields). Kept as its own
-// component so bespoke flows don't have to duplicate the gateway logic,
-// while payment handling itself never changes per-service.
-export function GuestPaySection({
+export type PaymentMethod = "wallet" | GuestGateway;
+
+const METHOD_STYLES: Record<PaymentMethod, { label: string; background: string; color: string; icon: string }> = {
+  wallet: { label: "Pay With Wallet Balance", background: "var(--green)", color: "#fff", icon: "wallet" },
+  paynow: { label: "Pay With Paynow", background: "#155EAB", color: "#fff", icon: "lock" },
+  ecocash: { label: "Pay With Ecocash Instant", background: "#E4032E", color: "#fff", icon: "phone" },
+  stripe: { label: "Pay With Stripe", background: "#635BFF", color: "#fff", icon: "smartphone" },
+};
+
+// Payment method picker: a logged-in user can choose to pay a specific
+// purchase out of their wallet, or bypass it and pay directly via a live
+// gateway (attributed to their account, not treated as an anonymous
+// guest — see startGuestCheckout). A guest only ever sees the 3 gateways.
+// Kept as its own component so bespoke flows don't have to duplicate the
+// gateway logic, while payment handling itself never changes per-service.
+export function PaymentMethodSection({
+  showWallet,
+  walletBalance,
+  method,
+  setMethod,
   guestEmail,
   setGuestEmail,
   guestPhone,
   setGuestPhone,
-  gateway,
-  setGateway,
 }: {
+  showWallet: boolean;
+  walletBalance?: number;
+  method: PaymentMethod;
+  setMethod: (v: PaymentMethod) => void;
   guestEmail: string;
   setGuestEmail: (v: string) => void;
   guestPhone: string;
   setGuestPhone: (v: string) => void;
-  gateway: GuestGateway;
-  setGateway: (v: GuestGateway) => void;
 }) {
+  const methods: PaymentMethod[] = showWallet ? ["wallet", "paynow", "ecocash", "stripe"] : ["paynow", "ecocash", "stripe"];
+  const isGateway = method !== "wallet";
+
   return (
     <div className="mt-3">
-      <div className="muted mb-2" style={{ fontSize: 13 }}>
-        No account needed. Pay directly and we&apos;ll email your receipt.
-      </div>
-      <label className="field-label">Email for receipt</label>
-      <input className="field" type="email" placeholder="you@example.com" value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} />
-
-      <label className="field-label mt-2">Pay with</label>
+      <label className="field-label">Pay with</label>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {(
-          [
-            { id: "paynow", label: "Paynow" },
-            { id: "stripe", label: "Card" },
-            { id: "ecocash", label: "EcoCash" },
-          ] as { id: GuestGateway; label: string }[]
-        ).map((g) => (
-          <label
-            key={g.id}
-            className="card tap row gap-2"
-            style={{ padding: "12px 14px", cursor: "pointer", borderColor: gateway === g.id ? "var(--green)" : "var(--border)" }}
-          >
-            <input type="radio" checked={gateway === g.id} onChange={() => setGateway(g.id)} />
-            <span style={{ flex: 1, fontWeight: 700, fontSize: 13.5 }}>{g.label}</span>
-          </label>
-        ))}
+        {methods.map((m) => {
+          const style = METHOD_STYLES[m];
+          const selected = method === m;
+          return (
+            <button
+              key={m}
+              type="button"
+              className="tap"
+              onClick={() => setMethod(m)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "14px 16px",
+                borderRadius: 14,
+                border: "none",
+                cursor: "pointer",
+                background: style.background,
+                color: style.color,
+                fontWeight: 800,
+                fontSize: 14,
+                boxShadow: selected ? "0 0 0 3px rgba(0,0,0,0.18) inset" : "none",
+                opacity: selected ? 1 : 0.88,
+              }}
+            >
+              <Icon name={style.icon} size={18} stroke={2} />
+              <span style={{ flex: 1, textAlign: "left" }}>{style.label}</span>
+              {m === "wallet" && typeof walletBalance === "number" && (
+                <span style={{ fontSize: 12, fontWeight: 700, opacity: 0.85 }}>${walletBalance.toFixed(2)}</span>
+              )}
+              {selected && <Icon name="check" size={16} stroke={2.4} />}
+            </button>
+          );
+        })}
       </div>
 
-      {gateway === "ecocash" && (
+      {isGateway && (
         <>
-          <label className="field-label mt-2">EcoCash Number</label>
-          <input className="field" placeholder="077 123 4567" value={guestPhone} onChange={(e) => setGuestPhone(e.target.value)} />
+          <div className="muted mt-3 mb-2" style={{ fontSize: 13 }}>
+            {showWallet ? "We'll email your receipt." : "No account needed. Pay directly and we'll email your receipt."}
+          </div>
+          <label className="field-label">Email for receipt</label>
+          <input className="field" type="email" placeholder="you@example.com" value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} />
+
+          {method === "ecocash" && (
+            <>
+              <label className="field-label mt-2">EcoCash Number</label>
+              <input className="field" placeholder="077 123 4567" value={guestPhone} onChange={(e) => setGuestPhone(e.target.value)} />
+            </>
+          )}
+
+          <div className="muted mt-2" style={{ fontSize: 11.5, display: "flex", alignItems: "center", gap: 6 }}>
+            <Icon name="lock" size={13} stroke={2} /> Secured by {method === "paynow" ? "Paynow Zimbabwe" : method === "stripe" ? "Stripe" : "EcoCash"}
+          </div>
         </>
       )}
-
-      <div className="muted mt-2" style={{ fontSize: 11.5, display: "flex", alignItems: "center", gap: 6 }}>
-        <Icon name="lock" size={13} stroke={2} /> Secured by {gateway === "paynow" ? "Paynow Zimbabwe" : gateway === "stripe" ? "Stripe" : "EcoCash"}
-      </div>
     </div>
   );
 }

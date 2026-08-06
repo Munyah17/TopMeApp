@@ -56,8 +56,14 @@ export async function startGuestCheckout(input: StartGuestCheckoutInput) {
   }
 
   const supabase = await createClient();
+  // A logged-in user can pay a specific purchase directly via a gateway
+  // instead of their wallet — when signed in, the resulting transaction is
+  // attributed to their account (not treated as an anonymous guest).
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   const reference = newReference();
-  // Platform processing fee, absorbed by the guest on top of the service
+  // Platform processing fee, absorbed by the payer on top of the service
   // amount — charged to the gateway as part of the same payment, and
   // remembered here so finalize_guest_payment can split it back out onto
   // the transaction without recomputing (it must always match what the
@@ -67,6 +73,7 @@ export async function startGuestCheckout(input: StartGuestCheckoutInput) {
 
   const { error: insertError } = await supabase.from("guest_checkout_intents").insert({
     reference,
+    user_id: user?.id ?? null,
     service_id: input.serviceId,
     network_id: input.networkId ?? null,
     recipient_identifier: input.recipient,

@@ -10,9 +10,17 @@ import { calculatePlatformFee } from "@/lib/fees";
 import { payService, sendGiftVoucher } from "@/lib/actions/payments";
 import { startGuestCheckout, type GuestGateway } from "@/lib/actions/guest-payments";
 import { addGuestActivity } from "@/lib/guest-activity";
+import { PaymentMethodSection, type PaymentMethod } from "./flow-shared";
 import type { DataBundle, Network, Service, Transaction, TvPackage } from "@/types/database";
 
 type Step = "details" | "amount" | "review" | "processing" | "guest-ecocash" | "success" | "receipt" | "error";
+
+const PAY_VIA_LABEL: Record<PaymentMethod, string> = {
+  wallet: "TopMe Wallet",
+  paynow: "Paynow",
+  ecocash: "Ecocash Instant",
+  stripe: "Stripe",
+};
 
 export function PaymentFlow({
   service,
@@ -49,7 +57,7 @@ export function PaymentFlow({
   const [voucherCode, setVoucherCode] = useState<string | null>(null);
   const [guestEmail, setGuestEmail] = useState(initialGuestEmail);
   const [guestPhone, setGuestPhone] = useState(initialGuestPhone);
-  const [gateway, setGateway] = useState<GuestGateway>("paynow");
+  const [method, setMethod] = useState<PaymentMethod>(isGuest ? "paynow" : "wallet");
   const qrRef = useRef<HTMLCanvasElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -73,7 +81,7 @@ export function PaymentFlow({
     };
   }, []);
 
-  async function submitGuestPayment() {
+  async function submitGatewayPayment() {
     setBusy(true);
     setErrorMsg(null);
     try {
@@ -86,7 +94,7 @@ export function PaymentFlow({
         extraValue: extra || null,
         guestEmail,
         guestPhone: guestPhone || undefined,
-        gateway,
+        gateway: method as GuestGateway,
       });
 
       if (res.gateway === "ecocash") {
@@ -128,7 +136,7 @@ export function PaymentFlow({
   }
 
   async function submitPayment() {
-    if (isGuest) return submitGuestPayment();
+    if (method !== "wallet") return submitGatewayPayment();
     setBusy(true);
     setErrorMsg(null);
     try {
@@ -289,10 +297,10 @@ export function PaymentFlow({
             setGuestEmail={setGuestEmail}
             guestPhone={guestPhone}
             setGuestPhone={setGuestPhone}
-            gateway={gateway}
-            setGateway={setGateway}
+            method={method}
+            setMethod={setMethod}
             onPay={() => {
-              if (!isGuest) setStep("processing");
+              if (method === "wallet") setStep("processing");
               submitPayment();
             }}
           />
@@ -347,7 +355,7 @@ export function PaymentFlow({
         )}
 
         {step === "receipt" && result && (
-          <ReceiptStep service={service} result={result} identifier={identifier} extra={extra} voucherCode={voucherCode} qrRef={qrRef} />
+          <ReceiptStep service={service} result={result} identifier={identifier} extra={extra} voucherCode={voucherCode} qrRef={qrRef} method={method} />
         )}
       </div>
     </div>
@@ -611,8 +619,8 @@ function ReviewStep({
   setGuestEmail,
   guestPhone,
   setGuestPhone,
-  gateway,
-  setGateway,
+  method,
+  setMethod,
   onPay,
 }: {
   service: Service;
@@ -632,8 +640,8 @@ function ReviewStep({
   setGuestEmail: (v: string) => void;
   guestPhone: string;
   setGuestPhone: (v: string) => void;
-  gateway: GuestGateway;
-  setGateway: (v: GuestGateway) => void;
+  method: PaymentMethod;
+  setMethod: (v: PaymentMethod) => void;
   onPay: () => void;
 }) {
   let detailLabel = service.name;
@@ -646,8 +654,8 @@ function ReviewStep({
   }
   const fee = service.is_gift ? 0 : calculatePlatformFee(service.id, amount);
   const total = amount + fee;
-  const insufficient = !isGuest && total > walletBalance;
-  const guestMissingInfo = isGuest && (!guestEmail.trim() || (gateway === "ecocash" && !guestPhone.trim()));
+  const insufficient = method === "wallet" && total > walletBalance;
+  const guestMissingInfo = method !== "wallet" && (!guestEmail.trim() || (method === "ecocash" && !guestPhone.trim()));
 
   return (
     <>
@@ -664,11 +672,10 @@ function ReviewStep({
           {service.is_gift && extra && <ReviewRow label="Sender Number" value={extra} />}
           <ReviewRow label="Amount" value={`$${amount.toFixed(2)}`} />
           <ReviewRow label="Processing fee" value={`$${fee.toFixed(2)}`} />
-          {!isGuest && (
-            <>
-              <ReviewRow label="Payment method" value="TopMe Wallet" />
-              <ReviewRow label="Wallet balance" value={`$${walletBalance.toFixed(2)}`} />
-            </>
+          {service.is_gift ? (
+            <ReviewRow label="Payment method" value="TopMe Wallet" />
+          ) : (
+            method === "wallet" && <ReviewRow label="Wallet balance" value={`$${walletBalance.toFixed(2)}`} />
           )}
         </div>
       </div>
@@ -680,57 +687,17 @@ function ReviewStep({
         </label>
       )}
 
-      {isGuest && (
-        <div className="mt-3">
-          <div className="muted mb-2" style={{ fontSize: 13 }}>
-            No account needed. Pay directly and we&apos;ll email your receipt.
-          </div>
-          <label className="field-label">Email for receipt</label>
-          <input
-            className="field"
-            type="email"
-            placeholder="you@example.com"
-            value={guestEmail}
-            onChange={(e) => setGuestEmail(e.target.value)}
-          />
-
-          <label className="field-label mt-2">Pay with</label>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {(
-              [
-                { id: "paynow", label: "Paynow" },
-                { id: "stripe", label: "Card" },
-                { id: "ecocash", label: "EcoCash" },
-              ] as { id: GuestGateway; label: string }[]
-            ).map((g) => (
-              <label
-                key={g.id}
-                className="card tap row gap-2"
-                style={{ padding: "12px 14px", cursor: "pointer", borderColor: gateway === g.id ? "var(--green)" : "var(--border)" }}
-              >
-                <input type="radio" checked={gateway === g.id} onChange={() => setGateway(g.id)} />
-                <span style={{ flex: 1, fontWeight: 700, fontSize: 13.5 }}>{g.label}</span>
-              </label>
-            ))}
-          </div>
-
-          {gateway === "ecocash" && (
-            <>
-              <label className="field-label mt-2">EcoCash Number</label>
-              <input
-                className="field"
-                placeholder="077 123 4567"
-                value={guestPhone}
-                onChange={(e) => setGuestPhone(e.target.value)}
-              />
-            </>
-          )}
-
-          <div className="muted mt-2" style={{ fontSize: 11.5, display: "flex", alignItems: "center", gap: 6 }}>
-            <Icon name="lock" size={13} stroke={2} /> Secured by{" "}
-            {gateway === "paynow" ? "Paynow Zimbabwe" : gateway === "stripe" ? "Stripe" : "EcoCash"}
-          </div>
-        </div>
+      {!service.is_gift && (
+        <PaymentMethodSection
+          showWallet={!isGuest}
+          walletBalance={walletBalance}
+          method={method}
+          setMethod={setMethod}
+          guestEmail={guestEmail}
+          setGuestEmail={setGuestEmail}
+          guestPhone={guestPhone}
+          setGuestPhone={setGuestPhone}
+        />
       )}
 
       {insufficient && (
@@ -761,6 +728,7 @@ function ReceiptStep({
   extra,
   voucherCode,
   qrRef,
+  method,
 }: {
   service: Service;
   result: Transaction;
@@ -768,6 +736,7 @@ function ReceiptStep({
   extra: string;
   voucherCode: string | null;
   qrRef: React.RefObject<HTMLCanvasElement | null>;
+  method: PaymentMethod;
 }) {
   const now = new Date(result.created_at);
   return (
@@ -838,7 +807,7 @@ function ReceiptStep({
             now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
           }
         />
-        <ReviewRow label="Paid via" value={result.user_id ? "TopMe Wallet" : "Guest checkout"} />
+        <ReviewRow label="Paid via" value={PAY_VIA_LABEL[method]} />
         {voucherCode && <ReviewRow label="Voucher Code" value={voucherCode} />}
         {service.is_gift && extra && <ReviewRow label="Sender Number" value={extra} />}
       </div>
