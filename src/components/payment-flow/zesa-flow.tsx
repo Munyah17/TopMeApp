@@ -44,7 +44,7 @@ export function ZesaFlow({
   const [result, setResult] = useState<Transaction | null>(null);
   const [guestEmail, setGuestEmail] = useState(initialGuestEmail);
   const [guestPhone, setGuestPhone] = useState(initialGuestPhone);
-  const [method, setMethod] = useState<PaymentMethod>(isGuest ? "paynow" : "wallet");
+  const [method, setMethod] = useState<PaymentMethod | null>(null);
 
   const amount = denom ?? (parseFloat(customAmount) || 0);
 
@@ -99,6 +99,7 @@ export function ZesaFlow({
   }
 
   async function submit() {
+    if (!method) return;
     if (method !== "wallet") return submitGateway();
     setBusy(true);
     setErrorMsg(null);
@@ -125,7 +126,8 @@ export function ZesaFlow({
   const fee = calculatePlatformFee(service.id, amount);
   const total = amount + fee;
   const insufficient = method === "wallet" && total > walletBalance;
-  const guestMissingInfo = method !== "wallet" && (!guestEmail.trim() || (method === "ecocash" && !guestPhone.trim()));
+  const noMethodChosen = method === null;
+  const guestMissingInfo = method !== null && method !== "wallet" && (!guestEmail.trim() || (method === "ecocash" && !guestPhone.trim()));
   const tokenPieces = Array.isArray(result?.receipt?.token_pieces) ? (result.receipt.token_pieces as string[]) : [];
 
   return (
@@ -261,10 +263,15 @@ export function ZesaFlow({
                 {!guestEmail.trim() ? "Enter your email above to continue." : "Enter your EcoCash number above to continue."}
               </div>
             )}
+            {noMethodChosen && (
+              <div className="muted mt-2" style={{ color: "var(--warning)" }}>
+                Choose a payment method above to continue.
+              </div>
+            )}
 
             <button
               className="btn btn-primary btn-block mt-4"
-              disabled={busy || insufficient || guestMissingInfo}
+              disabled={busy || insufficient || guestMissingInfo || noMethodChosen}
               onClick={() => { if (method === "wallet") setStep("processing"); submit(); }}
             >
               {busy ? "Processing…" : `Pay $${total.toFixed(2)}`}
@@ -340,7 +347,7 @@ export function ZesaFlow({
             <ReviewRow label="Reference" value={result.reference} />
             <ReviewRow label="Amount" value={`$${result.amount.toFixed(2)}`} />
             {result.fee > 0 && <ReviewRow label="Processing fee" value={`$${result.fee.toFixed(2)}`} />}
-            <ReviewRow label="Paid via" value={PAY_VIA_LABEL[method]} />
+            <ReviewRow label="Paid via" value={method ? PAY_VIA_LABEL[method] : "—"} />
             <Link href="/home" className="btn btn-primary btn-block mt-3" style={{ textDecoration: "none" }}>Done</Link>
           </div>
         )}

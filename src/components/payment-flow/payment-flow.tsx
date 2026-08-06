@@ -57,7 +57,10 @@ export function PaymentFlow({
   const [voucherCode, setVoucherCode] = useState<string | null>(null);
   const [guestEmail, setGuestEmail] = useState(initialGuestEmail);
   const [guestPhone, setGuestPhone] = useState(initialGuestPhone);
-  const [method, setMethod] = useState<PaymentMethod>(isGuest ? "paynow" : "wallet");
+  // Gift vouchers only ever have one possible method (wallet — there's no
+  // gateway path that can mint a redeemable code), so it's pre-set rather
+  // than left as a "default among options" the way the other four are.
+  const [method, setMethod] = useState<PaymentMethod | null>(service.is_gift ? "wallet" : null);
   const qrRef = useRef<HTMLCanvasElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -136,6 +139,7 @@ export function PaymentFlow({
   }
 
   async function submitPayment() {
+    if (!method) return;
     if (method !== "wallet") return submitGatewayPayment();
     setBusy(true);
     setErrorMsg(null);
@@ -640,7 +644,7 @@ function ReviewStep({
   setGuestEmail: (v: string) => void;
   guestPhone: string;
   setGuestPhone: (v: string) => void;
-  method: PaymentMethod;
+  method: PaymentMethod | null;
   setMethod: (v: PaymentMethod) => void;
   onPay: () => void;
 }) {
@@ -655,7 +659,8 @@ function ReviewStep({
   const fee = service.is_gift ? 0 : calculatePlatformFee(service.id, amount);
   const total = amount + fee;
   const insufficient = method === "wallet" && total > walletBalance;
-  const guestMissingInfo = method !== "wallet" && (!guestEmail.trim() || (method === "ecocash" && !guestPhone.trim()));
+  const noMethodChosen = method === null;
+  const guestMissingInfo = method !== null && method !== "wallet" && (!guestEmail.trim() || (method === "ecocash" && !guestPhone.trim()));
 
   return (
     <>
@@ -713,8 +718,13 @@ function ReviewStep({
           {!guestEmail.trim() ? "Enter your email above to continue." : "Enter your EcoCash number above to continue."}
         </div>
       )}
+      {noMethodChosen && (
+        <div className="muted mt-2" style={{ color: "var(--warning)" }}>
+          Choose a payment method above to continue.
+        </div>
+      )}
 
-      <button className="btn btn-primary btn-block mt-4" disabled={busy || insufficient || guestMissingInfo} onClick={onPay}>
+      <button className="btn btn-primary btn-block mt-4" disabled={busy || insufficient || guestMissingInfo || noMethodChosen} onClick={onPay}>
         {busy ? "Processing…" : `Pay $${total.toFixed(2)}`}
       </button>
     </>
@@ -736,7 +746,7 @@ function ReceiptStep({
   extra: string;
   voucherCode: string | null;
   qrRef: React.RefObject<HTMLCanvasElement | null>;
-  method: PaymentMethod;
+  method: PaymentMethod | null;
 }) {
   const now = new Date(result.created_at);
   return (
@@ -807,7 +817,7 @@ function ReceiptStep({
             now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
           }
         />
-        <ReviewRow label="Paid via" value={PAY_VIA_LABEL[method]} />
+        <ReviewRow label="Paid via" value={method ? PAY_VIA_LABEL[method] : "—"} />
         {voucherCode && <ReviewRow label="Voucher Code" value={voucherCode} />}
         {service.is_gift && extra && <ReviewRow label="Sender Number" value={extra} />}
       </div>

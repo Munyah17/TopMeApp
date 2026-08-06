@@ -157,12 +157,13 @@ const METHOD_STYLES: Record<PaymentMethod, { label: string; background: string; 
   stripe: { label: "Pay With Stripe", background: "#635BFF", color: "#fff", icon: "smartphone" },
 };
 
-// Payment method picker: a logged-in user can choose to pay a specific
-// purchase out of their wallet, or bypass it and pay directly via a live
-// gateway (attributed to their account, not treated as an anonymous
-// guest — see startGuestCheckout). A guest only ever sees the 3 gateways.
-// Kept as its own component so bespoke flows don't have to duplicate the
-// gateway logic, while payment handling itself never changes per-service.
+// Payment method picker: wallet balance, Paynow, EcoCash Instant, and
+// Stripe are four equal options — none pre-selected, none the "default"
+// with the others as fallbacks. A logged-in user picking a gateway still
+// gets attributed to their account (not treated as an anonymous guest —
+// see startGuestCheckout); a guest only ever sees the 3 gateways. Kept as
+// its own component so bespoke flows don't have to duplicate the gateway
+// logic, while payment handling itself never changes per-service.
 export function PaymentMethodSection({
   showWallet,
   walletBalance,
@@ -175,7 +176,7 @@ export function PaymentMethodSection({
 }: {
   showWallet: boolean;
   walletBalance?: number;
-  method: PaymentMethod;
+  method: PaymentMethod | null;
   setMethod: (v: PaymentMethod) => void;
   guestEmail: string;
   setGuestEmail: (v: string) => void;
@@ -183,7 +184,7 @@ export function PaymentMethodSection({
   setGuestPhone: (v: string) => void;
 }) {
   const methods: PaymentMethod[] = showWallet ? ["wallet", "paynow", "ecocash", "stripe"] : ["paynow", "ecocash", "stripe"];
-  const isGateway = method !== "wallet";
+  const isGateway = method !== null && method !== "wallet";
 
   return (
     <div className="mt-3">
