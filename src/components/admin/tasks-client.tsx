@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Icon } from "@/components/icons";
 import { createTask, reassignTask, setTaskStatus } from "@/lib/actions/tasks";
 import type { AdminTaskWithNames } from "@/lib/data/task-queries";
@@ -75,6 +75,8 @@ function CreateTaskForm({ staff, onDone }: { staff: Pick<Profile, "id" | "full_n
 
 function TaskRow({ task, staff }: { task: AdminTaskWithNames; staff: Pick<Profile, "id" | "full_name" | "email">[] }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const basePath = pathname.startsWith("/super-admin") ? "/super-admin" : "/admin";
   const [pending, startTransition] = useTransition();
 
   return (
@@ -84,7 +86,7 @@ function TaskRow({ task, staff }: { task: AdminTaskWithNames; staff: Pick<Profil
           <div style={{ fontWeight: 700, fontSize: 13.5 }}>{task.title}</div>
           {task.description && <div className="muted mt-1">{task.description}</div>}
           {task.related_table && (
-            <a href={`/admin/${task.related_table}/${task.related_id}`} style={{ fontSize: 11.5, color: "var(--green)", fontWeight: 700 }}>
+            <a href={`${basePath}/${task.related_table}/${task.related_id}`} style={{ fontSize: 11.5, color: "var(--green)", fontWeight: 700 }}>
               View {task.related_table.replace(/s$/, "")}
             </a>
           )}

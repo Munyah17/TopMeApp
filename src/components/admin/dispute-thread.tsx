@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { setDisputeStatus, sendDisputeMessage } from "@/lib/actions/disputes";
 import type { DisputeMessage, DisputeStatus } from "@/types/database";
 import type { DisputeWithNames } from "@/lib/data/dispute-queries";
@@ -18,6 +18,8 @@ export function DisputeThread({
   currentUserId: string;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const basePath = pathname.startsWith("/super-admin") ? "/super-admin" : "/admin";
   const [body, setBody] = useState("");
   const [note, setNote] = useState(dispute.resolution_note ?? "");
   const [pending, startTransition] = useTransition();
@@ -58,7 +60,7 @@ export function DisputeThread({
           {dispute.transaction_id && (
             <>
               {" "}
-              · <a href={`/admin/transactions/${dispute.transaction_id}`} style={{ color: "var(--green)", fontWeight: 700 }}>View transaction</a>
+              · <a href={`${basePath}/transactions/${dispute.transaction_id}`} style={{ color: "var(--green)", fontWeight: 700 }}>View transaction</a>
             </>
           )}
         </div>

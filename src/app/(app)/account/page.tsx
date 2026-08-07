@@ -148,48 +148,34 @@ export default async function AccountPage() {
         ))}
       </div>
 
+      {/* Staff get exactly one doorway into their console from here — not a
+          set of rows dressed up like more account settings. /admin (role:
+          admin) and /super-admin (role: superadmin) are separate consoles,
+          not one shared page — see src/app/admin and src/app/super-admin. */}
       {profile.role !== "customer" && (
-        <>
-          <div className="eyebrow mt-3 mb-1" style={{ paddingLeft: 2 }}>
-            Business
+        <Link
+          href={profile.role === "superadmin" ? "/super-admin" : "/admin"}
+          className="tap mt-3"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: "16px 18px",
+            borderRadius: 16,
+            background: "var(--navy)",
+            color: "#fff",
+            textDecoration: "none",
+          }}
+        >
+          <div className="ibadge round" style={{ width: 40, height: 40, background: "rgba(255,255,255,0.12)", color: "#fff" }}>
+            <Icon name="grid" size={19} stroke={1.8} />
           </div>
-          <div className="card" style={{ overflow: "hidden" }}>
-            <Link href="/admin" className="row gap-2 tap" style={{ padding: "14px 16px", borderBottom: "1px solid var(--border)", textDecoration: "none" }}>
-              <div className="ibadge round" style={{ width: 38, height: 38, background: "#F1F4F9", color: "var(--text-soft)" }}>
-                <Icon name="grid" size={17} stroke={1.8} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, fontSize: 13.5, color: "var(--text)" }}>Admin Dashboard</div>
-                <div className="muted">Operator view</div>
-              </div>
-              <Icon name="chevronR" size={17} stroke={2} />
-            </Link>
-            {profile.role === "superadmin" && (
-              <>
-                <Link href="/admin/apis" className="row gap-2 tap" style={{ padding: "14px 16px", borderBottom: "1px solid var(--border)", textDecoration: "none" }}>
-                  <div className="ibadge round" style={{ width: 38, height: 38, background: "#F1F4F9", color: "var(--text-soft)" }}>
-                    <Icon name="plug" size={17} stroke={1.8} />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, fontSize: 13.5, color: "var(--text)" }}>APIs Management</div>
-                    <div className="muted">Manage integrations</div>
-                  </div>
-                  <Icon name="chevronR" size={17} stroke={2} />
-                </Link>
-                <Link href="/admin/staff" className="row gap-2 tap" style={{ padding: "14px 16px", textDecoration: "none" }}>
-                  <div className="ibadge round" style={{ width: 38, height: 38, background: "#F1F4F9", color: "var(--text-soft)" }}>
-                    <Icon name="users" size={17} stroke={1.8} />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, fontSize: 13.5, color: "var(--text)" }}>Team & Roles</div>
-                    <div className="muted">Staff & permissions</div>
-                  </div>
-                  <Icon name="chevronR" size={17} stroke={2} />
-                </Link>
-              </>
-            )}
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 800, fontSize: 14.5 }}>{profile.role === "superadmin" ? "Super Admin Portal" : "Staff Console"}</div>
+            <div style={{ color: "rgba(255,255,255,0.65)", fontSize: 12.5 }}>Business operations, not part of your account</div>
           </div>
-        </>
+          <Icon name="chevronR" size={18} stroke={2} />
+        </Link>
       )}
 
       <form

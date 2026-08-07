@@ -64,19 +64,31 @@ const NAV: NavGroup[] = [
 
 const ROLE_LABEL: Record<string, string> = { superadmin: "Super Admin", admin: "Admin" };
 
-function isActive(pathname: string, href: string) {
-  if (href === "/admin") return pathname === "/admin";
+function isActive(pathname: string, href: string, basePath: string) {
+  if (href === basePath) return pathname === basePath;
   return pathname === href || pathname.startsWith(href + "/");
+}
+
+// NAV hrefs are authored against "/admin" and rewritten to whichever portal
+// is actually mounted — /admin for staff, /super-admin for the owner's own
+// console (see src/app/admin/layout.tsx and src/app/super-admin/layout.tsx).
+// Keeping one nav table instead of two means the two portals can't drift.
+function portalHref(href: string, basePath: string) {
+  return href === "/admin" ? basePath : basePath + href.slice("/admin".length);
 }
 
 export function AdminShell({
   role,
   permissions,
+  basePath,
+  portalLabel,
   announcements,
   children,
 }: {
   role: string;
   permissions: PermissionKey[];
+  basePath: "/admin" | "/super-admin";
+  portalLabel: string;
   announcements?: React.ReactNode;
   children: React.ReactNode;
 }) {
@@ -89,7 +101,7 @@ export function AdminShell({
     <div className="admin-shell">
       <aside className="admin-sidebar">
         <div className="admin-sidebar-header">
-          <div style={{ fontWeight: 800, fontSize: 15 }}>Command Center</div>
+          <div style={{ fontWeight: 800, fontSize: 15 }}>{portalLabel}</div>
           <span
             style={{
               background: role === "superadmin" ? "#F3EEFE" : "#EAF8FF",
@@ -108,12 +120,15 @@ export function AdminShell({
         {groups.map((g) => (
           <div key={g.label} className="admin-nav-group">
             <div className="admin-nav-group-label">{g.label}</div>
-            {g.items.map((item) => (
-              <Link key={item.href} href={item.href} className={`admin-sidebar-item ${isActive(pathname, item.href) ? "active" : ""}`}>
-                <Icon name={item.icon} size={16} stroke={1.9} />
-                <span>{item.label}</span>
-              </Link>
-            ))}
+            {g.items.map((item) => {
+              const href = portalHref(item.href, basePath);
+              return (
+                <Link key={href} href={href} className={`admin-sidebar-item ${isActive(pathname, href, basePath) ? "active" : ""}`}>
+                  <Icon name={item.icon} size={16} stroke={1.9} />
+                  <span>{item.label}</span>
+                </Link>
+              );
+            })}
           </div>
         ))}
         <Link href="/home" className="admin-sidebar-item admin-sidebar-exit">
@@ -123,11 +138,14 @@ export function AdminShell({
       </aside>
 
       <div className="admin-tabstrip">
-        {allItems.map((item) => (
-          <Link key={item.href} href={item.href} className={`chip tap admin-tabstrip-item ${isActive(pathname, item.href) ? "selected" : ""}`}>
-            <Icon name={item.icon} size={14} stroke={2} /> {item.label}
-          </Link>
-        ))}
+        {allItems.map((item) => {
+          const href = portalHref(item.href, basePath);
+          return (
+            <Link key={href} href={href} className={`chip tap admin-tabstrip-item ${isActive(pathname, href, basePath) ? "selected" : ""}`}>
+              <Icon name={item.icon} size={14} stroke={2} /> {item.label}
+            </Link>
+          );
+        })}
       </div>
 
       <div className="admin-content">

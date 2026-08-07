@@ -5,7 +5,12 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { encryptSecret } from "@/lib/crypto";
 import { logAdminAction } from "@/lib/actions/audit";
+import { requirePermission } from "@/lib/auth/permissions";
 
+// Reserved for the handful of actions that must stay locked to the owner
+// no matter what a permissions array says — granting superadmin itself is
+// the obvious one. Everything else below delegates via requirePermission()
+// so toggling a key on a staff member's team_members row actually works.
 async function requireSuperadmin() {
   const supabase = await createClient();
   const {
@@ -17,21 +22,10 @@ async function requireSuperadmin() {
   return { supabase, user };
 }
 
-async function requireStaff() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("not_authenticated");
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-  if (profile?.role !== "admin" && profile?.role !== "superadmin") throw new Error("forbidden");
-  return { supabase, user };
-}
-
 // Uploads a product/service logo to the public "product-images" storage
 // bucket and returns its public URL, ready to save on the service row.
 export async function uploadServiceImage(formData: FormData) {
-  await requireSuperadmin();
+  await requirePermission("catalog.manage");
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) throw new Error("Choose an image to upload.");
   if (!file.type.startsWith("image/")) throw new Error("Please choose an image file.");
@@ -54,7 +48,7 @@ export async function createApiModule(input: {
   key: string;
   webhookUrl?: string;
 }) {
-  const { user } = await requireSuperadmin();
+  const { user } = await requirePermission("apis.manage");
   const admin = createAdminClient();
 
   await admin.from("api_modules").insert({
@@ -72,7 +66,7 @@ export async function createApiModule(input: {
 }
 
 export async function toggleApiModule(id: string, currentStatus: "active" | "inactive") {
-  await requireSuperadmin();
+  await requirePermission("apis.manage");
   const admin = createAdminClient();
   await admin
     .from("api_modules")
@@ -82,7 +76,7 @@ export async function toggleApiModule(id: string, currentStatus: "active" | "ina
 }
 
 export async function inviteTeamMember(input: { name: string; email: string; role: string }) {
-  const { user } = await requireSuperadmin();
+  const { user } = await requirePermission("staff.manage");
   const admin = createAdminClient();
 
   const { data: invited, error } = await admin.auth.admin.inviteUserByEmail(input.email, {
@@ -103,7 +97,7 @@ export async function inviteTeamMember(input: { name: string; email: string; rol
 }
 
 export async function togglePermission(memberId: string, permission: string, currentPermissions: string[]) {
-  await requireSuperadmin();
+  await requirePermission("staff.manage");
   const admin = createAdminClient();
   const next = currentPermissions.includes(permission)
     ? currentPermissions.filter((p) => p !== permission)
@@ -119,7 +113,7 @@ export async function togglePermission(memberId: string, permission: string, cur
 // prevent_role_self_escalation blocks any non-service-role change to
 // profiles.role, not just self-updates.
 export async function activateTeamMember(memberId: string) {
-  const { user: actingUser } = await requireSuperadmin();
+  const { user: actingUser } = await requirePermission("staff.manage");
   const admin = createAdminClient();
 
   const { data: member, error: memberError } = await admin.from("team_members").select("*").eq("id", memberId).single();
@@ -141,7 +135,7 @@ export async function activateTeamMember(memberId: string) {
 // Offboards a team member: disables their team_members row and drops their
 // role back to customer, revoking /admin access immediately.
 export async function deactivateTeamMember(memberId: string) {
-  const { user: actingUser } = await requireSuperadmin();
+  const { user: actingUser } = await requirePermission("staff.manage");
   const admin = createAdminClient();
 
   const { data: member, error: memberError } = await admin.from("team_members").select("*").eq("id", memberId).single();
@@ -187,7 +181,7 @@ export async function promoteToSuperadmin(userId: string, confirmEmail: string) 
 // it) and mirrors the flag onto profiles so the admin list can show it
 // without a separate auth.admin.listUsers() call per row.
 export async function toggleAccountSuspension(userId: string, currentlySuspended: boolean) {
-  const { user: actingUser } = await requireStaff();
+  const { user: actingUser } = await requirePermission("users.suspend");
   if (userId === actingUser.id) throw new Error("You can't suspend your own account.");
 
   const admin = createAdminClient();
@@ -229,7 +223,7 @@ export interface CategoryInput {
 }
 
 export async function createCategory(input: CategoryInput) {
-  await requireSuperadmin();
+  await requirePermission("catalog.manage");
   const admin = createAdminClient();
   const { error } = await admin.from("service_categories").insert({
     id: input.id,
@@ -245,7 +239,7 @@ export async function createCategory(input: CategoryInput) {
 }
 
 export async function updateCategory(id: string, input: Omit<CategoryInput, "id">) {
-  await requireSuperadmin();
+  await requirePermission("catalog.manage");
   const admin = createAdminClient();
   await admin
     .from("service_categories")
@@ -307,7 +301,7 @@ function serviceRow(input: ServiceInput) {
 }
 
 export async function createService(input: ServiceInput) {
-  await requireSuperadmin();
+  await requirePermission("catalog.manage");
   const admin = createAdminClient();
   const { error } = await admin.from("services").insert({ id: input.id, ...serviceRow(input) });
   if (error) throw new Error(error.message.includes("duplicate") ? "A service with that ID already exists." : error.message);
@@ -315,7 +309,7 @@ export async function createService(input: ServiceInput) {
 }
 
 export async function updateService(id: string, input: ServiceInput) {
-  await requireSuperadmin();
+  await requirePermission("catalog.manage");
   const admin = createAdminClient();
   const { error } = await admin.from("services").update(serviceRow(input)).eq("id", id);
   if (error) throw new Error(error.message);
@@ -323,14 +317,14 @@ export async function updateService(id: string, input: ServiceInput) {
 }
 
 export async function toggleServiceActive(id: string, currentlyActive: boolean) {
-  await requireSuperadmin();
+  await requirePermission("catalog.manage");
   const admin = createAdminClient();
   await admin.from("services").update({ is_active: !currentlyActive }).eq("id", id);
   revalidateCatalog();
 }
 
 export async function deleteService(id: string) {
-  const { user } = await requireSuperadmin();
+  const { user } = await requirePermission("catalog.manage");
   const admin = createAdminClient();
   const { error } = await admin.from("services").delete().eq("id", id);
   if (error) {
@@ -372,7 +366,7 @@ function promoBannerRow(input: PromoBannerInput) {
 }
 
 export async function createPromoBanner(input: PromoBannerInput) {
-  await requireSuperadmin();
+  await requirePermission("announcements.manage");
   const admin = createAdminClient();
   const { error } = await admin.from("promo_banners").insert(promoBannerRow(input));
   if (error) throw new Error(error.message);
@@ -380,7 +374,7 @@ export async function createPromoBanner(input: PromoBannerInput) {
 }
 
 export async function updatePromoBanner(id: string, input: PromoBannerInput) {
-  await requireSuperadmin();
+  await requirePermission("announcements.manage");
   const admin = createAdminClient();
   const { error } = await admin.from("promo_banners").update(promoBannerRow(input)).eq("id", id);
   if (error) throw new Error(error.message);
@@ -388,14 +382,14 @@ export async function updatePromoBanner(id: string, input: PromoBannerInput) {
 }
 
 export async function togglePromoBannerActive(id: string, currentlyActive: boolean) {
-  await requireSuperadmin();
+  await requirePermission("announcements.manage");
   const admin = createAdminClient();
   await admin.from("promo_banners").update({ is_active: !currentlyActive }).eq("id", id);
   revalidateBanners();
 }
 
 export async function deletePromoBanner(id: string) {
-  await requireSuperadmin();
+  await requirePermission("announcements.manage");
   const admin = createAdminClient();
   const { error } = await admin.from("promo_banners").delete().eq("id", id);
   if (error) throw new Error(error.message);
