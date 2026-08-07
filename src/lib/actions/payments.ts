@@ -126,7 +126,7 @@ export async function payService(input: PayServiceInput) {
       date: new Date(finalTx.created_at).toLocaleString("en-GB"),
     });
     // Fire-and-forget — sendEmail never throws, so this can't fail the payment.
-    void sendEmail({ to: user.email, subject, html });
+    void sendEmail({ sender: "noreply", to: user.email, subject, html, replyTo: "accounts@topme.co.zw" });
   }
 
   return finalTx;
@@ -152,7 +152,7 @@ export async function sendGiftVoucher(receiverPhone: string, amount: number, sen
 
   if (user?.email) {
     const { subject, html } = giftSentEmail({ amount, receiverPhone, code: data.code });
-    void sendEmail({ to: user.email, subject, html });
+    void sendEmail({ sender: "noreply", to: user.email, subject, html });
   }
 
   return data;
@@ -200,11 +200,11 @@ export async function sendMoney(receiverPhone: string, amount: number, note?: st
 
   if (user.email) {
     const { subject, html } = moneySentEmail({ amount, receiverName: receiverProfile?.full_name || receiverPhone, kind });
-    void sendEmail({ to: user.email, subject, html });
+    void sendEmail({ sender: "noreply", to: user.email, subject, html });
   }
   if (receiverProfile?.email) {
     const { subject, html } = moneyReceivedEmail({ amount, senderName: senderProfile?.full_name || "A TopMe user", kind });
-    void sendEmail({ to: receiverProfile.email, subject, html });
+    void sendEmail({ sender: "noreply", to: receiverProfile.email, subject, html });
   }
 
   return transfer;
