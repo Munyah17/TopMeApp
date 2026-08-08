@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Icon } from "@/components/icons";
 import { DisputeThread } from "@/components/admin/dispute-thread";
 import { getDispute, getDisputeMessages } from "@/lib/data/dispute-queries";
+import { getStaffProfiles } from "@/lib/data/task-queries";
 import { getMyPermissions } from "@/lib/auth/permissions";
 import { getCurrentUser } from "@/lib/data/queries";
 
@@ -13,7 +14,7 @@ export async function DisputeDetailBody({ id, basePath }: { id: string; basePath
   }
   if (!user) return null;
 
-  const [dispute, messages] = await Promise.all([getDispute(id), getDisputeMessages(id)]);
+  const [dispute, messages, staff] = await Promise.all([getDispute(id), getDisputeMessages(id), getStaffProfiles()]);
   if (!dispute) notFound();
 
   return (
@@ -21,7 +22,7 @@ export async function DisputeDetailBody({ id, basePath }: { id: string; basePath
       <Link href={`${basePath}/disputes`} className="row gap-2" style={{ textDecoration: "none", color: "var(--text-soft)", marginBottom: 12, fontSize: 13, fontWeight: 700 }}>
         <Icon name="chevronL" size={15} stroke={2.2} /> Back to Disputes
       </Link>
-      <DisputeThread dispute={dispute} messages={messages} currentUserId={user.id} />
+      <DisputeThread dispute={dispute} messages={messages} currentUserId={user.id} staff={staff} />
     </div>
   );
 }

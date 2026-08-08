@@ -46,14 +46,15 @@ export async function DisputesBody({ searchParams, basePath }: { searchParams: P
               className="row between tap"
               style={{ padding: "12px 16px", borderBottom: i < disputes.length - 1 ? "1px solid var(--border)" : "none", textDecoration: "none" }}
             >
-              <div style={{ minWidth: 0 }}>
+              <div style={{ flex: 1, minWidth: 0, marginRight: 10 }}>
                 <div style={{ fontWeight: 700, fontSize: 13.5 }}>{d.subject}</div>
                 <div className="muted" style={{ fontSize: 11.5 }}>
                   {d.raised_by_profile?.full_name || d.raised_by_profile?.phone || "Unknown"} ·{" "}
                   {new Date(d.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}
+                  {d.assigned_to_profile && <> · Assigned: {d.assigned_to_profile.full_name}</>}
                 </div>
               </div>
-              <span style={{ fontSize: 11, fontWeight: 700, color: STATUS_COLOR[d.status], textTransform: "capitalize" }}>{d.status}</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: STATUS_COLOR[d.status], textTransform: "capitalize", flexShrink: 0 }}>{d.status}</span>
             </Link>
           ))
         )}

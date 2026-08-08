@@ -46,14 +46,15 @@ export async function SupportBody({ searchParams, basePath }: { searchParams: Pr
               className="row between tap"
               style={{ padding: "12px 16px", borderBottom: i < tickets.length - 1 ? "1px solid var(--border)" : "none", textDecoration: "none" }}
             >
-              <div style={{ minWidth: 0 }}>
+              <div style={{ flex: 1, minWidth: 0, marginRight: 10 }}>
                 <div style={{ fontWeight: 700, fontSize: 13.5 }}>{t.subject}</div>
                 <div className="muted" style={{ fontSize: 11.5 }}>
                   {t.user_profile?.full_name || t.user_profile?.email || t.guest_email || t.guest_phone || "Unknown"} ·{" "}
                   {new Date(t.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}
+                  {t.assigned_to_profile && <> · Assigned: {t.assigned_to_profile.full_name}</>}
                 </div>
               </div>
-              <span style={{ fontSize: 11, fontWeight: 700, color: STATUS_COLOR[t.status], textTransform: "capitalize" }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: STATUS_COLOR[t.status], textTransform: "capitalize", flexShrink: 0 }}>
                 {t.status.replace("_", " ")}
               </span>
             </Link>

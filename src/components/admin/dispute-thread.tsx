@@ -2,8 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { setDisputeStatus, sendDisputeMessage } from "@/lib/actions/disputes";
-import type { DisputeMessage, DisputeStatus } from "@/types/database";
+import { assignDispute, setDisputeStatus, sendDisputeMessage } from "@/lib/actions/disputes";
+import type { DisputeMessage, DisputeStatus, Profile } from "@/types/database";
 import type { DisputeWithNames } from "@/lib/data/dispute-queries";
 
 const STATUSES: DisputeStatus[] = ["open", "investigating", "resolved", "rejected"];
@@ -12,10 +12,12 @@ export function DisputeThread({
   dispute,
   messages,
   currentUserId,
+  staff,
 }: {
   dispute: DisputeWithNames;
   messages: DisputeMessage[];
   currentUserId: string;
+  staff: Pick<Profile, "id" | "full_name" | "email">[];
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -50,6 +52,17 @@ export function DisputeThread({
     });
   }
 
+  function changeAssignee(assigneeId: string) {
+    startTransition(async () => {
+      try {
+        await assignDispute(dispute.id, assigneeId || null);
+        router.refresh();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Could not reassign.");
+      }
+    });
+  }
+
   return (
     <div>
       <div className="card card-pad mb-3">
@@ -78,6 +91,16 @@ export function DisputeThread({
             </button>
           ))}
         </div>
+
+        <label className="field-label mt-3">Assigned to</label>
+        <select className="field" value={dispute.assigned_to ?? ""} disabled={pending} onChange={(e) => changeAssignee(e.target.value)}>
+          <option value="">Unassigned</option>
+          {staff.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.full_name || s.email}
+            </option>
+          ))}
+        </select>
 
         <label className="field-label mt-3">Resolution note</label>
         <input className="field" value={note} onChange={(e) => setNote(e.target.value)} placeholder="What was decided and why" />

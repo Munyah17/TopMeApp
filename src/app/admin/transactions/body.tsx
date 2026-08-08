@@ -78,7 +78,7 @@ export async function TransactionsBody({
               className="row between tap"
               style={{ padding: "12px 16px", borderBottom: i < transactions.length - 1 ? "1px solid var(--border)" : "none", textDecoration: "none" }}
             >
-              <div style={{ minWidth: 0 }}>
+              <div style={{ flex: 1, minWidth: 0, marginRight: 10 }}>
                 <div style={{ fontWeight: 700, fontSize: 13.5, color: "var(--text)" }}>{t.reference}</div>
                 <div className="muted" style={{ fontSize: 11.5 }}>
                   {t.service_id} · {t.recipient_identifier} · {new Date(t.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}

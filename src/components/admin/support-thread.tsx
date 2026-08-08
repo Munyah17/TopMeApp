@@ -2,20 +2,23 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { setTicketStatus, sendTicketMessage } from "@/lib/actions/support";
-import type { SupportTicketMessage, TicketStatus } from "@/types/database";
+import { assignTicket, setTicketPriority, setTicketStatus, sendTicketMessage } from "@/lib/actions/support";
+import type { Profile, SupportTicketMessage, TicketPriority, TicketStatus } from "@/types/database";
 import type { SupportTicketWithNames } from "@/lib/data/support-queries";
 
 const STATUSES: TicketStatus[] = ["open", "in_progress", "resolved", "closed"];
+const PRIORITIES: TicketPriority[] = ["low", "normal", "high", "urgent"];
 
 export function SupportThread({
   ticket,
   messages,
   currentUserId,
+  staff,
 }: {
   ticket: SupportTicketWithNames;
   messages: SupportTicketMessage[];
   currentUserId: string;
+  staff: Pick<Profile, "id" | "full_name" | "email">[];
 }) {
   const router = useRouter();
   const [body, setBody] = useState("");
@@ -47,12 +50,34 @@ export function SupportThread({
     });
   }
 
+  function changePriority(priority: TicketPriority) {
+    startTransition(async () => {
+      try {
+        await setTicketPriority(ticket.id, priority);
+        router.refresh();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Could not update priority.");
+      }
+    });
+  }
+
+  function changeAssignee(assigneeId: string) {
+    startTransition(async () => {
+      try {
+        await assignTicket(ticket.id, assigneeId || null);
+        router.refresh();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Could not reassign.");
+      }
+    });
+  }
+
   return (
     <div>
       <div className="card card-pad mb-3">
         <div style={{ fontWeight: 700, fontSize: 15 }}>{ticket.subject}</div>
         <div className="muted mt-1" style={{ fontSize: 11.5 }}>
-          {ticket.user_profile?.full_name || ticket.user_profile?.email || ticket.guest_email || ticket.guest_phone || "Unknown"} · Priority: {ticket.priority}
+          {ticket.user_profile?.full_name || ticket.user_profile?.email || ticket.guest_email || ticket.guest_phone || "Unknown"}
         </div>
         <div className="row gap-2 mt-3" style={{ flexWrap: "wrap" }}>
           {STATUSES.map((s) => (
@@ -66,6 +91,30 @@ export function SupportThread({
               {s.replace("_", " ")}
             </button>
           ))}
+        </div>
+
+        <div className="row gap-2 mt-3" style={{ flexWrap: "wrap" }}>
+          <div style={{ flex: "1 1 160px" }}>
+            <label className="field-label">Priority</label>
+            <select className="field" value={ticket.priority} disabled={pending} onChange={(e) => changePriority(e.target.value as TicketPriority)}>
+              {PRIORITIES.map((p) => (
+                <option key={p} value={p}>
+                  {p[0].toUpperCase() + p.slice(1)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div style={{ flex: "1 1 160px" }}>
+            <label className="field-label">Assigned to</label>
+            <select className="field" value={ticket.assigned_to ?? ""} disabled={pending} onChange={(e) => changeAssignee(e.target.value)}>
+              <option value="">Unassigned</option>
+              {staff.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.full_name || s.email}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
         {error && (
           <div className="muted mt-2" style={{ color: "var(--error)" }}>
