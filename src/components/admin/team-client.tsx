@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icons";
 import { activateTeamMember, deactivateTeamMember, inviteTeamMember, togglePermission } from "@/lib/actions/admin";
-import { PERMISSION_KEYS, PERMISSION_LABEL } from "@/lib/auth/permission-keys";
+import { PERMISSION_GROUPS, PERMISSION_LABEL } from "@/lib/auth/permission-keys";
 import type { TeamMember } from "@/types/database";
 
 const MEMBER_ROLES = ["Manager", "Support", "Finance"];
@@ -138,19 +138,32 @@ function MemberCard({ member }: { member: TeamMember }) {
         )}
       </div>
 
-      <div className="muted mt-2" style={{ fontSize: 11 }}>
+      <div className="muted mt-2 mb-1" style={{ fontSize: 11 }}>
         Permissions
       </div>
-      <div className="row gap-1 mt-1" style={{ flexWrap: "wrap", opacity: pending ? 0.6 : 1 }}>
-        {PERMISSION_KEYS.map((p) => (
-          <div
-            key={p}
-            className={`chip tap ${member.permissions.includes(p) ? "selected" : ""}`}
-            style={{ padding: "6px 10px", fontSize: 11 }}
-            title={p}
-            onClick={() => startTransition(async () => { await togglePermission(member.id, p, member.permissions); router.refresh(); })}
-          >
-            {PERMISSION_LABEL[p]}
+      <div style={{ opacity: pending ? 0.6 : 1 }}>
+        {PERMISSION_GROUPS.map((group) => (
+          <div key={group.label} className="mt-2">
+            <div className="muted" style={{ fontSize: 10.5, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+              {group.label}
+            </div>
+            {group.keys.map((p) => {
+              const on = member.permissions.includes(p);
+              return (
+                <div key={p} className="row between" style={{ padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
+                  <span style={{ fontSize: 13 }}>{PERMISSION_LABEL[p]}</span>
+                  <button
+                    type="button"
+                    className={`toggle ${on ? "on" : ""}`}
+                    disabled={pending}
+                    aria-label={PERMISSION_LABEL[p]}
+                    onClick={() => startTransition(async () => { await togglePermission(member.id, p, member.permissions); router.refresh(); })}
+                  >
+                    <div className="knob" />
+                  </button>
+                </div>
+              );
+            })}
           </div>
         ))}
       </div>

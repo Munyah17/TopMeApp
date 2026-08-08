@@ -40,3 +40,14 @@ export const PERMISSION_LABEL: Record<PermissionKey, string> = {
   "flags.manage": "Manage feature flags",
   "audit.view": "View audit log",
 };
+
+// Grouped for the per-permission toggle UI on /super-admin/staff — mirrors
+// the admin sidebar's section groupings so "what this unlocks" is obvious
+// at a glance instead of one flat wall of switches.
+export const PERMISSION_GROUPS: { label: string; keys: PermissionKey[] }[] = [
+  { label: "Operations", keys: ["transactions.view", "transactions.rectify", "wallet.adjust", "disputes.manage", "support.manage", "tasks.manage"] },
+  { label: "People", keys: ["users.view", "users.suspend", "staff.manage"] },
+  { label: "Platform", keys: ["catalog.manage", "apis.manage", "announcements.manage"] },
+  { label: "Insight", keys: ["reports.view", "audit.view"] },
+  { label: "Configuration", keys: ["settings.manage", "flags.manage"] },
+];
