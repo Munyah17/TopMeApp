@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon } from "@/components/icons";
@@ -93,29 +94,47 @@ export function AdminShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const canSee = (item: NavItem) => !item.perm || role === "superadmin" || permissions.includes(item.perm);
   const groups = NAV.map((g) => ({ ...g, items: g.items.filter(canSee) })).filter((g) => g.items.length > 0);
-  const allItems = groups.flatMap((g) => g.items);
+
+  // Any navigation (link tap, browser back/forward) closes the drawer —
+  // otherwise it'd still be open over the new page underneath it.
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [pathname]);
 
   return (
     <div className="admin-shell">
-      <aside className="admin-sidebar">
+      <div className="admin-mobile-bar">
+        <button type="button" className="admin-mobile-bar-btn tap" onClick={() => setDrawerOpen(true)} aria-label="Open navigation">
+          <Icon name="menu" size={22} stroke={2} />
+        </button>
+        <div className="admin-mobile-bar-title">{portalLabel}</div>
+        <span
+          style={{
+            background: role === "superadmin" ? "#F3EEFE" : "#EAF8FF",
+            color: role === "superadmin" ? "#8B5CF6" : "#38BDF8",
+            fontSize: 10,
+            fontWeight: 800,
+            padding: "4px 9px",
+            borderRadius: 7,
+            textTransform: "uppercase",
+            letterSpacing: "0.04em",
+          }}
+        >
+          {ROLE_LABEL[role] ?? role}
+        </span>
+      </div>
+
+      {drawerOpen && <div className="admin-drawer-backdrop" onClick={() => setDrawerOpen(false)} />}
+
+      <aside className={`admin-sidebar ${drawerOpen ? "admin-sidebar-open" : ""}`}>
         <div className="admin-sidebar-header">
           <div style={{ fontWeight: 800, fontSize: 15 }}>{portalLabel}</div>
-          <span
-            style={{
-              background: role === "superadmin" ? "#F3EEFE" : "#EAF8FF",
-              color: role === "superadmin" ? "#8B5CF6" : "#38BDF8",
-              fontSize: 10,
-              fontWeight: 800,
-              padding: "4px 9px",
-              borderRadius: 7,
-              textTransform: "uppercase",
-              letterSpacing: "0.04em",
-            }}
-          >
-            {ROLE_LABEL[role] ?? role}
-          </span>
+          <button type="button" className="admin-sidebar-close tap" onClick={() => setDrawerOpen(false)} aria-label="Close navigation">
+            <Icon name="x" size={18} stroke={2.2} />
+          </button>
         </div>
         {groups.map((g) => (
           <div key={g.label} className="admin-nav-group">
@@ -136,17 +155,6 @@ export function AdminShell({
           <span>Back to TopMe</span>
         </Link>
       </aside>
-
-      <div className="admin-tabstrip">
-        {allItems.map((item) => {
-          const href = portalHref(item.href, basePath);
-          return (
-            <Link key={href} href={href} className={`chip tap admin-tabstrip-item ${isActive(pathname, href, basePath) ? "selected" : ""}`}>
-              <Icon name={item.icon} size={14} stroke={2} /> {item.label}
-            </Link>
-          );
-        })}
-      </div>
 
       <div className="admin-content">
         {announcements}

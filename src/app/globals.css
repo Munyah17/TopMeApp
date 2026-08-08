@@ -1205,37 +1205,118 @@ h3 {
    src/app/admin/layout.tsx, src/app/super-admin/layout.tsx) — there's no
    .view-area/.screen-pad/.px wrapper supplying scroll, safe-area insets or
    horizontal padding the way customer pages get, so this shell has to
-   supply all of that itself instead of assuming it's nested in one. */
+   supply all of that itself instead of assuming it's nested in one.
+
+   Mobile nav is a retractable drawer (hamburger button + slide-in panel),
+   not a horizontal scroll strip — the same nav list the desktop sidebar
+   uses, just off-canvas until opened. Desktop (>=900px) turns that same
+   .admin-sidebar into a static in-flow column instead of an overlay. */
 .admin-shell {
   display: flex;
   flex-direction: column;
   min-height: 100dvh;
 }
-.admin-sidebar {
-  display: none;
-}
-.admin-tabstrip {
+.admin-mobile-bar {
   display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding: calc(env(safe-area-inset-top) + 10px) 16px 10px;
+  align-items: center;
+  gap: 10px;
+  padding: calc(env(safe-area-inset-top) + 12px) 16px 12px;
   border-bottom: 1px solid var(--border);
   background: var(--surface);
   position: sticky;
   top: 0;
   z-index: 40;
-  -webkit-overflow-scrolling: touch;
 }
-.admin-tabstrip::-webkit-scrollbar {
-  display: none;
+.admin-mobile-bar-btn {
+  background: none;
+  border: none;
+  padding: 6px;
+  margin: -6px;
+  color: var(--text);
+  display: flex;
 }
-.admin-tabstrip-item {
-  flex-shrink: 0;
-  display: inline-flex;
+.admin-mobile-bar-title {
+  flex: 1;
+  font-weight: 800;
+  font-size: 15px;
+}
+.admin-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  z-index: 199;
+}
+.admin-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 82vw;
+  max-width: 300px;
+  background: var(--surface);
+  z-index: 200;
+  padding: calc(env(safe-area-inset-top) + 14px) 14px 14px;
+  transform: translateX(-100%);
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  overflow-y: auto;
+  box-shadow: 10px 0 34px rgba(15, 23, 42, 0.2);
+}
+.admin-sidebar.admin-sidebar-open {
+  transform: translateX(0);
+}
+.admin-sidebar-header {
+  display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
+  padding: 4px 8px 12px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+.admin-sidebar-close {
+  background: none;
+  border: none;
+  padding: 6px;
+  color: var(--text-faint);
+}
+.admin-nav-group {
+  margin-bottom: 6px;
+}
+.admin-nav-group-label {
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-faint);
+  padding: 10px 8px 4px;
+}
+.admin-sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 10px;
+  border-radius: 10px;
+  color: var(--text-soft);
   text-decoration: none;
-  white-space: nowrap;
+  font-size: 13.5px;
+  font-weight: 600;
+  transition: background 0.15s, color 0.15s;
+}
+.admin-sidebar-item:hover {
+  background: var(--bg);
+}
+.admin-sidebar-item.active {
+  background: var(--green-50);
+  color: var(--green);
+  font-weight: 700;
+}
+.admin-sidebar-exit {
+  margin-top: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  color: var(--text-faint);
 }
 .admin-content {
   flex: 1;
@@ -1251,68 +1332,29 @@ h3 {
     max-width: 1400px;
     margin: 0 auto;
   }
-  .admin-tabstrip {
+  .admin-mobile-bar,
+  .admin-drawer-backdrop,
+  .admin-sidebar-close {
     display: none;
   }
   .admin-sidebar {
-    display: flex;
-    flex-direction: column;
-    width: 232px;
-    flex-shrink: 0;
     position: sticky;
-    top: 84px;
-    max-height: calc(100vh - 100px);
-    overflow-y: auto;
+    top: 24px;
+    left: auto;
+    bottom: auto;
+    width: 232px;
+    max-width: none;
+    flex-shrink: 0;
+    max-height: calc(100dvh - 48px);
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 18px;
     padding: 14px;
-    gap: 2px;
+    transform: none;
+    box-shadow: none;
   }
   .admin-sidebar-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 4px 8px 12px;
     border-bottom: 1px solid var(--border);
-    margin-bottom: 8px;
-  }
-  .admin-nav-group {
-    margin-bottom: 6px;
-  }
-  .admin-nav-group-label {
-    font-size: 10.5px;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--text-faint);
-    padding: 10px 8px 4px;
-  }
-  .admin-sidebar-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 9px 10px;
-    border-radius: 10px;
-    color: var(--text-soft);
-    text-decoration: none;
-    font-size: 13px;
-    font-weight: 600;
-    transition: background 0.15s, color 0.15s;
-  }
-  .admin-sidebar-item:hover {
-    background: var(--bg);
-  }
-  .admin-sidebar-item.active {
-    background: var(--green-50);
-    color: var(--green);
-    font-weight: 700;
-  }
-  .admin-sidebar-exit {
-    margin-top: 10px;
-    padding-top: 12px;
-    border-top: 1px solid var(--border);
-    color: var(--text-faint);
   }
   .admin-content {
     padding: 0;

@@ -18,6 +18,7 @@ const ICO: Record<string, string> = {
   starFill: `<path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.2 1 5.9-5.2-2.8-5.2 2.8 1-5.9-4.3-4.2 5.9-.8Z" fill="currentColor"/>`,
   check: `<path d="M5 12.5l4.5 4.5L19 7"/>`,
   x: `<path d="M6 6l12 12M18 6L6 18"/>`,
+  menu: `<path d="M4 6.5h16M4 12h16M4 17.5h16"/>`,
   share: `<circle cx="18" cy="5.5" r="2.3"/><circle cx="6" cy="12" r="2.3"/><circle cx="18" cy="18.5" r="2.3"/><path d="M8.1 10.8 15.9 6.7M8.1 13.2l7.8 4.1"/>`,
   download: `<path d="M12 3.5v11"/><path d="M7.5 10.5 12 15l4.5-4.5"/><path d="M4.5 18.5h15"/>`,
   printer: `<rect x="5" y="8.5" width="14" height="7" rx="1.5"/><path d="M7 8.5V4.5h10v4"/><path d="M7 15.5v4h10v-4"/>`,
