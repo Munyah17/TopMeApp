@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { revalidatePath } from "next/cache";
+import { revalidateAdminPath } from "@/lib/actions/admin-cache";
 import { createAdminClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/auth/permissions";
 import { logAdminAction } from "@/lib/actions/audit";
@@ -12,7 +12,7 @@ export async function updateSetting(key: string, value: unknown) {
   const { error } = await supabase.from("app_settings").update({ value, updated_at: new Date().toISOString(), updated_by: user.id }).eq("key", key);
   if (error) throw new Error(error.message);
   await logAdminAction(supabase, { actorId: user.id, action: "settings.update", targetTable: "app_settings", targetId: key, meta: { value } });
-  revalidatePath("/admin/settings");
+  revalidateAdminPath("/settings");
 }
 
 export async function toggleFeatureFlag(key: string, enabled: boolean) {
@@ -20,7 +20,7 @@ export async function toggleFeatureFlag(key: string, enabled: boolean) {
   const { error } = await supabase.from("feature_flags").update({ enabled, updated_at: new Date().toISOString(), updated_by: user.id }).eq("key", key);
   if (error) throw new Error(error.message);
   await logAdminAction(supabase, { actorId: user.id, action: "flags.toggle", targetTable: "feature_flags", targetId: key, meta: { enabled } });
-  revalidatePath("/admin/settings/flags");
+  revalidateAdminPath("/settings/flags");
 }
 
 // Uploads a real brand banner (PNG) for one of the three gateway buttons on
@@ -48,7 +48,7 @@ export async function uploadPaymentBanner(gateway: GuestGateway, formData: FormD
   if (error) throw new Error(error.message);
 
   await logAdminAction(admin, { actorId: user.id, action: "settings.upload_payment_banner", targetTable: "app_settings", targetId: "payment_method_banners", meta: { gateway } });
-  revalidatePath("/admin/settings");
+  revalidateAdminPath("/settings");
   return publicUrlData.publicUrl;
 }
 
@@ -64,12 +64,12 @@ export async function removePaymentBanner(gateway: GuestGateway) {
   if (error) throw new Error(error.message);
 
   await logAdminAction(admin, { actorId: user.id, action: "settings.remove_payment_banner", targetTable: "app_settings", targetId: "payment_method_banners", meta: { gateway } });
-  revalidatePath("/admin/settings");
+  revalidateAdminPath("/settings");
 }
 
 export async function logAppVersion(version: string, notes: string) {
   const { supabase, user } = await requirePermission("settings.manage");
   const { error } = await supabase.from("app_versions").insert({ version, notes: notes || null, released_by: user.id });
   if (error) throw new Error(error.message);
-  revalidatePath("/admin/settings/versions");
+  revalidateAdminPath("/settings/versions");
 }

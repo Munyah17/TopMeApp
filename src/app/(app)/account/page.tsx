@@ -6,8 +6,6 @@ import { NotificationsToggle } from "@/components/wallet/notifications-toggle";
 import { signOut } from "@/lib/actions/account";
 import { getBeneficiaries, getCurrentProfile } from "@/lib/data/queries";
 
-const ROLE_LABEL: Record<string, string> = { superadmin: "Super Admin", admin: "Admin", customer: "Customer" };
-
 function initials(name: string | null) {
   if (!name) return "TM";
   return name
@@ -32,10 +30,15 @@ export default async function AccountPage() {
       </div>
     );
   }
-  const beneficiaries = await getBeneficiaries(profile.id);
 
-  const roleColor = profile.role === "superadmin" ? "#8B5CF6" : profile.role === "admin" ? "#38BDF8" : "var(--green)";
-  const roleBg = profile.role === "superadmin" ? "#F3EEFE" : profile.role === "admin" ? "#EAF8FF" : "var(--green-50)";
+  // Staff don't have a customer-style "account" — their account IS business
+  // operations. /super-admin and /admin are the real destination, not a
+  // doorway bolted onto a wallet/beneficiaries page they'll never use in
+  // that capacity.
+  if (profile.role === "superadmin") redirect("/super-admin");
+  if (profile.role === "admin") redirect("/admin");
+
+  const beneficiaries = await getBeneficiaries(profile.id);
 
   return (
     <div className="px content-narrow" style={{ paddingTop: 6 }}>
@@ -58,24 +61,7 @@ export default async function AccountPage() {
           {initials(profile.full_name)}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="row gap-1" style={{ alignItems: "center", flexWrap: "wrap" }}>
-            <div style={{ fontWeight: 800, fontSize: 15, whiteSpace: "nowrap" }}>{profile.full_name || "Your name"}</div>
-            <span
-              style={{
-                background: roleBg,
-                color: roleColor,
-                fontSize: 9.5,
-                fontWeight: 800,
-                padding: "3px 7px",
-                borderRadius: 7,
-                textTransform: "uppercase",
-                letterSpacing: "0.03em",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {ROLE_LABEL[profile.role]}
-            </span>
-          </div>
+          <div style={{ fontWeight: 800, fontSize: 15 }}>{profile.full_name || "Your name"}</div>
           <div className="muted">{profile.phone || profile.email}</div>
         </div>
       </div>
@@ -147,36 +133,6 @@ export default async function AccountPage() {
           </div>
         ))}
       </div>
-
-      {/* Staff get exactly one doorway into their console from here — not a
-          set of rows dressed up like more account settings. /admin (role:
-          admin) and /super-admin (role: superadmin) are separate consoles,
-          not one shared page — see src/app/admin and src/app/super-admin. */}
-      {profile.role !== "customer" && (
-        <Link
-          href={profile.role === "superadmin" ? "/super-admin" : "/admin"}
-          className="tap mt-3"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            padding: "16px 18px",
-            borderRadius: 16,
-            background: "var(--navy)",
-            color: "#fff",
-            textDecoration: "none",
-          }}
-        >
-          <div className="ibadge round" style={{ width: 40, height: 40, background: "rgba(255,255,255,0.12)", color: "#fff" }}>
-            <Icon name="grid" size={19} stroke={1.8} />
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 800, fontSize: 14.5 }}>{profile.role === "superadmin" ? "Super Admin Portal" : "Staff Console"}</div>
-            <div style={{ color: "rgba(255,255,255,0.65)", fontSize: 12.5 }}>Business operations, not part of your account</div>
-          </div>
-          <Icon name="chevronR" size={18} stroke={2} />
-        </Link>
-      )}
 
       <form
         action={async () => {

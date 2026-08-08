@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidateAdminPath } from "@/lib/actions/admin-cache";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/auth/permissions";
 import { getFulfillmentProvider } from "@/lib/fulfillment";
@@ -19,9 +19,9 @@ function friendlyError(message: string) {
 }
 
 function revalidate(transactionId: string) {
-  revalidatePath("/admin/operations");
-  revalidatePath("/admin/transactions");
-  revalidatePath(`/admin/transactions/${transactionId}`);
+  revalidateAdminPath("/operations");
+  revalidateAdminPath("/transactions");
+  revalidateAdminPath(`/transactions/${transactionId}`);
 }
 
 export async function forceFulfilTransaction(transactionId: string, note: string) {
@@ -108,6 +108,6 @@ export async function adjustWallet(userId: string, amount: number, reason: strin
     p_reason: reason,
   });
   if (error) throw new Error(friendlyError(error.message));
-  revalidatePath(`/admin/users/${userId}`);
+  revalidateAdminPath(`/users/${userId}`);
   return data;
 }

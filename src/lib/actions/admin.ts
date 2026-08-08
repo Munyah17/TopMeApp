@@ -2,6 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
+import { revalidateAdminPath } from "@/lib/actions/admin-cache";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { encryptSecret } from "@/lib/crypto";
 import { logAdminAction } from "@/lib/actions/audit";
@@ -62,7 +63,7 @@ export async function createApiModule(input: {
     created_by: user.id,
   });
 
-  revalidatePath("/admin/apis");
+  revalidateAdminPath("/apis");
 }
 
 export async function toggleApiModule(id: string, currentStatus: "active" | "inactive") {
@@ -72,7 +73,7 @@ export async function toggleApiModule(id: string, currentStatus: "active" | "ina
     .from("api_modules")
     .update({ status: currentStatus === "active" ? "inactive" : "active" })
     .eq("id", id);
-  revalidatePath("/admin/apis");
+  revalidateAdminPath("/apis");
 }
 
 export async function inviteTeamMember(input: { name: string; email: string; role: string }) {
@@ -93,7 +94,7 @@ export async function inviteTeamMember(input: { name: string; email: string; rol
     status: "invited",
   });
 
-  revalidatePath("/admin/staff");
+  revalidateAdminPath("/staff");
 }
 
 export async function togglePermission(memberId: string, permission: string, currentPermissions: string[]) {
@@ -103,7 +104,7 @@ export async function togglePermission(memberId: string, permission: string, cur
     ? currentPermissions.filter((p) => p !== permission)
     : [...currentPermissions, permission];
   await admin.from("team_members").update({ permissions: next }).eq("id", memberId);
-  revalidatePath("/admin/staff");
+  revalidateAdminPath("/staff");
 }
 
 // Activates an invited team member: this is the actual moment they gain
@@ -129,7 +130,7 @@ export async function activateTeamMember(memberId: string) {
 
   await logAdminAction(admin, { actorId: actingUser.id, action: "staff.activate", targetTable: "team_members", targetId: memberId, meta: { user_id: member.user_id } });
 
-  revalidatePath("/admin/staff");
+  revalidateAdminPath("/staff");
 }
 
 // Offboards a team member: disables their team_members row and drops their
@@ -151,7 +152,7 @@ export async function deactivateTeamMember(memberId: string) {
 
   await logAdminAction(admin, { actorId: actingUser.id, action: "staff.deactivate", targetTable: "team_members", targetId: memberId, meta: { user_id: member.user_id } });
 
-  revalidatePath("/admin/staff");
+  revalidateAdminPath("/staff");
 }
 
 // The highest-privilege, hardest-to-undo action in the system — deliberately
@@ -172,8 +173,8 @@ export async function promoteToSuperadmin(userId: string, confirmEmail: string) 
 
   await logAdminAction(admin, { actorId: actingUser.id, action: "staff.promote_superadmin", targetTable: "profiles", targetId: userId });
 
-  revalidatePath("/admin/staff");
-  revalidatePath("/admin/users");
+  revalidateAdminPath("/staff");
+  revalidateAdminPath("/users");
 }
 
 // Suspends or reactivates a customer account: blocks sign-in via Supabase
@@ -201,11 +202,11 @@ export async function toggleAccountSuspension(userId: string, currentlySuspended
     targetTable: "profiles",
     targetId: userId,
   });
-  revalidatePath("/admin/users");
+  revalidateAdminPath("/users");
 }
 
 function revalidateCatalog() {
-  revalidatePath("/admin/products");
+  revalidateAdminPath("/products");
   revalidatePath("/home");
   // "layout" cascades to /services/[categoryId] sub-routes too — a plain
   // "page" revalidation only covers the exact /services path.
@@ -339,7 +340,7 @@ export async function deleteService(id: string) {
 }
 
 function revalidateBanners() {
-  revalidatePath("/admin/announcements");
+  revalidateAdminPath("/announcements");
   revalidatePath("/home");
 }
 

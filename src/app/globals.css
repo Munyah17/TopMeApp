@@ -1201,10 +1201,15 @@ h3 {
 }
 
 /* ---------- Admin command center shell ---------- */
+/* /admin and /super-admin render outside the customer AppShell (see
+   src/app/admin/layout.tsx, src/app/super-admin/layout.tsx) — there's no
+   .view-area/.screen-pad/.px wrapper supplying scroll, safe-area insets or
+   horizontal padding the way customer pages get, so this shell has to
+   supply all of that itself instead of assuming it's nested in one. */
 .admin-shell {
   display: flex;
   flex-direction: column;
-  min-height: 100%;
+  min-height: 100dvh;
 }
 .admin-sidebar {
   display: none;
@@ -1213,7 +1218,7 @@ h3 {
   display: flex;
   gap: 8px;
   overflow-x: auto;
-  padding: 10px 16px;
+  padding: calc(env(safe-area-inset-top) + 10px) 16px 10px;
   border-bottom: 1px solid var(--border);
   background: var(--surface);
   position: sticky;
@@ -1235,12 +1240,16 @@ h3 {
 .admin-content {
   flex: 1;
   min-width: 0;
+  padding: 16px 16px calc(32px + env(safe-area-inset-bottom));
 }
 @media (min-width: 900px) {
   .admin-shell {
     flex-direction: row;
     align-items: flex-start;
     gap: 24px;
+    padding: 24px 32px;
+    max-width: 1400px;
+    margin: 0 auto;
   }
   .admin-tabstrip {
     display: none;
@@ -1306,6 +1315,6 @@ h3 {
     color: var(--text-faint);
   }
   .admin-content {
-    padding-top: 2px;
+    padding: 0;
   }
 }

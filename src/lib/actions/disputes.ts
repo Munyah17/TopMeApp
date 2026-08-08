@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidateAdminPath } from "@/lib/actions/admin-cache";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/auth/permissions";
 import type { Dispute, DisputeStatus } from "@/types/database";
@@ -9,8 +9,8 @@ export async function assignDispute(disputeId: string, assigneeId: string | null
   const { supabase } = await requirePermission("disputes.manage");
   const { error } = await supabase.from("disputes").update({ assigned_to: assigneeId, updated_at: new Date().toISOString() }).eq("id", disputeId);
   if (error) throw new Error(error.message);
-  revalidatePath(`/admin/disputes/${disputeId}`);
-  revalidatePath("/admin/disputes");
+  revalidateAdminPath(`/disputes/${disputeId}`);
+  revalidateAdminPath("/disputes");
 }
 
 export async function setDisputeStatus(disputeId: string, status: DisputeStatus, resolutionNote?: string) {
@@ -31,8 +31,8 @@ export async function setDisputeStatus(disputeId: string, status: DisputeStatus,
     meta: { status, resolutionNote },
   });
 
-  revalidatePath(`/admin/disputes/${disputeId}`);
-  revalidatePath("/admin/disputes");
+  revalidateAdminPath(`/disputes/${disputeId}`);
+  revalidateAdminPath("/disputes");
 }
 
 export async function sendDisputeMessage(disputeId: string, body: string) {
@@ -47,5 +47,5 @@ export async function sendDisputeMessage(disputeId: string, body: string) {
 
   const { error } = await supabase.from("dispute_messages").insert({ dispute_id: disputeId, sender_id: user.id, body: trimmed });
   if (error) throw new Error(error.message);
-  revalidatePath(`/admin/disputes/${disputeId}`);
+  revalidateAdminPath(`/disputes/${disputeId}`);
 }

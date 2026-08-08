@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidateAdminPath } from "@/lib/actions/admin-cache";
 import { requirePermission } from "@/lib/auth/permissions";
 import type { TaskStatus, TicketPriority } from "@/types/database";
 
@@ -23,7 +23,7 @@ export async function createTask(input: CreateTaskInput) {
     due_at: input.dueAt || null,
   });
   if (error) throw new Error(error.message);
-  revalidatePath("/admin/tasks");
+  revalidateAdminPath("/tasks");
 }
 
 export async function setTaskStatus(taskId: string, status: TaskStatus) {
@@ -35,12 +35,12 @@ export async function setTaskStatus(taskId: string, status: TaskStatus) {
   if (status === "done") patch.completed_at = new Date().toISOString();
   const { error } = await supabase.from("admin_tasks").update(patch).eq("id", taskId);
   if (error) throw new Error(error.message);
-  revalidatePath("/admin/tasks");
+  revalidateAdminPath("/tasks");
 }
 
 export async function reassignTask(taskId: string, assigneeId: string | null) {
   const { supabase } = await requirePermission("tasks.manage");
   const { error } = await supabase.from("admin_tasks").update({ assigned_to: assigneeId, updated_at: new Date().toISOString() }).eq("id", taskId);
   if (error) throw new Error(error.message);
-  revalidatePath("/admin/tasks");
+  revalidateAdminPath("/tasks");
 }
