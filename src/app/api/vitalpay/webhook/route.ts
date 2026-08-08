@@ -10,21 +10,31 @@ import { recordIntegrationHealth } from "@/lib/integrations/health";
  * reference we passed as VitalPay's `reference` field when calling
  * /airtime/purchase or /bills/pay (see src/lib/fulfillment/vitalpay.ts).
  *
+ * Two endpoints are registered on VitalPay's dashboard against this same
+ * route — the real domain (VITALPAY_WEBHOOK_SECRET) and the raw Vercel
+ * deployment URL as a fallback (VITALPAY_WEBHOOK_SECRET_FALLBACK), each
+ * with its own signing secret. Accept either signature since delivery could
+ * legitimately arrive signed with either one.
+ *
  * Signature verification uses HMAC-SHA256 of the raw body with the webhook
- * secret (VITALPAY_WEBHOOK_SECRET, returned once by POST /webhooks) — this
- * is the standard convention but wasn't spelled out explicitly in the docs
- * we have; if verification always fails in practice, confirm the exact
- * scheme with VitalPay and adjust `verifySignature` below.
+ * secret (returned once by POST /webhooks) — this is the standard
+ * convention but wasn't spelled out explicitly in the docs we have; if
+ * verification always fails in practice, confirm the exact scheme with
+ * VitalPay and adjust `verifySignature` below.
  */
 function verifySignature(rawBody: string, signatureHeader: string | null): boolean {
-  const secret = process.env.VITALPAY_WEBHOOK_SECRET;
-  if (!secret || !signatureHeader) return false;
-  const expected = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
-  try {
-    return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signatureHeader));
-  } catch {
-    return false;
-  }
+  if (!signatureHeader) return false;
+  const secrets = [process.env.VITALPAY_WEBHOOK_SECRET, process.env.VITALPAY_WEBHOOK_SECRET_FALLBACK].filter(
+    (s): s is string => !!s
+  );
+  return secrets.some((secret) => {
+    const expected = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+    try {
+      return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signatureHeader));
+    } catch {
+      return false;
+    }
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -32,6 +42,10 @@ export async function POST(request: NextRequest) {
   const signature = request.headers.get("x-vitalpay-signature");
 
   if (!verifySignature(rawBody, signature)) {
+    console.error(`[vitalpay webhook] invalid signature — header present: ${!!signature}, secrets configured: ${[
+      !!process.env.VITALPAY_WEBHOOK_SECRET,
+      !!process.env.VITALPAY_WEBHOOK_SECRET_FALLBACK,
+    ].filter(Boolean).length}`);
     void recordIntegrationHealth(createAdminClient(), "vitalpay", { success: false, error: "invalid_signature" });
     return NextResponse.json({ error: "invalid_signature" }, { status: 401 });
   }
