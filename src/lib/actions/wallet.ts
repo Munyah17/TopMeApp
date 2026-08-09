@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "crypto";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { checkPaynowStatus, initiatePaynowPayment } from "@/lib/payments/paynow";
 import { applyPaynowResult } from "@/lib/payments/paynow-result";
 import { createTopupCheckoutSession } from "@/lib/payments/stripe";
@@ -20,8 +20,16 @@ function newReference(prefix: string) {
   return `${prefix}-${randomUUID().slice(0, 8).toUpperCase()}`;
 }
 
+// topup_intents grants users select/insert on their own row only — every
+// update (status, meta.pollUrl/sessionId/endUserId) is service-role only
+// (see supabase/schema.sql). Updating via the session-scoped `supabase`
+// client silently no-ops under RLS instead of erroring, which is what left
+// "Check Payment" with no pollUrl to poll — always use the admin client
+// for these writes.
+
 export async function startPaynowTopup(amount: number) {
   const { supabase, user } = await requireUser();
+  const admin = createAdminClient();
   const reference = newReference("PNW");
 
   await supabase.from("topup_intents").insert({ user_id: user.id, amount, provider: "paynow", reference });
@@ -33,39 +41,41 @@ export async function startPaynowTopup(amount: number) {
     returnUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/wallet?paynow_ref=${encodeURIComponent(reference)}`,
   });
   if (!result.ok || !result.browserUrl) {
-    await supabase.from("topup_intents").update({ status: "failed" }).eq("reference", reference);
+    await admin.from("topup_intents").update({ status: "failed" }).eq("reference", reference);
     throw new Error(result.error || "Could not start Paynow payment.");
   }
   if (result.pollUrl) {
-    await supabase.from("topup_intents").update({ meta: { pollUrl: result.pollUrl } }).eq("reference", reference);
+    await admin.from("topup_intents").update({ meta: { pollUrl: result.pollUrl } }).eq("reference", reference);
   }
   return { redirectUrl: result.browserUrl, reference };
 }
 
 export async function startStripeTopup(amount: number) {
   const { supabase, user } = await requireUser();
+  const admin = createAdminClient();
   const reference = newReference("STR");
 
   await supabase.from("topup_intents").insert({ user_id: user.id, amount, provider: "stripe", reference });
 
   const session = await createTopupCheckoutSession({ amount, reference, userId: user.id, customerEmail: user.email });
   if (!session.url) throw new Error("Could not start Stripe checkout.");
-  await supabase.from("topup_intents").update({ meta: { sessionId: session.id } }).eq("reference", reference);
+  await admin.from("topup_intents").update({ meta: { sessionId: session.id } }).eq("reference", reference);
   return { redirectUrl: session.url };
 }
 
 export async function startEcocashTopup(amount: number, phone: string) {
   const { supabase, user } = await requireUser();
+  const admin = createAdminClient();
   const reference = newReference("ECO");
 
   await supabase.from("topup_intents").insert({ user_id: user.id, amount, provider: "ecocash", reference, meta: { phone } });
 
   const result = await initiateEcocashPush({ phone, amount, reference });
   if (!result.ok) {
-    await supabase.from("topup_intents").update({ status: "failed" }).eq("reference", reference);
+    await admin.from("topup_intents").update({ status: "failed" }).eq("reference", reference);
     throw new Error(result.error || "Could not start EcoCash payment.");
   }
-  await supabase
+  await admin
     .from("topup_intents")
     .update({ meta: { phone, endUserId: result.endUserId } })
     .eq("reference", reference);

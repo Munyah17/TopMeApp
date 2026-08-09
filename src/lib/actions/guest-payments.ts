@@ -99,7 +99,12 @@ export async function startGuestCheckout(input: StartGuestCheckoutInput) {
       throw new Error(result.error || "Could not start Paynow payment.");
     }
     if (result.pollUrl) {
-      await supabase.from("guest_checkout_intents").update({ meta: { pollUrl: result.pollUrl } }).eq("reference", reference);
+      // guest_checkout_intents has no UPDATE grant for the session-scoped
+      // client (only insert, and only service-role can update — see
+      // supabase/migrations/2026-07-29-guest-checkout.sql) — using
+      // `supabase` here silently no-ops under RLS instead of erroring,
+      // which is exactly what left "Check Payment" with no pollUrl to poll.
+      await admin.from("guest_checkout_intents").update({ meta: { pollUrl: result.pollUrl } }).eq("reference", reference);
     }
     return { gateway: "paynow" as const, redirectUrl: result.browserUrl, reference };
   }
@@ -124,7 +129,7 @@ export async function startGuestCheckout(input: StartGuestCheckoutInput) {
     await failGuestCheckout(reference);
     throw new Error(result.error || "Could not start EcoCash payment.");
   }
-  await supabase
+  await admin
     .from("guest_checkout_intents")
     .update({ meta: { endUserId: result.endUserId } })
     .eq("reference", reference);

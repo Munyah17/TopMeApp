@@ -42,8 +42,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: "completed" });
   }
   if (providerStatus === "failed" || providerStatus === "cancelled") {
-    await supabase.from("topup_intents").update({ status: "failed" }).eq("reference", reference);
     const admin = createAdminClient();
+    await admin.from("topup_intents").update({ status: "failed" }).eq("reference", reference);
     await notifyTopupResult(admin, { userId: intent.user_id, amount: intent.amount, provider: "ecocash", reference, success: false });
     return NextResponse.json({ status: "failed" });
   }
