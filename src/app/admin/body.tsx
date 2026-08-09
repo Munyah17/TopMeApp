@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Icon } from "@/components/icons";
 import { fmt } from "@/lib/data/catalog-helpers";
 import { getAllServices, getCurrentProfile } from "@/lib/data/queries";
-import { getAttentionCount } from "@/lib/data/admin-queries";
+import { getAttentionCount, getRecentFailures } from "@/lib/data/admin-queries";
 import { createClient } from "@/lib/supabase/server";
 import type { IntegrationHealth, Transaction } from "@/types/database";
 
@@ -17,11 +17,12 @@ export async function AdminOverviewBody({ basePath }: { basePath: string }) {
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
 
-  const [{ data: recentTx }, services, attentionCount, { data: healthData }] = await Promise.all([
+  const [{ data: recentTx }, services, attentionCount, { data: healthData }, recentFailures] = await Promise.all([
     supabase.from("transactions").select("*").gte("created_at", since7d).order("created_at", { ascending: false }),
     getAllServices(true),
     getAttentionCount(),
     supabase.from("integration_health").select("*").order("id"),
+    getRecentFailures(6),
   ]);
   const health = (healthData as IntegrationHealth[]) ?? [];
   const tx = (recentTx as Transaction[]) ?? [];
@@ -107,6 +108,37 @@ export async function AdminOverviewBody({ basePath }: { basePath: string }) {
           );
         })}
       </div>
+
+      {recentFailures.length > 0 && (
+        <>
+          <div className="section-title mt-3 mb-2">Recent failures</div>
+          <div className="card" style={{ overflow: "hidden" }}>
+            {recentFailures.map((f, i) => (
+              <Link
+                key={f.id}
+                href={f.transactionId ? `${basePath}/transactions/${f.transactionId}` : `${basePath}/transactions`}
+                className="row gap-2 tap"
+                style={{ padding: "12px 16px", borderBottom: i < recentFailures.length - 1 ? "1px solid var(--border)" : "none", textDecoration: "none" }}
+              >
+                <div className="ibadge round" style={{ width: 30, height: 30, background: "#FDECEC", color: "var(--error)", flexShrink: 0 }}>
+                  <Icon name="alert" size={14} stroke={2} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: "var(--text)" }}>
+                    {f.message}
+                  </div>
+                  <div className="muted" style={{ fontSize: 11 }}>
+                    {f.reference ?? f.serviceId ?? "—"} · {new Date(f.createdAt).toLocaleString("en-GB")}
+                  </div>
+                </div>
+                <span style={{ flexShrink: 0 }}>
+                  <Icon name="chevronR" size={16} stroke={2} />
+                </span>
+              </Link>
+            ))}
+          </div>
+        </>
+      )}
 
       <div className="row gap-2 mt-2">
         <div className="card card-pad" style={{ flex: 1 }}>

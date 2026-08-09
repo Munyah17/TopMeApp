@@ -7,6 +7,7 @@ import { isFeatureEnabled } from "@/lib/data/flags";
 import { findProfileByPhone } from "@/lib/data/queries";
 import { sendEmail } from "@/lib/email/client";
 import { giftSentEmail, moneyReceivedEmail, moneySentEmail, paymentReceiptEmail } from "@/lib/email/templates";
+import { logTransactionEvent } from "@/lib/transaction-events";
 import type { ApiModuleSafe, P2pTransfer, Transaction } from "@/types/database";
 
 const FRIENDLY_ERRORS: Record<string, string> = {
@@ -66,6 +67,12 @@ export async function payService(input: PayServiceInput) {
   }
 
   const tx = txData as Transaction;
+  void logTransactionEvent(admin, {
+    transactionId: tx.id,
+    reference: tx.reference,
+    eventType: "payment_confirmed",
+    message: `Paid from wallet balance — $${input.amount.toFixed(2)}.`,
+  });
 
   // Resolve fulfillment: first active aggregator that covers this service
   // (already confirmed to exist by the coverage check above).
@@ -78,6 +85,12 @@ export async function payService(input: PayServiceInput) {
     networkId: input.networkId,
     amount: input.amount,
   };
+  void logTransactionEvent(admin, {
+    transactionId: tx.id,
+    reference: tx.reference,
+    eventType: "fulfillment_started",
+    message: `Calling ${provider.name} to fulfil this order.`,
+  });
   let fulfillmentResult;
   try {
     fulfillmentResult = await provider.fulfil(fulfillmentInput);
@@ -90,6 +103,13 @@ export async function payService(input: PayServiceInput) {
       message: e instanceof Error ? `${provider.name} error: ${e.message}` : `${provider.name} failed to fulfil this order.`,
     };
   }
+  void logTransactionEvent(admin, {
+    transactionId: tx.id,
+    reference: tx.reference,
+    eventType: fulfillmentResult.status === "fulfilled" ? "fulfillment_success" : fulfillmentResult.status === "failed" ? "fulfillment_failed" : "fulfillment_started",
+    message: fulfillmentResult.message || `${provider.name} returned status: ${fulfillmentResult.status}.`,
+    meta: { provider: provider.name, providerRef: fulfillmentResult.providerRef ?? null },
+  });
 
   const { data: updatedTx } = await admin.rpc("set_fulfillment_result", {
     p_transaction_id: tx.id,

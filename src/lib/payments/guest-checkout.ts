@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { getFulfillmentProvider } from "@/lib/fulfillment";
 import { sendEmail } from "@/lib/email/client";
 import { paymentReceiptEmail } from "@/lib/email/templates";
+import { logTransactionEvent } from "@/lib/transaction-events";
 import type { ApiModuleSafe, Transaction } from "@/types/database";
 
 /**
@@ -19,6 +20,12 @@ export async function finalizeGuestCheckout(reference: string): Promise<Transact
   });
   if (error) throw new Error(error.message);
   const tx = txData as Transaction;
+  void logTransactionEvent(admin, {
+    transactionId: tx.id,
+    reference: tx.reference,
+    eventType: "payment_confirmed",
+    message: `Payment confirmed via ${tx.fulfillment_provider ?? "gateway"} — $${tx.amount.toFixed(2)} captured.`,
+  });
 
   const [{ data: apiModules }, { data: service }] = await Promise.all([
     admin.from("api_modules_safe").select("*").eq("status", "active"),
@@ -34,6 +41,12 @@ export async function finalizeGuestCheckout(reference: string): Promise<Transact
     networkId: tx.network_id,
     amount: tx.amount,
   };
+  void logTransactionEvent(admin, {
+    transactionId: tx.id,
+    reference: tx.reference,
+    eventType: "fulfillment_started",
+    message: `Calling ${provider.name} to fulfil this order.`,
+  });
   let fulfillmentResult;
   try {
     fulfillmentResult = await provider.fulfil(fulfillmentInput);
@@ -46,6 +59,13 @@ export async function finalizeGuestCheckout(reference: string): Promise<Transact
       message: e instanceof Error ? `${provider.name} error: ${e.message}` : `${provider.name} failed to fulfil this order.`,
     };
   }
+  void logTransactionEvent(admin, {
+    transactionId: tx.id,
+    reference: tx.reference,
+    eventType: fulfillmentResult.status === "fulfilled" ? "fulfillment_success" : fulfillmentResult.status === "failed" ? "fulfillment_failed" : "fulfillment_started",
+    message: fulfillmentResult.message || `${provider.name} returned status: ${fulfillmentResult.status}.`,
+    meta: { provider: provider.name, providerRef: fulfillmentResult.providerRef ?? null },
+  });
 
   const { data: updatedTx } = await admin.rpc("set_fulfillment_result", {
     p_transaction_id: tx.id,
@@ -77,4 +97,5 @@ export async function finalizeGuestCheckout(reference: string): Promise<Transact
 export async function failGuestCheckout(reference: string): Promise<void> {
   const admin = createAdminClient();
   await admin.rpc("fail_guest_checkout", { p_reference: reference });
+  void logTransactionEvent(admin, { reference, eventType: "payment_failed", message: "Payment did not go through — gateway declined or the customer cancelled." });
 }

@@ -6,7 +6,57 @@ import { Icon } from "@/components/icons";
 import { fmt } from "@/lib/data/catalog-helpers";
 import { ReviewRow } from "@/components/payment-flow/flow-shared";
 import { forceFulfilTransaction, refundTransaction, retryFulfillment } from "@/lib/actions/rectification";
+import type { TransactionTimelineEntry } from "@/lib/data/admin-queries";
 import type { Transaction, WalletLedgerRow } from "@/types/database";
+
+const EVENT_STYLE: Record<string, { icon: string; color: string }> = {
+  payment_confirmed: { icon: "check", color: "var(--success)" },
+  payment_failed: { icon: "alert", color: "var(--error)" },
+  fulfillment_started: { icon: "refresh", color: "var(--blue)" },
+  fulfillment_success: { icon: "check", color: "var(--success)" },
+  fulfillment_failed: { icon: "alert", color: "var(--error)" },
+  webhook_received: { icon: "plug", color: "var(--text-soft)" },
+};
+
+function TransactionTimeline({ timeline }: { timeline: TransactionTimelineEntry[] }) {
+  if (timeline.length === 0) {
+    return (
+      <div className="card card-pad mb-3">
+        <div className="section-title" style={{ fontSize: 14 }}>
+          What happened
+        </div>
+        <div className="muted mt-1">No events logged yet for this transaction.</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="card card-pad mb-3">
+      <div className="section-title" style={{ fontSize: 14 }}>
+        What happened
+      </div>
+      <div className="mt-2">
+        {timeline.map((entry) => {
+          const style = entry.source === "admin" ? { icon: "user", color: "var(--navy)" } : EVENT_STYLE[entry.eventType] ?? { icon: "clock", color: "var(--text-soft)" };
+          return (
+            <div key={entry.id} className="row gap-2" style={{ padding: "8px 0", alignItems: "flex-start" }}>
+              <div className="ibadge round" style={{ width: 26, height: 26, background: `${style.color}1a`, color: style.color, flexShrink: 0, marginTop: 1 }}>
+                <Icon name={style.icon} size={13} stroke={2} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>
+                  {entry.message}
+                  {entry.source === "admin" && entry.actorName && <span className="muted"> — {entry.actorName}</span>}
+                </div>
+                <div className="muted" style={{ fontSize: 11 }}>{new Date(entry.createdAt).toLocaleString("en-GB")}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 const FULFILLMENT_LABEL: Record<string, { label: string; color: string }> = {
   fulfilled: { label: "Fulfilled", color: "var(--success)" },
@@ -15,7 +65,15 @@ const FULFILLMENT_LABEL: Record<string, { label: string; color: string }> = {
   simulated: { label: "Simulated", color: "var(--warning)" },
 };
 
-export function TransactionDetail({ transaction, ledgerRows }: { transaction: Transaction; ledgerRows: WalletLedgerRow[] }) {
+export function TransactionDetail({
+  transaction,
+  ledgerRows,
+  timeline,
+}: {
+  transaction: Transaction;
+  ledgerRows: WalletLedgerRow[];
+  timeline: TransactionTimelineEntry[];
+}) {
   const router = useRouter();
   const [note, setNote] = useState("");
   const [pending, startTransition] = useTransition();
@@ -76,6 +134,8 @@ export function TransactionDetail({ transaction, ledgerRows }: { transaction: Tr
           <ReviewRow label="Created" value={new Date(transaction.created_at).toLocaleString("en-GB")} />
         </div>
       </div>
+
+      <TransactionTimeline timeline={timeline} />
 
       {Object.keys(transaction.receipt ?? {}).length > 0 && (
         <div className="card card-pad mb-3">

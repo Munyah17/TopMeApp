@@ -4,6 +4,7 @@ import { revalidateAdminPath } from "@/lib/actions/admin-cache";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/auth/permissions";
 import { getFulfillmentProvider } from "@/lib/fulfillment";
+import { logTransactionEvent } from "@/lib/transaction-events";
 import type { Transaction } from "@/types/database";
 
 const FRIENDLY_ERRORS: Record<string, string> = {
@@ -64,13 +65,33 @@ export async function retryFulfillment(transactionId: string, note: string) {
   const { data: apiModules } = await admin.from("api_modules_safe").select("*").eq("status", "active");
   const provider = getFulfillmentProvider(transaction.service_id, apiModules ?? []);
 
-  const fulfillmentResult = await provider.fulfil({
+  void logTransactionEvent(admin, {
     transactionId: transaction.id,
-    serviceId: transaction.service_id,
-    recipient: transaction.recipient_identifier,
-    extraValue: transaction.extra_value,
-    networkId: transaction.network_id,
-    amount: transaction.amount,
+    reference: transaction.reference,
+    eventType: "fulfillment_started",
+    message: `Staff retry: calling ${provider.name} again${note ? ` — ${note}` : ""}.`,
+  });
+
+  let fulfillmentResult;
+  try {
+    fulfillmentResult = await provider.fulfil({
+      transactionId: transaction.id,
+      serviceId: transaction.service_id,
+      recipient: transaction.recipient_identifier,
+      extraValue: transaction.extra_value,
+      networkId: transaction.network_id,
+      amount: transaction.amount,
+    });
+  } catch (e) {
+    const message = e instanceof Error ? `${provider.name} error: ${e.message}` : `${provider.name} failed to fulfil this order.`;
+    void logTransactionEvent(admin, { transactionId: transaction.id, reference: transaction.reference, eventType: "fulfillment_failed", message });
+    throw new Error(message);
+  }
+  void logTransactionEvent(admin, {
+    transactionId: transaction.id,
+    reference: transaction.reference,
+    eventType: fulfillmentResult.status === "fulfilled" ? "fulfillment_success" : fulfillmentResult.status === "failed" ? "fulfillment_failed" : "fulfillment_started",
+    message: fulfillmentResult.message || `${provider.name} returned status: ${fulfillmentResult.status}.`,
   });
 
   const { data: updated } = await admin.rpc("set_fulfillment_result", {

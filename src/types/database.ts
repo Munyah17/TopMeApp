@@ -286,6 +286,16 @@ export interface AdminTask {
   completed_at: string | null;
 }
 
+export interface TransactionEventRow {
+  id: string;
+  transaction_id: string | null;
+  reference: string | null;
+  event_type: string;
+  message: string;
+  meta: Record<string, unknown>;
+  created_at: string;
+}
+
 export interface AdminAuditLogRow {
   id: string;
   actor_id: string | null;

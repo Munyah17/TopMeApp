@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { notifyTopupResult } from "@/lib/email/notify";
 import { finalizeGuestCheckout, failGuestCheckout } from "@/lib/payments/guest-checkout";
 import { recordIntegrationHealth } from "@/lib/integrations/health";
+import { logTransactionEvent } from "@/lib/transaction-events";
 import type { TopupIntent } from "@/types/database";
 
 // Shared by the Paynow result_url webhook and the manual "Check Payment"
@@ -36,9 +37,11 @@ export async function applyPaynowResult(reference: string, status: string, meta?
       });
       await admin.from("topup_intents").update({ status: "completed" }).eq("reference", reference);
       await notifyTopupResult(admin, { userId: row.user_id, amount: row.amount, provider: "paynow", reference, success: true });
+      void logTransactionEvent(admin, { reference, eventType: "payment_confirmed", message: `Wallet top-up confirmed via Paynow — $${row.amount.toFixed(2)}.` });
     } else if (failed) {
       await admin.from("topup_intents").update({ status: "failed" }).eq("reference", reference);
       await notifyTopupResult(admin, { userId: row.user_id, amount: row.amount, provider: "paynow", reference, success: false });
+      void logTransactionEvent(admin, { reference, eventType: "payment_failed", message: `Wallet top-up via Paynow failed (status: ${status}).` });
     }
     return { kind: "topup" as const, success, failed };
   }

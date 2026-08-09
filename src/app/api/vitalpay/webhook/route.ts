@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import { recordIntegrationHealth } from "@/lib/integrations/health";
+import { logTransactionEvent } from "@/lib/transaction-events";
 
 /**
  * Receives VitalPay's async fulfillment webhooks (service.completed /
@@ -66,10 +67,25 @@ export async function POST(request: NextRequest) {
   const { data: tx } = await admin.from("transactions").select("id").eq("reference", reference).maybeSingle();
   if (!tx) return NextResponse.json({ ok: true });
 
+  void logTransactionEvent(admin, {
+    transactionId: tx.id,
+    reference,
+    eventType: "webhook_received",
+    message: `VitalPay webhook: ${payload.event}.`,
+    meta: { event: payload.event },
+  });
+
   await admin.rpc("set_fulfillment_result", {
     p_transaction_id: tx.id,
     p_status: payload.event === "service.completed" ? "fulfilled" : "failed",
     p_receipt: { provider: "vitalpay", event: payload.event },
+  });
+  void logTransactionEvent(admin, {
+    transactionId: tx.id,
+    reference,
+    eventType: payload.event === "service.completed" ? "fulfillment_success" : "fulfillment_failed",
+    message: payload.event === "service.completed" ? "VitalPay confirmed delivery." : "VitalPay reported delivery failed.",
+    meta: { event: payload.event },
   });
 
   return NextResponse.json({ ok: true });

@@ -22,7 +22,7 @@ function ConfirmContent() {
   const reference = searchParams.get("reference");
   const cancelled = searchParams.get("status") === "cancelled";
 
-  const [status, setStatus] = useState<"checking" | "pending" | "completed" | "failed" | "not_found">(
+  const [status, setStatus] = useState<"checking" | "pending" | "timeout" | "completed" | "failed" | "not_found">(
     cancelled ? "failed" : "checking"
   );
   const [receipt, setReceipt] = useState<GuestReceipt | null>(null);
@@ -31,10 +31,18 @@ function ConfirmContent() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const checkRef = useRef<() => Promise<void>>(async () => {});
 
+  // Auto-polling never used to give up — if the transaction genuinely
+  // stayed stuck, the screen span forever with no way out short of closing
+  // the tab (and reopening it just resumed the same infinite loop). Give
+  // up automatically after 2 minutes and hand control to the manual "Check
+  // Payment" button instead, with a clear "this is taking too long" state.
   useEffect(() => {
     if (!reference || cancelled) return;
 
     let stopped = false;
+    let attempts = 0;
+    const MAX_ATTEMPTS = 40; // ~2 minutes at 3s intervals
+
     async function check() {
       const res = await getGuestCheckoutStatus(reference!);
       if (stopped) return;
@@ -53,7 +61,13 @@ function ConfirmContent() {
         setStatus(res.status);
         if (pollRef.current) clearInterval(pollRef.current);
       } else {
-        setStatus("pending");
+        attempts += 1;
+        if (attempts >= MAX_ATTEMPTS) {
+          setStatus("timeout");
+          if (pollRef.current) clearInterval(pollRef.current);
+        } else {
+          setStatus("pending");
+        }
       }
     }
     checkRef.current = check;
@@ -105,6 +119,32 @@ function ConfirmContent() {
             {checkError}
           </div>
         )}
+      </div>
+    );
+  }
+
+  if (status === "timeout") {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 480, textAlign: "center", paddingTop: 40, paddingBottom: 24 }}>
+        <div style={{ width: 84, height: 84, borderRadius: 26, background: "#FEF6E7", color: "var(--warning)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Icon name="clock" size={38} stroke={1.6} />
+        </div>
+        <h2 style={{ fontSize: 18, marginTop: 18 }}>This is taking longer than expected</h2>
+        <div className="muted mt-1" style={{ maxWidth: 280 }}>
+          We&apos;ve stopped checking automatically. If Paynow already took payment, tapping below will pick it up —
+          otherwise contact support with reference <strong>{reference}</strong>.
+        </div>
+        <button className="btn btn-primary btn-block mt-4" disabled={checkingNow} onClick={handleCheckPayment}>
+          {checkingNow ? "Checking…" : "Check Payment"}
+        </button>
+        {checkError && (
+          <div className="muted mt-2" style={{ color: "var(--error)" }}>
+            {checkError}
+          </div>
+        )}
+        <Link href="/home" className="btn btn-ghost btn-block mt-2" style={{ textDecoration: "none" }}>
+          Back to Home
+        </Link>
       </div>
     );
   }
