@@ -66,10 +66,26 @@ export async function getActivePromoBanner(): Promise<PromoBanner | null> {
     .select("*")
     .eq("is_active", true)
     .eq("kind", "image")
+    .eq("placement", "home_top")
     .order("sort_order")
     .limit(1)
     .maybeSingle();
   return (data as PromoBanner) ?? null;
+}
+
+// Portrait promo tiles that fill the blank grid slots left when a Home
+// category row has fewer products than the desktop column count — see
+// .cat-widget-tile in globals.css and src/app/(app)/home/page.tsx.
+export async function getGridWidgetBanners(): Promise<PromoBanner[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("promo_banners")
+    .select("*")
+    .eq("is_active", true)
+    .eq("kind", "image")
+    .eq("placement", "grid_widget")
+    .order("sort_order");
+  return (data as PromoBanner[]) ?? [];
 }
 
 // Text announcements (audience 'customers'|'staff'|'all') — separate from

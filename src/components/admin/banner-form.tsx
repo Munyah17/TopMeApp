@@ -12,6 +12,7 @@ function toInput(b: PromoBanner | undefined): PromoBannerInput {
     title: b?.title ?? "",
     body: b?.body ?? "",
     audience: b?.audience ?? "customers",
+    placement: b?.placement ?? "home_top",
     sortOrder: b?.sort_order ?? 0,
   };
 }
@@ -48,6 +49,22 @@ export function BannerForm({ existing, onDone }: { existing?: PromoBanner; onDon
       {form.kind === "image" ? (
         <>
           <div>
+            <label className="field-label">Placement</label>
+            <div className="row gap-2">
+              <div className={`chip tap ${form.placement === "home_top" ? "selected" : ""}`} style={{ flex: 1, textAlign: "center" }} onClick={() => set("placement", "home_top")}>
+                Home top banner
+              </div>
+              <div className={`chip tap ${form.placement === "grid_widget" ? "selected" : ""}`} style={{ flex: 1, textAlign: "center" }} onClick={() => set("placement", "grid_widget")}>
+                Grid widget tile
+              </div>
+            </div>
+            <div className="muted mt-1" style={{ fontSize: 11.5 }}>
+              {form.placement === "grid_widget"
+                ? "Fills the empty slot(s) left when a Home category row has fewer products than the desktop column count — desktop only. Use a portrait image (recommend ~600×800px); it's cropped to fit a single card-sized cell."
+                : "The wide banner shown at the top of Home, under the Gadgets category row."}
+            </div>
+          </div>
+          <div>
             <label className="field-label">Image URL</label>
             <input className="field" placeholder="https://…/banner.png" value={form.imageUrl} onChange={(e) => set("imageUrl", e.target.value)} />
           </div>
@@ -57,7 +74,15 @@ export function BannerForm({ existing, onDone }: { existing?: PromoBanner; onDon
           </div>
           {form.imageUrl.trim() && (
             // eslint-disable-next-line @next/next/no-img-element -- arbitrary admin-supplied banner URL
-            <img src={form.imageUrl} alt="Banner preview" style={{ width: "100%", borderRadius: 12, maxHeight: 180, objectFit: "cover" }} />
+            <img
+              src={form.imageUrl}
+              alt="Banner preview"
+              style={
+                form.placement === "grid_widget"
+                  ? { width: 160, height: 200, borderRadius: 12, objectFit: "cover" }
+                  : { width: "100%", borderRadius: 12, maxHeight: 180, objectFit: "cover" }
+              }
+            />
           )}
         </>
       ) : (

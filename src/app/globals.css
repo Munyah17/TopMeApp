@@ -905,6 +905,19 @@ h3 {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+/* Admin-uploaded portrait tile filling a category row's otherwise-blank
+   slots (see .cat-section-row's comment) — desktop only, matches a
+   product card's own border/radius so it sits in the grid as a peer, not
+   an obviously different shape. */
+.cat-widget-tile {
+  display: none;
+}
+.cat-widget-tile a,
+.cat-widget-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
 @media (min-width: 820px) {
   .cat-section-row {
     grid-template-columns: repeat(4, 1fr);
@@ -912,6 +925,15 @@ h3 {
   }
   .prod-media {
     height: 190px;
+  }
+  .cat-widget-tile {
+    display: block;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .cat-widget-img {
+    object-fit: cover;
   }
   .hist-row {
     padding: 14px 20px !important;

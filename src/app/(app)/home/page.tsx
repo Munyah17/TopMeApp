@@ -12,20 +12,27 @@ import {
   getCategories,
   getCurrentProfile,
   getFavoriteServiceIds,
+  getGridWidgetBanners,
   getRecentTransactions,
 } from "@/lib/data/queries";
+
+const CAT_ROW_DESKTOP_COLUMNS = 4;
 
 export default async function HomePage() {
   const profile = await getCurrentProfile();
 
-  const [categories, services, favoriteIds, recent, beneficiaries, promoBanner] = await Promise.all([
+  const [categories, services, favoriteIds, recent, beneficiaries, promoBanner, gridWidgets] = await Promise.all([
     getCategories(),
     getAllServices(),
     profile ? getFavoriteServiceIds(profile.id) : Promise.resolve(new Set<string>()),
     profile ? getRecentTransactions(profile.id, 3) : Promise.resolve([]),
     profile ? getBeneficiaries(profile.id) : Promise.resolve([]),
     getActivePromoBanner(),
+    profile ? getGridWidgetBanners() : Promise.resolve([]),
   ]);
+  // Cursor shared across all category rows below so, with more than one
+  // active widget, they rotate rather than always showing the same one.
+  let widgetCursor = 0;
 
   const servicesByCategory = new Map<string, typeof services>();
   for (const s of services) {
@@ -242,6 +249,21 @@ export default async function HomePage() {
                   {items.map((i) => (
                     <ProductCard key={i.id} service={i} categoryColor={c.color} />
                   ))}
+                  {gridWidgets.length > 0 &&
+                    items.length < CAT_ROW_DESKTOP_COLUMNS &&
+                    Array.from({ length: CAT_ROW_DESKTOP_COLUMNS - items.length }, () => {
+                      const widget = gridWidgets[widgetCursor % gridWidgets.length];
+                      widgetCursor += 1;
+                      const content = (
+                        // eslint-disable-next-line @next/next/no-img-element -- admin-uploaded widget tile, arbitrary host
+                        <img src={widget.image_url ?? ""} alt={widget.title ?? "Promotion"} className="cat-widget-img" />
+                      );
+                      return (
+                        <div key={`widget-${widget.id}-${widgetCursor}`} className="cat-widget-tile">
+                          {widget.link_url ? <Link href={widget.link_url}>{content}</Link> : content}
+                        </div>
+                      );
+                    })}
                 </div>
 
                 {c.id === "gadgets" && promoBanner && (

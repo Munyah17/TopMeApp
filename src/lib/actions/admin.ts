@@ -351,6 +351,7 @@ export interface PromoBannerInput {
   title: string;
   body: string;
   audience: "customers" | "staff" | "all";
+  placement: "home_top" | "grid_widget";
   sortOrder: number;
 }
 
@@ -362,6 +363,7 @@ function promoBannerRow(input: PromoBannerInput) {
     title: input.kind === "announcement" ? input.title || null : null,
     body: input.kind === "announcement" ? input.body || null : null,
     audience: input.audience,
+    placement: input.kind === "image" ? input.placement : "home_top",
     sort_order: input.sortOrder,
   };
 }

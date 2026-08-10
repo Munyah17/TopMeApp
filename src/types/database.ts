@@ -13,6 +13,7 @@ export interface PromoBanner {
   title: string | null;
   body: string | null;
   audience: "customers" | "staff" | "all";
+  placement: "home_top" | "grid_widget";
   is_active: boolean;
   sort_order: number;
   created_at: string;
