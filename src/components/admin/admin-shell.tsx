@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Icon } from "@/components/icons";
+import { signOut } from "@/lib/actions/account";
 import type { PermissionKey } from "@/lib/auth/permission-keys";
 
 interface NavItem {
@@ -94,6 +95,7 @@ export function AdminShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const canSee = (item: NavItem) => !item.perm || role === "superadmin" || permissions.includes(item.perm);
   const groups = NAV.map((g) => ({ ...g, items: g.items.filter(canSee) })).filter((g) => g.items.length > 0);
@@ -151,9 +153,21 @@ export function AdminShell({
           </div>
         ))}
         <Link href="/home" className="admin-sidebar-item admin-sidebar-exit">
-          <Icon name="logout" size={16} stroke={1.9} />
+          <Icon name="arrowUpR" size={16} stroke={1.9} />
           <span>Back to TopMe</span>
         </Link>
+        <button
+          type="button"
+          className="admin-sidebar-item admin-sidebar-logout"
+          onClick={async () => {
+            await signOut();
+            router.push("/login");
+            router.refresh();
+          }}
+        >
+          <Icon name="logout" size={16} stroke={1.9} />
+          <span>Log Out</span>
+        </button>
       </aside>
 
       <div className="admin-content">

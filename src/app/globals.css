@@ -568,6 +568,45 @@ h3 {
   font-size: 13px;
   cursor: pointer;
   flex-shrink: 0;
+  border: none;
+}
+.avatar-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 190px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 14px 34px -10px rgba(15, 23, 42, 0.22);
+  padding: 6px;
+  z-index: 120;
+}
+.avatar-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 10px;
+  border-radius: 9px;
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-decoration: none;
+  background: none;
+  border: none;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.avatar-menu-item:hover {
+  background: var(--bg);
+}
+.avatar-menu-logout {
+  color: var(--error);
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+  padding-top: 12px;
 }
 
 .app-main {
@@ -1020,6 +1059,15 @@ h3 {
     gap: 28px;
     align-items: start;
   }
+  /* .col-side's few short cards otherwise sit once near the top of the
+     document while .col-main keeps going for many more category rows,
+     leaving a tall blank column beside the rest of the page as you
+     scroll — sticky keeps it visible alongside whatever you're actually
+     looking at instead of trailing off into empty space. */
+  .col-side {
+    position: sticky;
+    top: 24px;
+  }
 }
 .cats-grid {
   display: flex;
@@ -1339,6 +1387,15 @@ h3 {
   padding-top: 12px;
   border-top: 1px solid var(--border);
   color: var(--text-faint);
+}
+.admin-sidebar-logout {
+  width: 100%;
+  background: none;
+  border: none;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  color: var(--error);
 }
 .admin-content {
   flex: 1;

@@ -13,7 +13,7 @@ on conflict (id) do update set name = excluded.name, color = excluded.color;
 
 insert into public.service_categories (id, name, icon, color, bg, description, sort_order) values
   ('airtimedata',  'Airtime & Data',                  'phone',   '#00C853', '#E9FBF0', 'Airtime and data top ups',                      1),
-  ('utilent',      'Utilities & Entertainment',        'zap',     '#F59E0B', '#FEF6E7', 'ZESA, TV, vouchers & home power',               2),
+  ('utilent',      'Entertainment',                    'zap',     '#F59E0B', '#FEF6E7', 'ZESA, TV, vouchers & home power',               2),
   ('insurance',    'Insurance',                        'shield',  '#00C853', '#E9FBF0', 'Vehicle, legal, agriculture & cash plans',      3),
   ('connectivity', 'Connectivity Products & Services', 'wifi',    '#38BDF8', '#EAF8FF', 'ISPs, eSIM & networking gear',                  4),
   ('gadgets',      'Tech Gadgets',                     'laptop',  '#8B5CF6', '#F3EEFE', 'Devices delivered or collected',                5),

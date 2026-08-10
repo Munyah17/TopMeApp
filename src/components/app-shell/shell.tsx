@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Icon } from "@/components/icons";
+import { AvatarMenu } from "@/components/app-shell/avatar-menu";
 import { BrandMark, Wordmark } from "@/components/logo";
 import { Footer } from "@/components/app-shell/footer";
 import type { Profile } from "@/types/database";
@@ -100,9 +101,7 @@ export function AppShell({
                       }}
                     />
                   </Link>
-                  <Link href="/account" className="header-avatar tap" style={{ textDecoration: "none" }}>
-                    {initials(profile.full_name)}
-                  </Link>
+                  <AvatarMenu initials={initials(profile.full_name)} />
                 </>
               ) : (
                 <>

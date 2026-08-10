@@ -80,7 +80,7 @@ export default async function AccountPage() {
           </div>
           <Icon name="chevronR" size={17} stroke={2} />
         </div>
-        <div className="row gap-2" style={{ padding: "14px 16px" }}>
+        <div id="notifications" className="row gap-2" style={{ padding: "14px 16px", scrollMarginTop: 80 }}>
           <div className="ibadge round" style={{ width: 38, height: 38, background: "#F1F4F9", color: "var(--text-soft)" }}>
             <Icon name="bell" size={17} stroke={1.8} />
           </div>
