@@ -20,30 +20,46 @@ type GuestReceipt = {
 function ConfirmContent() {
   const searchParams = useSearchParams();
   const reference = searchParams.get("reference");
-  const cancelled = searchParams.get("status") === "cancelled";
 
-  const [status, setStatus] = useState<"checking" | "pending" | "timeout" | "completed" | "failed" | "not_found">(
-    cancelled ? "failed" : "checking"
-  );
+  const [status, setStatus] = useState<"checking" | "pending" | "timeout" | "completed" | "failed" | "not_found">("checking");
   const [receipt, setReceipt] = useState<GuestReceipt | null>(null);
   const [checkingNow, setCheckingNow] = useState(false);
   const [checkError, setCheckError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const checkRef = useRef<() => Promise<void>>(async () => {});
 
-  // Auto-polling never used to give up — if the transaction genuinely
-  // stayed stuck, the screen span forever with no way out short of closing
-  // the tab (and reopening it just resumed the same infinite loop). Give
-  // up automatically after 2 minutes and hand control to the manual "Check
-  // Payment" button instead, with a clear "this is taking too long" state.
+  // Two real bugs, not one: (1) Paynow never actually appends
+  // ?status=cancelled to the return URL on its own — there was no way to
+  // reach this page and land on the "cancelled" branch, so a customer who
+  // cancelled (or whose payment failed for any other reason, e.g. an
+  // EcoCash balance too low) always fell into the ordinary pending-spinner
+  // path. (2) That path only ever read our own database — which depends on
+  // Paynow's own webhook, independently confirmed unreliable — instead of
+  // ever actively asking Paynow directly unless the customer manually
+  // tapped "Check Payment". Now every check cycle asks Paynow for real
+  // status first (immediately on load, then periodically), so a
+  // cancelled/failed/succeeded payment resolves in seconds instead of
+  // silently waiting on a webhook that might never arrive, and gives up
+  // automatically after ~2 minutes if it truly can't resolve.
   useEffect(() => {
-    if (!reference || cancelled) return;
+    if (!reference) return;
 
     let stopped = false;
     let attempts = 0;
     const MAX_ATTEMPTS = 40; // ~2 minutes at 3s intervals
 
     async function check() {
+      attempts += 1;
+      if (attempts === 1 || attempts % 4 === 0) {
+        try {
+          await checkGuestPaymentNow(reference!);
+        } catch {
+          // Fall through to the passive DB read below regardless — the
+          // active check is a best-effort accelerator, not a requirement.
+        }
+      }
+      if (stopped) return;
+
       const res = await getGuestCheckoutStatus(reference!);
       if (stopped) return;
       if (res.status === "completed") {
@@ -60,14 +76,11 @@ function ConfirmContent() {
       } else if (res.status === "failed" || res.status === "not_found") {
         setStatus(res.status);
         if (pollRef.current) clearInterval(pollRef.current);
+      } else if (attempts >= MAX_ATTEMPTS) {
+        setStatus("timeout");
+        if (pollRef.current) clearInterval(pollRef.current);
       } else {
-        attempts += 1;
-        if (attempts >= MAX_ATTEMPTS) {
-          setStatus("timeout");
-          if (pollRef.current) clearInterval(pollRef.current);
-        } else {
-          setStatus("pending");
-        }
+        setStatus("pending");
       }
     }
     checkRef.current = check;
@@ -77,7 +90,7 @@ function ConfirmContent() {
       stopped = true;
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [reference, cancelled]);
+  }, [reference]);
 
   async function handleCheckPayment() {
     if (!reference) return;
@@ -238,12 +251,11 @@ function ConfirmContent() {
         <Icon name="alert" size={38} stroke={1.6} />
       </div>
       <h2 style={{ fontSize: 18, marginTop: 18 }}>
-        {cancelled ? "Payment cancelled" : status === "not_found" ? "We couldn't find that payment" : "Payment didn't go through"}
+        {status === "not_found" ? "We couldn't find that payment" : "Payment didn't go through"}
       </h2>
       <div className="muted mt-1" style={{ maxWidth: 280 }}>
-        {cancelled
-          ? "You cancelled before completing payment. No charge was made."
-          : "Nothing was charged. You can try again from the service page."}
+        Nothing was charged — if you cancelled or the payment was declined, no funds moved. You can try again from the
+        service page.
       </div>
       <Link href="/services" className="btn btn-primary btn-block mt-4" style={{ textDecoration: "none" }}>
         Back to Services

@@ -14,12 +14,26 @@ export function PaynowTopupStatus({ reference }: { reference: string }) {
 
   // Give up auto-polling after ~2 minutes instead of spinning forever if the
   // transaction genuinely never resolves — "Check Payment" stays available.
+  // Also actively asks Paynow directly (not just our own DB, which depends
+  // on their independently-unreliable webhook) on load and periodically
+  // after, so a cancelled/declined payment resolves in seconds instead of
+  // only ever updating once someone manually taps Check Payment.
   useEffect(() => {
     let stopped = false;
     let attempts = 0;
     const MAX_ATTEMPTS = 40;
 
     async function check() {
+      attempts += 1;
+      if (attempts === 1 || attempts % 4 === 0) {
+        try {
+          await checkTopupPaymentNow(reference);
+        } catch {
+          // best-effort accelerator — fall through to the passive read below
+        }
+      }
+      if (stopped) return;
+
       const s = await checkTopupStatus(reference);
       if (stopped) return;
       if (s === "completed") {
@@ -29,12 +43,9 @@ export function PaynowTopupStatus({ reference }: { reference: string }) {
       } else if (s === "failed") {
         setStatus("failed");
         if (pollRef.current) clearInterval(pollRef.current);
-      } else {
-        attempts += 1;
-        if (attempts >= MAX_ATTEMPTS) {
-          setStatus("timeout");
-          if (pollRef.current) clearInterval(pollRef.current);
-        }
+      } else if (attempts >= MAX_ATTEMPTS) {
+        setStatus("timeout");
+        if (pollRef.current) clearInterval(pollRef.current);
       }
     }
     checkRef.current = check;
