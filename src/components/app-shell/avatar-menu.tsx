@@ -8,7 +8,7 @@ import { signOut } from "@/lib/actions/account";
 
 const ITEMS = [
   { href: "/account", label: "My Profile", icon: "user" },
-  { href: "/account", label: "Settings", icon: "settings" },
+  { href: "/account#appearance", label: "Settings", icon: "settings" },
   { href: "/account#notifications", label: "Notifications", icon: "bell" },
 ] as const;
 

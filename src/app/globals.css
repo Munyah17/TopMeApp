@@ -33,6 +33,42 @@
   --chat-bubble-mine: #dcf8c6;
 }
 
+/* Dark mode: light is the default (base :root above); this block only
+   applies once src/lib/theme-script.ts has set data-theme="dark" on
+   <html> — either the user's own toggle choice or, on first visit with no
+   saved choice yet, their device's own dark-mode setting. Same token
+   names, dark values, so every existing var(--...) reference across the
+   app repaints automatically — nothing that already uses the design
+   tokens needs its own dark-mode rule. Brand green stays the same in both
+   themes; only backgrounds/text/borders and the pale tint colors (which
+   would look washed out on a dark surface) actually change.
+
+   Scoped to .app-shell (the customer app's own root), NOT :root — the
+   toggle is a customer-only preference (see /account#appearance; staff
+   never reach it, /admin and /super-admin redirect away from /account
+   entirely). Scoping at :root would leak into .admin-shell too, since it
+   has no background of its own and just inherits body's — which is
+   exactly what the owner explicitly said not to touch. */
+html[data-theme="dark"] .app-shell {
+  --green-50: rgba(0, 200, 83, 0.16);
+  --navy: #1e293b;
+  --navy-700: #0f172a;
+  --blue-50: rgba(56, 189, 248, 0.16);
+  --bg: #0a0f1a;
+  --surface: #131b2c;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --error: #f87171;
+  --text: #f1f5f9;
+  --text-soft: #a3b0c2;
+  --text-faint: #6b7893;
+  --border: #232f45;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.24), 0 1px 1px rgba(0, 0, 0, 0.18);
+  --shadow-md: 0 8px 24px -8px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 20px 48px -12px rgba(0, 0, 0, 0.55);
+  --chat-bubble-mine: #0b3d2a;
+}
+
 @theme inline {
   --color-green: var(--green);
   --color-green-600: var(--green-600);

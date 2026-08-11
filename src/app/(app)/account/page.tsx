@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { AuthRequired } from "@/components/auth-required";
 import { Icon } from "@/components/icons";
 import { NotificationsToggle } from "@/components/wallet/notifications-toggle";
+import { ThemeToggle } from "@/components/wallet/theme-toggle";
 import { signOut } from "@/lib/actions/account";
 import { getBeneficiaries, getCurrentProfile } from "@/lib/data/queries";
 
@@ -91,6 +92,22 @@ export default async function AccountPage() {
         </div>
       </div>
 
+      <div id="appearance" className="eyebrow mt-3 mb-1" style={{ paddingLeft: 2, scrollMarginTop: 80 }}>
+        Appearance
+      </div>
+      <div className="card" style={{ overflow: "hidden" }}>
+        <div className="row gap-2" style={{ padding: "14px 16px" }}>
+          <div className="ibadge round" style={{ width: 38, height: 38, background: "#F1F4F9", color: "var(--text-soft)" }}>
+            <Icon name="sun" size={17} stroke={1.8} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 700, fontSize: 13.5 }}>Dark Mode</div>
+            <div className="muted">Off follows your device automatically until you choose</div>
+          </div>
+          <ThemeToggle />
+        </div>
+      </div>
+
       <div className="eyebrow mt-3 mb-1" style={{ paddingLeft: 2 }}>
         Wallet
       </div>
@@ -114,7 +131,6 @@ export default async function AccountPage() {
         {[
           { icon: "shield", label: "Security" },
           { icon: "headset", label: "Support" },
-          { icon: "settings", label: "Settings" },
           { icon: "gift", label: "Referral Program", sub: "Earn $2 per friend" },
         ].map((row, i, arr) => (
           <div
