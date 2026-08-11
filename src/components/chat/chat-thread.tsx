@@ -6,6 +6,7 @@ import { Icon } from "@/components/icons";
 import { createClient } from "@/lib/supabase/client";
 import { fmt } from "@/lib/data/catalog-helpers";
 import { markConversationRead, sendImageMessage, sendMoneyMessage, sendTextMessage } from "@/lib/actions/chat";
+import { compressImage } from "@/lib/client/compress-image";
 import type { ChatMessage, ProfileLookup } from "@/types/database";
 
 function initials(name: string | null | undefined, phone: string | null | undefined) {
@@ -97,8 +98,9 @@ export function ChatThread({
   async function submitImage(file: File) {
     setUploading(true);
     try {
+      const compressed = await compressImage(file);
       const fd = new FormData();
-      fd.append("file", file);
+      fd.append("file", compressed);
       await sendImageMessage(conversationId, fd);
     } catch (e) {
       setMoneyError(null);
@@ -192,8 +194,8 @@ export function ChatThread({
                 {divider}
                 <div style={{ display: "flex", justifyContent: mine ? "flex-end" : "flex-start", marginBottom: 12 }}>
                   <div style={{ maxWidth: 220, borderRadius: 16, overflow: "hidden", boxShadow: "0 1px 3px rgba(15,23,42,0.15)" }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element -- user-uploaded chat image, arbitrary content */}
-                    <img src={m.image_url} alt="Shared photo" style={{ width: "100%", display: "block" }} />
+                    {/* eslint-disable-next-line @next/next/no-img-element -- user-uploaded chat image, variable aspect ratio with no stored dimensions (next/image needs one or the other) */}
+                    <img src={m.image_url} alt="Shared photo" loading="lazy" decoding="async" style={{ width: "100%", display: "block" }} />
                     <div style={{ background: mine ? "var(--chat-bubble-mine)" : "var(--surface)", padding: "4px 8px", fontSize: 10, opacity: 0.65, textAlign: "right" }}>
                       {timeOf(m.created_at)}
                     </div>

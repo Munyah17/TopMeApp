@@ -37,9 +37,22 @@ export async function getConversations(userId: string): Promise<ConversationWith
   });
 }
 
+// Powers the nav badge, called on every page load via the (app) layout —
+// deliberately NOT reusing getConversations(), which also joins counterpart
+// profiles just to render names nobody needs for a number. Two lightweight
+// queries instead of three (one of them a profiles join) on every single
+// navigation across the whole app, not just /chat.
 export async function getUnreadChatCount(userId: string): Promise<number> {
-  const conversations = await getConversations(userId);
-  return conversations.filter((c) => c.unread).length;
+  const supabase = await createClient();
+  const [{ data: convos }, { data: reads }] = await Promise.all([
+    supabase.from("conversations").select("id, last_message_at").or(`user_a.eq.${userId},user_b.eq.${userId}`),
+    supabase.from("conversation_reads").select("conversation_id, last_read_at").eq("user_id", userId),
+  ]);
+  const readAtByConvo = new Map(((reads as { conversation_id: string; last_read_at: string }[]) ?? []).map((r) => [r.conversation_id, r.last_read_at]));
+  return ((convos as { id: string; last_message_at: string }[]) ?? []).filter((c) => {
+    const readAt = readAtByConvo.get(c.id);
+    return !readAt || new Date(readAt) < new Date(c.last_message_at);
+  }).length;
 }
 
 export async function getConversation(conversationId: string, userId: string): Promise<ConversationWithCounterpart | null> {
@@ -62,13 +75,19 @@ export async function getConversation(conversationId: string, userId: string): P
   };
 }
 
+// Fetches the most recent `limit` messages — ordering descending then
+// limiting (instead of ascending+limit, which silently returned the
+// OLDEST messages in any conversation past `limit` and made long threads
+// look frozen in the past) then reversing back to chronological order for
+// display.
 export async function getMessages(conversationId: string, limit = 50): Promise<ChatMessage[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("messages")
     .select("*, p2p_transfer:p2p_transfers(*)")
     .eq("conversation_id", conversationId)
-    .order("created_at", { ascending: true })
+    .order("created_at", { ascending: false })
     .limit(limit);
-  return (data as (ChatMessage & { p2p_transfer: P2pTransfer | null })[]) ?? [];
+  const rows = (data as (ChatMessage & { p2p_transfer: P2pTransfer | null })[]) ?? [];
+  return rows.reverse();
 }
