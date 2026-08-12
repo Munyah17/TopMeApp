@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -139,7 +139,7 @@ function ConfirmContent() {
   if (status === "timeout") {
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 480, textAlign: "center", paddingTop: 40, paddingBottom: 24 }}>
-        <div style={{ width: 84, height: 84, borderRadius: 26, background: "#FEF6E7", color: "var(--warning)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ width: 84, height: 84, borderRadius: 26, background: "var(--warning-bg)", color: "var(--warning)", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <Icon name="clock" size={38} stroke={1.6} />
         </div>
         <h2 style={{ fontSize: 18, marginTop: 18 }}>This is taking longer than expected</h2>
@@ -241,7 +241,7 @@ function ConfirmContent() {
           width: 84,
           height: 84,
           borderRadius: 26,
-          background: "#FDECEC",
+          background: "var(--error-bg)",
           color: "var(--error)",
           display: "flex",
           alignItems: "center",

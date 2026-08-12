@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import jsQR from "jsqr";
@@ -74,7 +74,7 @@ export default function ScanPage() {
 
       {error ? (
         <div className="mt-4" style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 30, textAlign: "center" }}>
-          <div style={{ width: 84, height: 84, borderRadius: 26, background: "#FDECEC", color: "var(--error)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ width: 84, height: 84, borderRadius: 26, background: "var(--error-bg)", color: "var(--error)", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Icon name="alert" size={38} stroke={1.6} />
           </div>
           <h2 style={{ fontSize: 18, marginTop: 18 }}>Camera unavailable</h2>

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -218,7 +218,7 @@ export function BroadbandFlow({
 
         {step === "error" && (
           <div className="mt-4" style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 30, textAlign: "center" }}>
-            <div style={{ width: 84, height: 84, borderRadius: 26, background: "#FDECEC", color: "var(--error)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ width: 84, height: 84, borderRadius: 26, background: "var(--error-bg)", color: "var(--error)", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <Icon name="alert" size={38} stroke={1.6} />
             </div>
             <h2 style={{ fontSize: 18, marginTop: 18 }}>We couldn&apos;t process that</h2>
@@ -408,7 +408,7 @@ export function BroadbandFlow({
               <div style={{ textAlign: "center", marginBottom: 14 }}>
                 <span style={{ background: "var(--green-50)", color: "var(--success)", fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 8 }}>✓ Successful</span>
                 {result.fulfillment_status === "simulated" && (
-                  <span style={{ marginLeft: 6, background: "#FEF6E7", color: "var(--warning)", fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 8 }}>Simulated fulfillment</span>
+                  <span style={{ marginLeft: 6, background: "var(--warning-bg)", color: "var(--warning)", fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 8 }}>Simulated fulfillment</span>
                 )}
                 {result.fulfillment_status === "pending" && (
                   <span style={{ marginLeft: 6, background: "var(--blue-50)", color: "var(--blue)", fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 8 }}>Delivering…</span>

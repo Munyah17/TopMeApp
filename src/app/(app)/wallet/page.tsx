@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { AuthRequired } from "@/components/auth-required";
 import { Icon } from "@/components/icons";
 import { PaynowTopupStatus } from "@/components/wallet/paynow-topup-status";
@@ -86,7 +86,7 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
                     style={{
                       width: 38,
                       height: 38,
-                      background: l.amount >= 0 ? "var(--green-50)" : "#FEF6E7",
+                      background: l.amount >= 0 ? "var(--green-50)" : "var(--warning-bg)",
                       color: l.amount >= 0 ? "var(--success)" : "var(--warning)",
                     }}
                   >

@@ -72,7 +72,7 @@ export default async function AccountPage() {
       </div>
       <div className="card" style={{ overflow: "hidden" }}>
         <div className="row gap-2" style={{ padding: "14px 16px", borderBottom: "1px solid var(--border)" }}>
-          <div className="ibadge round" style={{ width: 38, height: 38, background: "#F1F4F9", color: "var(--text-soft)" }}>
+          <div className="ibadge round" style={{ width: 38, height: 38, background: "var(--badge-neutral-bg)", color: "var(--text-soft)" }}>
             <Icon name="users" size={17} stroke={1.8} />
           </div>
           <div style={{ flex: 1 }}>
@@ -82,7 +82,7 @@ export default async function AccountPage() {
           <Icon name="chevronR" size={17} stroke={2} />
         </div>
         <div id="notifications" className="row gap-2" style={{ padding: "14px 16px", scrollMarginTop: 80 }}>
-          <div className="ibadge round" style={{ width: 38, height: 38, background: "#F1F4F9", color: "var(--text-soft)" }}>
+          <div className="ibadge round" style={{ width: 38, height: 38, background: "var(--badge-neutral-bg)", color: "var(--text-soft)" }}>
             <Icon name="bell" size={17} stroke={1.8} />
           </div>
           <div style={{ flex: 1 }}>
@@ -97,7 +97,7 @@ export default async function AccountPage() {
       </div>
       <div className="card" style={{ overflow: "hidden" }}>
         <div className="row gap-2" style={{ padding: "14px 16px" }}>
-          <div className="ibadge round" style={{ width: 38, height: 38, background: "#F1F4F9", color: "var(--text-soft)" }}>
+          <div className="ibadge round" style={{ width: 38, height: 38, background: "var(--badge-neutral-bg)", color: "var(--text-soft)" }}>
             <Icon name="sun" size={17} stroke={1.8} />
           </div>
           <div style={{ flex: 1 }}>
@@ -138,7 +138,7 @@ export default async function AccountPage() {
             className="row gap-2"
             style={{ padding: "14px 16px", borderBottom: i < arr.length - 1 ? "1px solid var(--border)" : "none" }}
           >
-            <div className="ibadge round" style={{ width: 38, height: 38, background: "#F1F4F9", color: "var(--text-soft)" }}>
+            <div className="ibadge round" style={{ width: 38, height: 38, background: "var(--badge-neutral-bg)", color: "var(--text-soft)" }}>
               <Icon name={row.icon} size={17} stroke={1.8} />
             </div>
             <div style={{ flex: 1 }}>
@@ -157,7 +157,7 @@ export default async function AccountPage() {
           redirect("/login");
         }}
       >
-        <button className="btn btn-secondary btn-block mt-3" style={{ color: "var(--error)", borderColor: "#FBD5D5" }} type="submit">
+        <button className="btn btn-secondary btn-block mt-3" style={{ color: "var(--error)", borderColor: "var(--error-border-soft)" }} type="submit">
           <Icon name="logout" size={17} stroke={2} /> Log out
         </button>
       </form>

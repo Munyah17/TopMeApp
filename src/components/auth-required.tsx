@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { Icon } from "@/components/icons";
 
 export function AuthRequired({ title, message }: { title: string; message: string }) {
@@ -9,7 +9,7 @@ export function AuthRequired({ title, message }: { title: string; message: strin
           width: 74,
           height: 74,
           borderRadius: 22,
-          background: "#F1F4F9",
+          background: "var(--badge-neutral-bg)",
           color: "var(--text-faint)",
           display: "flex",
           alignItems: "center",

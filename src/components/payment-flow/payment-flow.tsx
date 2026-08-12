@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -243,7 +243,7 @@ export function PaymentFlow({
                 width: 84,
                 height: 84,
                 borderRadius: 26,
-                background: "#FDECEC",
+                background: "var(--error-bg)",
                 color: "var(--error)",
                 display: "flex",
                 alignItems: "center",
@@ -774,7 +774,7 @@ function ReceiptStep({
             <span
               style={{
                 marginLeft: 6,
-                background: "#FEF6E7",
+                background: "var(--warning-bg)",
                 color: "var(--warning)",
                 fontSize: 11,
                 fontWeight: 700,

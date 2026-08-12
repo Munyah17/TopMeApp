@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { Icon } from "@/components/icons";
 import { GuestHistory } from "@/components/history/guest-history";
 import { fmt } from "@/lib/data/catalog-helpers";
@@ -103,7 +103,7 @@ export default async function HistoryPage({
               width: 74,
               height: 74,
               borderRadius: 22,
-              background: "#F1F4F9",
+              background: "var(--badge-neutral-bg)",
               color: "var(--text-faint)",
               display: "flex",
               alignItems: "center",
@@ -132,7 +132,7 @@ export default async function HistoryPage({
                     className="row gap-2 hist-row"
                     style={{ padding: "14px 16px", borderBottom: i < list.length - 1 ? "1px solid var(--border)" : "none" }}
                   >
-                    <div className="ibadge" style={{ background: svc ? `${svc.color}1a` : "#F1F4F9", color: svc?.color }}>
+                    <div className="ibadge" style={{ background: svc ? `${svc.color}1a` : "var(--badge-neutral-bg)", color: svc?.color }}>
                       <Icon name={svc?.icon || "wallet"} size={20} stroke={1.8} />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>

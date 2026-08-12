@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { AuthRequired } from "@/components/auth-required";
 import { Icon } from "@/components/icons";
 import { getConversations } from "@/lib/data/chat-queries";
@@ -49,7 +49,7 @@ export default async function ChatInboxPage() {
 
       {conversations.length === 0 ? (
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "50px 20px" }}>
-          <div style={{ width: 74, height: 74, borderRadius: 22, background: "#F1F4F9", color: "var(--text-faint)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ width: 74, height: 74, borderRadius: 22, background: "var(--badge-neutral-bg)", color: "var(--text-faint)", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Icon name="chat" size={30} stroke={1.6} />
           </div>
           <div style={{ fontWeight: 700, fontSize: 15, marginTop: 16 }}>No chats yet</div>

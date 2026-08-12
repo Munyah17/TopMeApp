@@ -31,6 +31,10 @@
   --shadow-lg: 0 20px 48px -12px rgba(15, 23, 42, 0.18);
   --shadow-green: 0 12px 24px -8px rgba(0, 200, 83, 0.35);
   --chat-bubble-mine: #dcf8c6;
+  --badge-neutral-bg: #f1f4f9;
+  --error-bg: #fdecec;
+  --warning-bg: #fef6e7;
+  --error-border-soft: #fbd5d5;
 }
 
 /* Dark mode: light is the default (base :root above); this block only
@@ -66,6 +70,10 @@ html[data-theme="dark"] .app-shell {
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.24), 0 1px 1px rgba(0, 0, 0, 0.18);
   --shadow-md: 0 8px 24px -8px rgba(0, 0, 0, 0.45);
   --shadow-lg: 0 20px 48px -12px rgba(0, 0, 0, 0.55);
+  --badge-neutral-bg: #1c2638;
+  --error-bg: rgba(248, 113, 113, 0.14);
+  --warning-bg: rgba(245, 158, 11, 0.14);
+  --error-border-soft: rgba(248, 113, 113, 0.35);
   --chat-bubble-mine: #0b3d2a;
 }
 

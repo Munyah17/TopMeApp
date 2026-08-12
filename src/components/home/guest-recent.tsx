@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { Icon } from "@/components/icons";
@@ -32,7 +32,7 @@ export function GuestRecent() {
             borderBottom: i < activity.length - 1 ? "1px solid var(--border)" : "none",
           }}
         >
-          <div className="ibadge" style={{ background: "#F1F4F9", color: "var(--text-soft)" }}>
+          <div className="ibadge" style={{ background: "var(--badge-neutral-bg)", color: "var(--text-soft)" }}>
             <Icon name="wallet" size={20} stroke={1.8} />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>

@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { Icon } from "@/components/icons";
 import { FavoriteButton } from "@/components/home/favorite-button";
 import { GuestRecent } from "@/components/home/guest-recent";
@@ -168,7 +168,7 @@ export default async function HomePage() {
                 >
                   <div
                     className="ibadge round"
-                    style={{ background: "#F1F4F9", color: "var(--text-soft)", border: "1.5px dashed var(--border)" }}
+                    style={{ background: "var(--badge-neutral-bg)", color: "var(--text-soft)", border: "1.5px dashed var(--border)" }}
                   >
                     <Icon name="plus" size={20} stroke={2} />
                   </div>
@@ -203,7 +203,7 @@ export default async function HomePage() {
                       textDecoration: "none",
                     }}
                   >
-                    <div className="ibadge" style={{ background: svc ? `${svc.color}1a` : "#F1F4F9", color: svc?.color }}>
+                    <div className="ibadge" style={{ background: svc ? `${svc.color}1a` : "var(--badge-neutral-bg)", color: svc?.color }}>
                       <Icon name={svc?.icon || "wallet"} size={20} stroke={1.8} />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -336,7 +336,7 @@ export default async function HomePage() {
               ) : (
                 beneficiaries.slice(0, 3).map((b) => (
                   <div className="row gap-2 mt-2" key={b.id}>
-                    <div className="ibadge round" style={{ width: 34, height: 34, background: "#F1F4F9", color: "var(--text-soft)", fontSize: 12, fontWeight: 700 }}>
+                    <div className="ibadge round" style={{ width: 34, height: 34, background: "var(--badge-neutral-bg)", color: "var(--text-soft)", fontSize: 12, fontWeight: 700 }}>
                       {(b.label || b.identifier).slice(0, 2).toUpperCase()}
                     </div>
                     <div style={{ flex: 1 }}>

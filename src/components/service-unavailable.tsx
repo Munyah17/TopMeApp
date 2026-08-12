@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { Icon } from "@/components/icons";
 import type { Service } from "@/types/database";
 
@@ -17,7 +17,7 @@ export function ServiceUnavailable({ service }: { service: Service }) {
             width: 84,
             height: 84,
             borderRadius: 26,
-            background: "#FEF6E7",
+            background: "var(--warning-bg)",
             color: "var(--warning)",
             display: "flex",
             alignItems: "center",
