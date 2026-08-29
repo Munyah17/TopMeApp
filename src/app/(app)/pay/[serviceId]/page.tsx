@@ -27,6 +27,24 @@ export default async function PayPage({ params }: { params: Promise<{ serviceId:
   const [service, profile] = await Promise.all([getService(serviceId), getCurrentProfile()]);
   if (!service) notFound();
 
+  // Everything below is independent of the others' results (each only
+  // depends on `service`/`profile`, already resolved above) — one parallel
+  // batch instead of the coverage check running as its own serial round
+  // trip before a second Promise.all for the rest. Gift vouchers skip the
+  // coverage query outright (wallet-to-wallet, no gateway/provider
+  // involved), so it'd otherwise be a wasted fetch for that one case, not
+  // an extra wait — worth it for collapsing a full sequential step off
+  // every other service's checkout page load.
+  const admin = createAdminClient();
+  const [apiModules, bundles, packages, networks, wallet, paymentBanners] = await Promise.all([
+    service.is_gift ? Promise.resolve([]) : admin.from("api_modules_safe").select("*").eq("status", "active").then((r) => r.data ?? []),
+    service.amount_mode === "bundles" ? getDataBundles() : Promise.resolve([]),
+    service.amount_mode === "packages" ? getTvPackages() : Promise.resolve([]),
+    service.needs_network ? getNetworks() : Promise.resolve([]),
+    profile ? getWallet(profile.id) : Promise.resolve(null),
+    getPublicSetting<Record<string, string>>("payment_method_banners"),
+  ]);
+
   // Gift vouchers are wallet-to-wallet only (debit sender, mint a redeemable
   // code) — there's no gateway path that can produce a voucher for someone
   // with no wallet, so a guest reaching this URL directly (nav already sends
@@ -40,21 +58,9 @@ export default async function PayPage({ params }: { params: Promise<{ serviceId:
         </div>
       );
     }
-  } else {
-    const admin = createAdminClient();
-    const { data: apiModules } = await admin.from("api_modules_safe").select("*").eq("status", "active");
-    if (!hasRealCoverage(service.id, (apiModules as ApiModuleSafe[]) ?? [])) {
-      return <ServiceUnavailable service={service} />;
-    }
+  } else if (!hasRealCoverage(service.id, apiModules as ApiModuleSafe[])) {
+    return <ServiceUnavailable service={service} />;
   }
-
-  const [bundles, packages, networks, wallet, paymentBanners] = await Promise.all([
-    service.amount_mode === "bundles" ? getDataBundles() : Promise.resolve([]),
-    service.amount_mode === "packages" ? getTvPackages() : Promise.resolve([]),
-    service.needs_network ? getNetworks() : Promise.resolve([]),
-    profile ? getWallet(profile.id) : Promise.resolve(null),
-    getPublicSetting<Record<string, string>>("payment_method_banners"),
-  ]);
 
   const isGuest = !profile;
   const walletBalance = wallet?.balance ?? 0;

@@ -1,6 +1,7 @@
 import "server-only";
 import { cache } from "react";
-import { createClient } from "@/lib/supabase/server";
+import { unstable_cache } from "next/cache";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 import type {
   Beneficiary,
   DataBundle,
@@ -16,11 +17,27 @@ import type {
   Wallet,
 } from "@/types/database";
 
-export async function getNetworks(): Promise<Network[]> {
-  const supabase = await createClient();
-  const { data } = await supabase.from("networks").select("*");
-  return (data as Network[]) ?? [];
-}
+// Networks/categories/all-services barely ever change (an admin editing the
+// catalog is rare; every customer loading /home, /services, or /pay/[id]
+// re-querying them from scratch on every single page view was pure added
+// latency for data that's identical across everyone). unstable_cache holds
+// these server-wide with a 5-minute safety-net revalidation, but the real
+// invalidation is immediate: every catalog-mutating admin action calls
+// revalidateTag("catalog") (see revalidateCatalog() in src/lib/actions/
+// admin.ts) so an edit is never stale for longer than it takes to save.
+// Uses the admin client deliberately — this is public catalog data (RLS
+// already grants it broadly to any authenticated caller), and
+// unstable_cache's callback can't depend on the current request's cookies
+// the way the session-scoped client does.
+export const getNetworks = unstable_cache(
+  async (): Promise<Network[]> => {
+    const admin = createAdminClient();
+    const { data } = await admin.from("networks").select("*");
+    return (data as Network[]) ?? [];
+  },
+  ["networks"],
+  { tags: ["catalog"], revalidate: 300 }
+);
 
 // Cached per-request: layout.tsx and individual pages each call these, and
 // without dedup that's a redundant Supabase auth round-trip on every one of
@@ -47,11 +64,15 @@ export async function getWallet(userId: string): Promise<Wallet | null> {
   return (data as Wallet) ?? null;
 }
 
-export async function getCategories(): Promise<ServiceCategory[]> {
-  const supabase = await createClient();
-  const { data } = await supabase.from("service_categories").select("*").order("sort_order");
-  return (data as ServiceCategory[]) ?? [];
-}
+export const getCategories = unstable_cache(
+  async (): Promise<ServiceCategory[]> => {
+    const admin = createAdminClient();
+    const { data } = await admin.from("service_categories").select("*").order("sort_order");
+    return (data as ServiceCategory[]) ?? [];
+  },
+  ["categories"],
+  { tags: ["catalog"], revalidate: 300 }
+);
 
 export async function getCategory(id: string): Promise<ServiceCategory | null> {
   const supabase = await createClient();
@@ -116,13 +137,17 @@ export async function getServicesByCategory(categoryId: string, includeInactive 
   return (data as Service[]) ?? [];
 }
 
-export async function getAllServices(includeInactive = false): Promise<Service[]> {
-  const supabase = await createClient();
-  let query = supabase.from("services").select("*");
-  if (!includeInactive) query = query.eq("is_active", true);
-  const { data } = await query.order("sort_order");
-  return (data as Service[]) ?? [];
-}
+export const getAllServices = unstable_cache(
+  async (includeInactive = false): Promise<Service[]> => {
+    const admin = createAdminClient();
+    let query = admin.from("services").select("*");
+    if (!includeInactive) query = query.eq("is_active", true);
+    const { data } = await query.order("sort_order");
+    return (data as Service[]) ?? [];
+  },
+  ["all-services"],
+  { tags: ["catalog"], revalidate: 300 }
+);
 
 export async function getService(id: string, includeInactive = false): Promise<Service | null> {
   const supabase = await createClient();

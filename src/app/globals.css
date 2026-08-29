@@ -1224,7 +1224,7 @@ h3 {
   width: 72px;
   height: 72px;
   border-radius: 50%;
-  border: 5px solid #e7ecf3;
+  border: 5px solid var(--border);
   border-top-color: var(--green);
   animation: spin 0.9s linear infinite;
 }

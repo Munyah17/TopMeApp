@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { revalidateAdminPath } from "@/lib/actions/admin-cache";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { encryptSecret } from "@/lib/crypto";
@@ -206,6 +206,14 @@ export async function toggleAccountSuspension(userId: string, currentlySuspended
 }
 
 function revalidateCatalog() {
+  // getCategories/getAllServices/getNetworks are unstable_cache-wrapped
+  // (see src/lib/data/queries.ts) precisely so customer pages don't
+  // re-query Postgres on every view. updateTag (not revalidateTag) is the
+  // one that guarantees a read-your-own-writes result — the admin who just
+  // saved an edit must never see their own stale data on the very next
+  // page load, which revalidateTag's stale-while-revalidate semantics
+  // would allow.
+  updateTag("catalog");
   revalidateAdminPath("/products");
   revalidatePath("/home");
   // "layout" cascades to /services/[categoryId] sub-routes too — a plain
