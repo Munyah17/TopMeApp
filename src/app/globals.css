@@ -950,8 +950,14 @@ h3 {
   box-shadow: var(--shadow-md);
   border-color: #dce3ee;
 }
+/* Product artwork is uploaded square (every current image is 600×600), so
+   the media box carries the same 1:1 ratio and the image fills the card
+   edge to edge. A fixed height instead left the box wider than tall in the
+   2-up mobile grid — ~166px wide against 140px tall — so `contain`
+   letterboxed the square image and exposed the backdrop below as blank
+   gutters down both sides of every card. */
 .prod-media {
-  height: 140px;
+  aspect-ratio: 1 / 1;
   position: relative;
   display: flex;
   align-items: center;
@@ -962,7 +968,10 @@ h3 {
 .prod-media img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  /* cover, not contain: at 1:1 a square upload fills exactly with nothing
+     cropped, and a non-square one crops to fill rather than bringing the
+     bars back. */
+  object-fit: cover;
 }
 .prod-icon-tile {
   width: 100%;
@@ -1005,9 +1014,6 @@ h3 {
   .cat-section-row {
     grid-template-columns: repeat(4, 1fr);
     gap: 18px;
-  }
-  .prod-media {
-    height: 190px;
   }
   .cat-widget-tile {
     display: block;

@@ -71,7 +71,14 @@ export default async function HomePage() {
                 Perfect for birthdays, school fees, or just helping someone out. They&apos;ll
                 need a TopMe account to receive it, so make sure they&apos;re signed up.
               </div>
-              <div className="row gap-2 mt-4" style={{ position: "relative", flexWrap: "wrap" }}>
+              {/* nowrap because .btn is itself a flex container: the label is an
+                  anonymous flex item that will otherwise shrink and break mid-phrase
+                  ("Gift / Voucher"), rendering left-aligned against a vertically
+                  centred icon. Flex items keep their automatic min-content minimum,
+                  so the buttons simply won't compress past their label — and if all
+                  three no longer fit, flexWrap moves a whole button to the next line
+                  instead of splitting its text. */}
+              <div className="row gap-2 mt-4" style={{ position: "relative", flexWrap: "wrap", whiteSpace: "nowrap" }}>
                 <Link
                   href={profile ? "/wallet" : "/login"}
                   className="btn btn-primary tap"
