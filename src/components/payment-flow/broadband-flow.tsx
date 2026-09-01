@@ -11,6 +11,7 @@ import { payService } from "@/lib/actions/payments";
 import { startGuestCheckout, type GuestGateway } from "@/lib/actions/guest-payments";
 import { addGuestActivity } from "@/lib/guest-activity";
 import { EditableRow, PaymentMethodSection, ReviewRow, type PaymentBanners, type PaymentMethod } from "./flow-shared";
+import { TELONE_PACKAGES } from "@/lib/telone-packages";
 import type { Service, Transaction } from "@/types/database";
 
 type Step = "account" | "amount" | "review" | "processing" | "guest-ecocash" | "success" | "receipt" | "error";
@@ -21,28 +22,6 @@ const PAY_VIA_LABEL: Record<PaymentMethod, string> = {
   ecocash: "Ecocash Instant",
   stripe: "Stripe",
 };
-
-// TelOne is the only one of these with a real named-package catalogue (per
-// the reference flow) — VitalPay's bills API has no plan/package concept of
-// its own, it only takes an amount, so picking a package here just locks in
-// that package's price as the amount we submit.
-const TELONE_PACKAGES = [
-  { name: "Voice Bundle US$4", price: 4 },
-  { name: "Voice On Net US$5", price: 5 },
-  { name: "Voice Bundle US$7", price: 7 },
-  { name: "Voice Bundle US$13", price: 13 },
-  { name: "Home 75", price: 15 },
-  { name: "Voice Bundle US$20", price: 20 },
-  { name: "Blaze 75", price: 20 },
-  { name: "Voice Bundle US$25", price: 25 },
-  { name: "Blaze 150", price: 25 },
-  { name: "Home Unlimited", price: 30 },
-  { name: "Speed 50", price: 40 },
-  { name: "Blaze 500", price: 50 },
-  { name: "Speed 80", price: 60 },
-  { name: "Blaze Unlimited", price: 75 },
-  { name: "Speed 100", price: 90 },
-];
 
 export function BroadbandFlow({
   service,
@@ -98,6 +77,8 @@ export function BroadbandFlow({
         serviceId: service.id,
         serviceName: service.name,
         amount,
+        packageIndex: usesPackages ? packageIdx : null,
+        payFullBalance: usesPackages ? undefined : payFullBalance,
         recipient: account,
         guestEmail,
         guestPhone: guestPhone || undefined,
@@ -150,6 +131,8 @@ export function BroadbandFlow({
         serviceId: service.id,
         serviceName: service.name,
         amount,
+        packageIndex: usesPackages ? packageIdx : null,
+        payFullBalance: usesPackages ? undefined : payFullBalance,
         recipient: account,
         beneficiaryLabel: account,
       });

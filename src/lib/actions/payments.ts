@@ -8,6 +8,7 @@ import { findProfileByPhone } from "@/lib/data/queries";
 import { sendEmail } from "@/lib/email/client";
 import { giftSentEmail, moneyReceivedEmail, moneySentEmail, paymentReceiptEmail } from "@/lib/email/templates";
 import { logTransactionEvent } from "@/lib/transaction-events";
+import { resolveVerifiedAmount } from "@/lib/pricing";
 import type { ApiModuleSafe, P2pTransfer, Transaction } from "@/types/database";
 
 const FRIENDLY_ERRORS: Record<string, string> = {
@@ -33,6 +34,10 @@ export interface PayServiceInput {
   recipient: string;
   networkId?: string | null;
   extraValue?: string | null;
+  bundleId?: string | null;
+  pkgId?: string | null;
+  packageIndex?: number | null;
+  payFullBalance?: boolean;
   saveBeneficiary?: boolean;
   beneficiaryLabel?: string;
 }
@@ -48,14 +53,30 @@ export async function payService(input: PayServiceInput) {
   // this must run before wallet_pay, not after (see /pay/[serviceId]/page.tsx
   // for the same check gating the checkout UI itself).
   const admin = createAdminClient();
-  const { data: activeModules } = await admin.from("api_modules_safe").select("*").eq("status", "active");
+  const [{ data: activeModules }, { data: service }] = await Promise.all([
+    admin.from("api_modules_safe").select("*").eq("status", "active"),
+    admin.from("services").select("id, amount_mode, outstanding").eq("id", input.serviceId).single(),
+  ]);
+  if (!service) throw new Error(FRIENDLY_ERRORS.service_unavailable);
   if (!hasRealCoverage(input.serviceId, (activeModules as ApiModuleSafe[]) ?? [])) {
     throw new Error(FRIENDLY_ERRORS.service_unavailable);
   }
 
+  // Never trust a client-supplied amount for a fixed-price catalog item
+  // (data bundle, TV package, outstanding bill) — recompute it from the
+  // real catalog row. Only "chips" mode (airtime, ZESA, bills the customer
+  // enters an amount for) legitimately takes the caller's own amount.
+  const verifiedAmount = await resolveVerifiedAmount(service, {
+    bundleId: input.bundleId,
+    pkgId: input.pkgId,
+    packageIndex: input.packageIndex,
+    payFullBalance: input.payFullBalance,
+    clientAmount: input.amount,
+  });
+
   const { data: txData, error } = await supabase.rpc("wallet_pay", {
     p_service_id: input.serviceId,
-    p_amount: input.amount,
+    p_amount: verifiedAmount,
     p_recipient: input.recipient,
     p_network_id: input.networkId ?? null,
     p_extra_value: input.extraValue ?? null,
@@ -71,7 +92,7 @@ export async function payService(input: PayServiceInput) {
     transactionId: tx.id,
     reference: tx.reference,
     eventType: "payment_confirmed",
-    message: `Paid from wallet balance — $${input.amount.toFixed(2)}.`,
+    message: `Paid from wallet balance — $${verifiedAmount.toFixed(2)}.`,
   });
 
   // Resolve fulfillment: first active aggregator that covers this service
@@ -83,7 +104,7 @@ export async function payService(input: PayServiceInput) {
     recipient: input.recipient,
     extraValue: input.extraValue,
     networkId: input.networkId,
-    amount: input.amount,
+    amount: verifiedAmount,
   };
   void logTransactionEvent(admin, {
     transactionId: tx.id,
@@ -140,7 +161,7 @@ export async function payService(input: PayServiceInput) {
   if (user.email) {
     const { subject, html } = paymentReceiptEmail({
       serviceName: input.serviceName,
-      amount: input.amount,
+      amount: verifiedAmount,
       reference: finalTx.reference,
       recipient: input.recipient,
       date: new Date(finalTx.created_at).toLocaleString("en-GB"),

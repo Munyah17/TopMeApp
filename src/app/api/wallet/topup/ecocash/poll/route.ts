@@ -3,6 +3,7 @@ import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { getEcocashStatus } from "@/lib/payments/ecocash";
 import { notifyTopupResult } from "@/lib/email/notify";
 import { recordIntegrationHealth } from "@/lib/integrations/health";
+import { logTransactionEvent } from "@/lib/transaction-events";
 import type { TopupIntent } from "@/types/database";
 
 // Called from the client while showing "Approve on your phone". Uses the
@@ -30,21 +31,29 @@ export async function POST(request: NextRequest) {
   if (providerStatus === "completed") {
     const admin = createAdminClient();
     void recordIntegrationHealth(admin, "ecocash", { success: true });
-    await admin.rpc("wallet_topup", {
-      p_user_id: intent.user_id,
-      p_amount: intent.amount,
-      p_provider: "ecocash",
-      p_reference: reference,
-      p_meta: intent.meta,
-    });
-    await admin.from("topup_intents").update({ status: "completed" }).eq("reference", reference);
-    await notifyTopupResult(admin, { userId: intent.user_id, amount: intent.amount, provider: "ecocash", reference, success: true });
+    // Atomic: this client polls every few seconds while showing "Approve on
+    // your phone", so overlapping/duplicate calls for the same reference
+    // are expected, not an edge case — wallet_topup_from_intent's
+    // `for update` lock means only the first one actually credits the
+    // wallet, the rest safely no-op via not_found_or_processed.
+    const { data: ledgerRow, error } = await admin.rpc("wallet_topup_from_intent", { p_reference: reference });
+    if (error) {
+      if (!error.message.includes("not_found_or_processed")) {
+        console.error(`[ecocash poll] wallet_topup_from_intent failed for ${reference}:`, error.message);
+        void logTransactionEvent(admin, { reference, eventType: "payment_failed", message: `EcoCash poll: wallet_topup_from_intent failed — ${error.message}` });
+        return NextResponse.json({ error: "topup_failed" }, { status: 500 });
+      }
+      return NextResponse.json({ status: "completed" });
+    }
+    await notifyTopupResult(admin, { userId: intent.user_id, amount: (ledgerRow as { amount: number }).amount, provider: "ecocash", reference, success: true });
     return NextResponse.json({ status: "completed" });
   }
   if (providerStatus === "failed" || providerStatus === "cancelled") {
     const admin = createAdminClient();
-    await admin.from("topup_intents").update({ status: "failed" }).eq("reference", reference);
-    await notifyTopupResult(admin, { userId: intent.user_id, amount: intent.amount, provider: "ecocash", reference, success: false });
+    const { data: updated } = await admin.from("topup_intents").update({ status: "failed" }).eq("reference", reference).eq("status", "pending").select().maybeSingle();
+    if (updated) {
+      await notifyTopupResult(admin, { userId: intent.user_id, amount: intent.amount, provider: "ecocash", reference, success: false });
+    }
     return NextResponse.json({ status: "failed" });
   }
   return NextResponse.json({ status: "pending" });
