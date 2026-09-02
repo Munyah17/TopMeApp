@@ -25,14 +25,36 @@ export async function GET(request: NextRequest) {
   const fail = (reason: string) =>
     NextResponse.redirect(`${origin}/forgot-password?error=${encodeURIComponent(reason)}`);
 
-  if (!token_hash || !type) return fail("That link is incomplete. Request a new one below.");
-
   const supabase = await createClient();
-  const { error } = await supabase.auth.verifyOtp({ type, token_hash });
-  if (error) {
+
+  // Two link shapes reach here, and both must work:
+  //   token_hash — the recommended template (see the comment above), which
+  //     survives being opened on a different device; and
+  //   code       — what Supabase's *stock* template produces, since
+  //     {{ .ConfirmationURL }} bounces through their verify endpoint and
+  //     lands here with a PKCE code instead.
+  // Handling only the first would mean password reset silently breaks until
+  // someone remembers to edit the dashboard template, which is exactly the
+  // kind of dependency that gets discovered by a locked-out customer.
+  const code = searchParams.get("code");
+  let failed = false;
+
+  if (token_hash && type) {
+    const { error } = await supabase.auth.verifyOtp({ type, token_hash });
+    failed = !!error;
+  } else if (code) {
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    failed = !!error;
+  } else {
+    return fail("That link is incomplete. Request a new one below.");
+  }
+
+  if (failed) {
     // Recovery links are single-use and time-limited, and this is the most
     // common way a customer arrives here — say so plainly instead of
-    // surfacing Supabase's wording.
+    // surfacing Supabase's wording. A PKCE code opened on a different
+    // device than it was requested from also lands here, and a fresh link
+    // is the fix for that too.
     return fail("That link has expired or has already been used. Request a new one below.");
   }
 
