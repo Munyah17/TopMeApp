@@ -47,7 +47,16 @@ function LoginForm() {
           />
         </div>
         <div>
-          <label className="field-label">Password</label>
+          <div className="row between" style={{ alignItems: "baseline" }}>
+            <label className="field-label">Password</label>
+            <Link
+              href="/forgot-password"
+              className="muted"
+              style={{ fontSize: 12.5, fontWeight: 600, textDecoration: "none", color: "var(--green-600)" }}
+            >
+              Forgot password?
+            </Link>
+          </div>
           <input
             className="field"
             type="password"

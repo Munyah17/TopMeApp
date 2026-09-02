@@ -78,8 +78,18 @@ export async function updateSession(request: NextRequest) {
 
   // Maintenance mode: blocks everyone except staff, and never blocks /admin,
   // /super-admin, or the maintenance page (so it can always be turned back off).
+  // /auth and the password-reset pages are exempt too: locking a customer
+  // out of account recovery is exactly the wrong thing to do during an
+  // outage, and a recovery link that lands on /maintenance is spent — they
+  // are single-use, so the customer can't simply retry it later.
   const exemptFromMaintenance =
-    pathname.startsWith("/admin") || pathname.startsWith("/super-admin") || pathname.startsWith("/maintenance") || pathname.startsWith("/api");
+    pathname.startsWith("/admin") ||
+    pathname.startsWith("/super-admin") ||
+    pathname.startsWith("/maintenance") ||
+    pathname.startsWith("/api") ||
+    pathname.startsWith("/auth") ||
+    pathname.startsWith("/forgot-password") ||
+    pathname.startsWith("/reset-password");
   if (!exemptFromMaintenance) {
     const maintenanceOn = await getMaintenanceMode(supabase);
     if (maintenanceOn) {
