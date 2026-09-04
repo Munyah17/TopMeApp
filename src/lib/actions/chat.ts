@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { findProfileByPhone } from "@/lib/data/queries";
 import { isFeatureEnabled } from "@/lib/data/flags";
 import { sendMoney } from "@/lib/actions/payments";
-import type { Conversation } from "@/types/database";
+import type { ChatMessage, Conversation } from "@/types/database";
 
 const FRIENDLY_ERRORS: Record<string, string> = {
   recipient_not_found: "No TopMe account found with that phone number.",
@@ -51,25 +51,32 @@ async function touchConversation(conversationId: string, preview: string) {
     .eq("id", conversationId);
 }
 
-export async function sendTextMessage(conversationId: string, body: string) {
+export async function sendTextMessage(conversationId: string, body: string): Promise<ChatMessage> {
   const { supabase, user } = await requireUser();
   const trimmed = body.trim();
   if (!trimmed) throw new Error("Enter a message.");
 
-  const { error } = await supabase.from("messages").insert({
-    conversation_id: conversationId,
-    sender_id: user.id,
-    kind: "text",
-    body: trimmed,
-  });
+  // Returns the inserted row rather than void: the sender's own bubble was
+  // previously rendered only once the Realtime postgres_changes event for
+  // this exact insert round-tripped back through the DB — extra, avoidable
+  // latency for your own message, and if that channel wasn't connected
+  // yet (a real possibility right after opening a thread) it never
+  // rendered at all until the next page load. The caller now appends this
+  // return value straight to local state.
+  const { data, error } = await supabase
+    .from("messages")
+    .insert({ conversation_id: conversationId, sender_id: user.id, kind: "text", body: trimmed })
+    .select()
+    .single();
   if (error) throw new Error(friendlyError(error.message));
 
   await touchConversation(conversationId, trimmed);
   revalidatePath(`/chat/${conversationId}`);
   revalidatePath("/chat");
+  return data as ChatMessage;
 }
 
-export async function sendImageMessage(conversationId: string, formData: FormData) {
+export async function sendImageMessage(conversationId: string, formData: FormData): Promise<ChatMessage> {
   const { supabase, user } = await requireUser();
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) throw new Error("Choose an image to send.");
@@ -83,20 +90,20 @@ export async function sendImageMessage(conversationId: string, formData: FormDat
 
   const { data: pub } = supabase.storage.from("chat-images").getPublicUrl(path);
 
-  const { error } = await supabase.from("messages").insert({
-    conversation_id: conversationId,
-    sender_id: user.id,
-    kind: "image",
-    image_url: pub.publicUrl,
-  });
+  const { data, error } = await supabase
+    .from("messages")
+    .insert({ conversation_id: conversationId, sender_id: user.id, kind: "image", image_url: pub.publicUrl })
+    .select()
+    .single();
   if (error) throw new Error(friendlyError(error.message));
 
   await touchConversation(conversationId, "📷 Photo");
   revalidatePath(`/chat/${conversationId}`);
   revalidatePath("/chat");
+  return data as ChatMessage;
 }
 
-export async function sendMoneyMessage(conversationId: string, receiverPhone: string, amount: number, note: string | undefined, kind: "transfer" | "red_packet") {
+export async function sendMoneyMessage(conversationId: string, receiverPhone: string, amount: number, note: string | undefined, kind: "transfer" | "red_packet"): Promise<ChatMessage> {
   const { supabase, user } = await requireUser();
 
   // Money movement itself is unchanged — reuses the exact same wallet_transfer
@@ -104,12 +111,18 @@ export async function sendMoneyMessage(conversationId: string, receiverPhone: st
   const transfer = await sendMoney(receiverPhone, amount, note, kind);
 
   const preview = kind === "red_packet" ? `🧧 Sent a red packet` : `Sent $${amount.toFixed(2)}`;
-  const { error } = await supabase.from("messages").insert({
-    conversation_id: conversationId,
-    sender_id: user.id,
-    kind: "p2p_transfer",
-    p2p_transfer_id: transfer.id,
-  });
+  // select() joins p2p_transfer the same way getMessages() does for the
+  // initial page load — needed so the sender's own bubble can render the
+  // "$X sent" card immediately instead of a blank one. Postgres Realtime's
+  // postgres_changes payloads are always the bare row with no joins, which
+  // is a real, separate bug on the *recipient's* side: their card would
+  // render blank until they reloaded the page. See the join fetched
+  // client-side in chat-thread.tsx's realtime handler for that half of it.
+  const { data, error } = await supabase
+    .from("messages")
+    .insert({ conversation_id: conversationId, sender_id: user.id, kind: "p2p_transfer", p2p_transfer_id: transfer.id })
+    .select("*, p2p_transfer:p2p_transfers(*)")
+    .single();
   if (error) throw new Error(friendlyError(error.message));
 
   await touchConversation(conversationId, preview);
@@ -117,7 +130,7 @@ export async function sendMoneyMessage(conversationId: string, receiverPhone: st
   revalidatePath("/chat");
   revalidatePath("/wallet");
 
-  return transfer;
+  return data as ChatMessage;
 }
 
 export async function markConversationRead(conversationId: string) {
