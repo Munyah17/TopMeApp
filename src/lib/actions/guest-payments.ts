@@ -9,6 +9,7 @@ import { initiateEcocashPush } from "@/lib/payments/ecocash";
 import { failGuestCheckout } from "@/lib/payments/guest-checkout";
 import { hasRealCoverage } from "@/lib/fulfillment";
 import { calculatePlatformFee } from "@/lib/fees";
+import { resolveVerifiedAmount } from "@/lib/pricing";
 import type { ApiModuleSafe } from "@/types/database";
 
 const FRIENDLY_ERRORS: Record<string, string> = {
@@ -35,13 +36,16 @@ export interface StartGuestCheckoutInput {
   recipient: string;
   networkId?: string | null;
   extraValue?: string | null;
+  bundleId?: string | null;
+  pkgId?: string | null;
+  packageIndex?: number | null;
+  payFullBalance?: boolean;
   guestEmail: string;
   guestPhone?: string;
   gateway: GuestGateway;
 }
 
 export async function startGuestCheckout(input: StartGuestCheckoutInput) {
-  if (!(input.amount > 0)) throw new Error(FRIENDLY_ERRORS.invalid_amount);
   if (!input.guestEmail?.trim()) throw new Error("Enter your email so we can send your receipt.");
   if (input.gateway === "ecocash" && !input.guestPhone?.trim()) {
     throw new Error("Enter your EcoCash number.");
@@ -50,10 +54,27 @@ export async function startGuestCheckout(input: StartGuestCheckoutInput) {
   // Never take a real card/mobile-money payment for a service with no
   // working provider behind it.
   const admin = createAdminClient();
-  const { data: activeModules } = await admin.from("api_modules_safe").select("*").eq("status", "active");
+  const [{ data: activeModules }, { data: service }] = await Promise.all([
+    admin.from("api_modules_safe").select("*").eq("status", "active"),
+    admin.from("services").select("id, amount_mode, outstanding").eq("id", input.serviceId).single(),
+  ]);
+  if (!service) throw new Error(FRIENDLY_ERRORS.service_unavailable);
   if (!hasRealCoverage(input.serviceId, (activeModules as ApiModuleSafe[]) ?? [])) {
     throw new Error(FRIENDLY_ERRORS.service_unavailable);
   }
+
+  // Never trust a client-supplied amount for a fixed-price catalog item —
+  // recompute it server-side from the real catalog row (see
+  // src/lib/pricing.ts). A guest checkout has no session/auth at all
+  // guarding the request, so this matters even more here than on the
+  // wallet-paid path.
+  const verifiedAmount = await resolveVerifiedAmount(service, {
+    bundleId: input.bundleId,
+    pkgId: input.pkgId,
+    packageIndex: input.packageIndex,
+    payFullBalance: input.payFullBalance,
+    clientAmount: input.amount,
+  });
 
   const supabase = await createClient();
   // A logged-in user can pay a specific purchase directly via a gateway
@@ -68,8 +89,8 @@ export async function startGuestCheckout(input: StartGuestCheckoutInput) {
   // remembered here so finalize_guest_payment can split it back out onto
   // the transaction without recomputing (it must always match what the
   // gateway actually collected).
-  const fee = calculatePlatformFee(input.serviceId, input.amount);
-  const totalCharge = input.amount + fee;
+  const fee = calculatePlatformFee(input.serviceId, verifiedAmount);
+  const totalCharge = verifiedAmount + fee;
 
   const { error: insertError } = await supabase.from("guest_checkout_intents").insert({
     reference,
@@ -78,7 +99,7 @@ export async function startGuestCheckout(input: StartGuestCheckoutInput) {
     network_id: input.networkId ?? null,
     recipient_identifier: input.recipient,
     extra_value: input.extraValue ?? null,
-    amount: input.amount,
+    amount: verifiedAmount,
     fee,
     guest_email: input.guestEmail,
     guest_phone: input.guestPhone ?? null,

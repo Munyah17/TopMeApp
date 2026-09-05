@@ -9,8 +9,18 @@ export function ProductCard({ service, categoryColor }: { service: Service; cate
     <Link href={`/pay/${service.id}`} className="tap prod-card">
       <div className="prod-media">
         {service.logo_url ? (
-          // eslint-disable-next-line @next/next/no-img-element -- external provider logos, arbitrary hosts
-          <img src={service.logo_url} alt={service.name} />
+          // Tried next/image here (every logo_url is our own Supabase
+          // Storage upload, not an arbitrary external host, so it's
+          // eligible) but reverted it: Next's image optimizer does its own
+          // server-side fetch of the source with a hard ~7s timeout, and a
+          // slow/cold connection to Storage — confirmed happening, at least
+          // from this environment — turns into a BROKEN image instead of a
+          // slow one, which a plain <img> tag doesn't risk. Not a trade to
+          // make blind on a product catalog. loading="lazy" still gets the
+          // real, zero-risk part of the win (native browser lazy-loading,
+          // no server-side fetch or timeout involved).
+          // eslint-disable-next-line @next/next/no-img-element -- see above; next/image reverted for a real timeout/reliability risk, not stale caution
+          <img src={service.logo_url} alt={service.name} loading="lazy" decoding="async" />
         ) : (
           <span
             className="prod-icon-tile"

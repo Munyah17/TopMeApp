@@ -65,6 +65,7 @@ export function CouncilFlow({
         serviceId: service.id,
         serviceName: service.name,
         amount,
+        payFullBalance: false,
         recipient: account,
         guestEmail,
         guestPhone: guestPhone || undefined,
@@ -117,6 +118,7 @@ export function CouncilFlow({
         serviceId: service.id,
         serviceName: service.name,
         amount,
+        payFullBalance: false,
         recipient: account,
         beneficiaryLabel: account,
       });

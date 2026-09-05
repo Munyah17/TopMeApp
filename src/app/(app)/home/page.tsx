@@ -71,47 +71,75 @@ export default async function HomePage() {
                 Perfect for birthdays, school fees, or just helping someone out. They&apos;ll
                 need a TopMe account to receive it, so make sure they&apos;re signed up.
               </div>
-              <div className="row gap-2 mt-4" style={{ position: "relative", flexWrap: "wrap" }}>
+              {/* All three buttons stay on one row, always — flexWrap:"nowrap"
+                  (not "wrap") means a button can never drop to a second line the
+                  way "Red Packet" used to. Top Up and Gift size to their own
+                  content (flex:"0 1 auto") rather than splitting the row into
+                  forced equal thirds, because their labels are short — "Top Up"
+                  and "Gift" ("Gift Voucher" trimmed down: the heading two lines up
+                  already says "Send a Gift Voucher", and the gift icon is right
+                  there) — so claiming a full third for them would starve "Red
+                  Packet", the one label long enough to actually need the room.
+                  Red Packet gets flex:"1 1 auto" and absorbs whatever's left,
+                  which is enough for its full text down to ~360px-wide phones.
+                  minWidth:0 lets flexbox shrink any of them below content size if
+                  it truly must, and the span+ellipsis is the fallback for when it
+                  does — a graceful truncation instead of a second row or split
+                  text, kept for the narrowest outlier devices rather than the
+                  normal case. */}
+              <div className="row mt-4" style={{ position: "relative", flexWrap: "nowrap", gap: 6, whiteSpace: "nowrap" }}>
                 <Link
                   href={profile ? "/wallet" : "/login"}
                   className="btn btn-primary tap"
-                  style={{ flex: "1 1 120px", height: 44, fontSize: 13.5, padding: "0 12px", gap: 7, textDecoration: "none" }}
+                  style={{ flex: "0 1 auto", minWidth: 0, height: 44, fontSize: 12.5, padding: "0 10px", gap: 5, textDecoration: "none" }}
                 >
-                  <Icon name="wallet" size={16} stroke={2} /> Top Up
+                  <Icon name="wallet" size={15} stroke={2} />
+                  <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>Top Up</span>
                 </Link>
                 <Link
                   href={profile ? "/pay/gift" : "/login"}
                   className="btn tap"
                   style={{
-                    flex: "1 1 120px",
+                    flex: "0 1 auto",
+                    minWidth: 0,
                     height: 44,
-                    fontSize: 13.5,
-                    padding: "0 12px",
-                    gap: 7,
+                    fontSize: 12.5,
+                    padding: "0 10px",
+                    gap: 5,
                     textDecoration: "none",
                     background: "rgba(255,255,255,0.14)",
                     color: "#fff",
                     border: "1px solid rgba(255,255,255,0.24)",
                   }}
                 >
-                  <Icon name="gift" size={16} stroke={2} /> Gift Voucher
+                  <Icon name="gift" size={15} stroke={2} />
+                  <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>Gift</span>
                 </Link>
                 <Link
                   href={profile ? "/pay/send?kind=red_packet" : "/login"}
                   className="btn tap"
                   style={{
-                    flex: "1 1 120px",
+                    // Grows to absorb the row's remaining space (that's what
+                    // gives it room for the full "Red Packet" label on
+                    // mobile) but caps at 200px — comfortably more than the
+                    // label ever needs — so on a wide desktop layout it
+                    // reads as a normal-sized pill instead of stretching
+                    // across the leftover width.
+                    flex: "1 1 auto",
+                    maxWidth: 200,
+                    minWidth: 0,
                     height: 44,
-                    fontSize: 13.5,
-                    padding: "0 12px",
-                    gap: 7,
+                    fontSize: 12.5,
+                    padding: "0 10px",
+                    gap: 5,
                     textDecoration: "none",
                     background: "rgba(255,255,255,0.14)",
                     color: "#fff",
                     border: "1px solid rgba(255,255,255,0.24)",
                   }}
                 >
-                  <Icon name="packet" size={16} stroke={2} /> Red Packet
+                  <Icon name="packet" size={15} stroke={2} />
+                  <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>Red Packet</span>
                 </Link>
               </div>
             </div>

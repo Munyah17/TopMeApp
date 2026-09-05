@@ -55,6 +55,15 @@ export function ChatThread({
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  // Adds a message to local state exactly once, however it arrived —
+  // pushed straight from a successful send (see submitText/submitImage/
+  // submitMoney below) or echoed back over Realtime. Whichever gets there
+  // first wins; the id-based dedupe means the other is a harmless no-op,
+  // so this one function is safe to call from both paths.
+  function addMessage(m: ChatMessage) {
+    setMessages((prev) => (prev.some((existing) => existing.id === m.id) ? prev : [...prev, m]));
+  }
+
   useEffect(() => {
     const supabase = createClient();
     const channel = supabase
@@ -62,9 +71,23 @@ export function ChatThread({
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${conversationId}` },
-        (payload) => {
+        async (payload) => {
           const incoming = payload.new as ChatMessage;
-          setMessages((prev) => (prev.some((m) => m.id === incoming.id) ? prev : [...prev, incoming]));
+          // postgres_changes always delivers the bare row — never a joined
+          // one — so a money-transfer message from the OTHER person arrives
+          // with p2p_transfer_id set but p2p_transfer itself missing. The
+          // render below keys off p2p_transfer being present, so without
+          // this fetch their "$X sent" card would render blank until the
+          // page was reloaded (which re-fetches through getMessages()'s own
+          // join). RLS already allows either party to read the transfer
+          // row (p2p_transfers_select_related), so this is just the join
+          // getMessages() does server-side, done client-side instead.
+          if (incoming.kind === "p2p_transfer" && incoming.p2p_transfer_id && !incoming.p2p_transfer) {
+            const { data: transfer } = await supabase.from("p2p_transfers").select("*").eq("id", incoming.p2p_transfer_id).single();
+            addMessage({ ...incoming, p2p_transfer: transfer ?? null });
+            return;
+          }
+          addMessage(incoming);
         }
       )
       .subscribe();
@@ -87,7 +110,7 @@ export function ChatThread({
     setText("");
     setSending(true);
     try {
-      await sendTextMessage(conversationId, body);
+      addMessage(await sendTextMessage(conversationId, body));
     } catch {
       setText(body);
     } finally {
@@ -101,7 +124,7 @@ export function ChatThread({
       const compressed = await compressImage(file);
       const fd = new FormData();
       fd.append("file", compressed);
-      await sendImageMessage(conversationId, fd);
+      addMessage(await sendImageMessage(conversationId, fd));
     } catch (e) {
       setMoneyError(null);
       alert(e instanceof Error ? e.message : "Could not send that image.");
@@ -117,7 +140,7 @@ export function ChatThread({
     setMoneyBusy(true);
     setMoneyError(null);
     try {
-      await sendMoneyMessage(conversationId, counterpart.phone, amt, note.trim() || undefined, moneySheet);
+      addMessage(await sendMoneyMessage(conversationId, counterpart.phone, amt, note.trim() || undefined, moneySheet));
       setMoneySheet(null);
       setAmount("");
       setNote("");

@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { notifyTopupResult } from "@/lib/email/notify";
 import { finalizeGuestCheckout } from "@/lib/payments/guest-checkout";
 import { recordIntegrationHealth } from "@/lib/integrations/health";
+import { logTransactionEvent } from "@/lib/transaction-events";
 import type Stripe from "stripe";
 
 export async function POST(request: NextRequest) {
@@ -31,9 +32,20 @@ export async function POST(request: NextRequest) {
     if (reference && purpose === "guest_service_payment") {
       try {
         await finalizeGuestCheckout(reference);
-      } catch {
-        // Already finalized by another webhook delivery, or intent not
-        // found/pending — safe to ignore, Stripe will not retry on 200.
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        if (message.includes("not_found_or_processed")) {
+          // Expected/benign: already finalized by another webhook delivery
+          // (Stripe retries deliveries) — genuinely safe to ignore.
+          return NextResponse.json({ received: true });
+        }
+        // A real failure — Stripe already captured the customer's card
+        // payment, and swallowing this here would mean it's lost with no
+        // trace anywhere. Log it for real and return a non-200 so Stripe
+        // retries the delivery instead of considering it handled.
+        console.error(`[stripe webhook] finalizeGuestCheckout failed for ${reference}:`, message);
+        void logTransactionEvent(createAdminClient(), { reference, eventType: "fulfillment_failed", message: `Stripe webhook: finalizeGuestCheckout threw — ${message}` });
+        return NextResponse.json({ error: "finalize_failed" }, { status: 500 });
       }
       return NextResponse.json({ received: true });
     }
@@ -41,22 +53,16 @@ export async function POST(request: NextRequest) {
     const userId = session.metadata?.userId;
     if (reference && userId) {
       const admin = createAdminClient();
-      const { data: intent } = await admin
-        .from("topup_intents")
-        .select("*")
-        .eq("reference", reference)
-        .eq("status", "pending")
-        .single();
-      if (intent) {
-        await admin.rpc("wallet_topup", {
-          p_user_id: userId,
-          p_amount: intent.amount,
-          p_provider: "stripe",
-          p_reference: reference,
-          p_meta: { sessionId: session.id },
-        });
-        await admin.from("topup_intents").update({ status: "completed" }).eq("reference", reference);
-        await notifyTopupResult(admin, { userId, amount: intent.amount, provider: "stripe", reference, success: true });
+      const { data: ledgerRow, error } = await admin.rpc("wallet_topup_from_intent", { p_reference: reference, p_extra_meta: { sessionId: session.id } });
+      if (error) {
+        if (!error.message.includes("not_found_or_processed")) {
+          console.error(`[stripe webhook] wallet_topup_from_intent failed for ${reference}:`, error.message);
+          void logTransactionEvent(admin, { reference, eventType: "payment_failed", message: `Stripe webhook: wallet_topup_from_intent failed — ${error.message}` });
+          return NextResponse.json({ error: "topup_failed" }, { status: 500 });
+        }
+        // not_found_or_processed — already credited by a concurrent delivery.
+      } else {
+        await notifyTopupResult(admin, { userId, amount: (ledgerRow as { amount: number }).amount, provider: "stripe", reference, success: true });
       }
     }
   }

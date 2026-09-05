@@ -97,6 +97,8 @@ export function PaymentFlow({
         recipient: identifier,
         networkId,
         extraValue: extra || null,
+        bundleId,
+        pkgId,
         guestEmail,
         guestPhone: guestPhone || undefined,
         gateway: method as GuestGateway,
@@ -176,6 +178,8 @@ export function PaymentFlow({
           recipient: identifier,
           networkId,
           extraValue: extra || null,
+          bundleId,
+          pkgId,
           saveBeneficiary,
           beneficiaryLabel: extra || identifier,
         });

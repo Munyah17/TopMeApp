@@ -18,30 +18,46 @@ export async function applyPaynowResult(reference: string, status: string, meta?
     void recordIntegrationHealth(admin, "paynow", { success: true });
   }
 
-  const { data: intent } = await admin
-    .from("topup_intents")
-    .select("*")
-    .eq("reference", reference)
-    .eq("status", "pending")
-    .single();
+  // Read-only lookup, just to route to the right flow — real safety against
+  // double-processing (a webhook delivery landing at nearly the same
+  // moment as the user's own manual "Check Payment" poll, or a provider's
+  // own webhook retry) comes from wallet_topup_from_intent's atomic
+  // `for update` lock on the success path, and the conditional UPDATE
+  // (status='pending' in the WHERE clause) on the failure path below —
+  // not from this read.
+  const { data: intent } = await admin.from("topup_intents").select("*").eq("reference", reference).maybeSingle();
 
   if (intent) {
     const row = intent as TopupIntent;
+    if (row.status !== "pending") {
+      return { kind: "topup" as const, success, failed }; // already processed by a concurrent delivery
+    }
     if (success) {
-      await admin.rpc("wallet_topup", {
-        p_user_id: row.user_id,
-        p_amount: row.amount,
-        p_provider: "paynow",
-        p_reference: reference,
-        p_meta: meta ?? {},
-      });
-      await admin.from("topup_intents").update({ status: "completed" }).eq("reference", reference);
-      await notifyTopupResult(admin, { userId: row.user_id, amount: row.amount, provider: "paynow", reference, success: true });
+      const { data: ledgerRow, error } = await admin.rpc("wallet_topup_from_intent", { p_reference: reference, p_extra_meta: meta ?? {} });
+      if (error) {
+        if (!error.message.includes("not_found_or_processed")) {
+          // Paynow has confirmed the money moved, so a failure to credit
+          // the wallet is a real, customer-visible loss — it has to leave a
+          // trace, not disappear the way the swallowed branch below can.
+          console.error(`[paynow] wallet_topup_from_intent failed for ${reference}:`, error.message);
+          void logTransactionEvent(admin, { reference, eventType: "payment_failed", message: `Paynow: wallet_topup_from_intent failed — ${error.message}` });
+        }
+        // not_found_or_processed — a concurrent delivery already handled
+        // this exact reference between the read above and this call.
+        return { kind: "topup" as const, success, failed };
+      }
       void logTransactionEvent(admin, { reference, eventType: "payment_confirmed", message: `Wallet top-up confirmed via Paynow — $${row.amount.toFixed(2)}.` });
+      await notifyTopupResult(admin, { userId: row.user_id, amount: (ledgerRow as { amount: number }).amount, provider: "paynow", reference, success: true });
     } else if (failed) {
-      await admin.from("topup_intents").update({ status: "failed" }).eq("reference", reference);
-      await notifyTopupResult(admin, { userId: row.user_id, amount: row.amount, provider: "paynow", reference, success: false });
-      void logTransactionEvent(admin, { reference, eventType: "payment_failed", message: `Wallet top-up via Paynow failed (status: ${status}).` });
+      // Conditional UPDATE, not a separate read-then-write — only the
+      // first concurrent caller for this reference actually flips the row
+      // (its WHERE clause stops matching once the first commits), so a
+      // duplicate delivery can't send two failure notifications either.
+      const { data: updated } = await admin.from("topup_intents").update({ status: "failed" }).eq("reference", reference).eq("status", "pending").select().maybeSingle();
+      if (updated) {
+        await notifyTopupResult(admin, { userId: row.user_id, amount: row.amount, provider: "paynow", reference, success: false });
+        void logTransactionEvent(admin, { reference, eventType: "payment_failed", message: `Wallet top-up via Paynow failed (status: ${status}).` });
+      }
     }
     return { kind: "topup" as const, success, failed };
   }
@@ -55,7 +71,22 @@ export async function applyPaynowResult(reference: string, status: string, meta?
 
   if (guestIntent) {
     if (success) {
-      await finalizeGuestCheckout(reference);
+      try {
+        await finalizeGuestCheckout(reference);
+      } catch (e) {
+        // Same overlap as the top-up path: Paynow's result_url webhook and
+        // the customer's own "Check Payment" button both land here, and the
+        // pending read above is not a lock. finalize_guest_payment's
+        // `for update` means the loser gets not_found_or_processed for a
+        // payment that did go through — surfacing that would show an error
+        // to a customer whose order is already fulfilled.
+        const message = e instanceof Error ? e.message : String(e);
+        if (!message.includes("not_found_or_processed")) {
+          console.error(`[paynow] finalizeGuestCheckout failed for ${reference}:`, message);
+          void logTransactionEvent(admin, { reference, eventType: "fulfillment_failed", message: `Paynow: finalizeGuestCheckout threw — ${message}` });
+          throw e;
+        }
+      }
     } else if (failed) {
       await failGuestCheckout(reference);
     }
