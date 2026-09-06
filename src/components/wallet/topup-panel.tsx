@@ -80,10 +80,12 @@ export function TopupPanel({ userPhone }: { userPhone?: string | null }) {
     <div>
       <div className="row gap-2 mb-3">
         {(
+          // EcoCash hidden here too — see the matching note in
+          // flow-shared.tsx's ENABLED_GATEWAYS; same sandbox-only-keys
+          // reason, same fix (add it back once EcoCash env vars are live).
           [
             { id: "paynow", label: "Paynow" },
             { id: "stripe", label: "Card (Stripe)" },
-            { id: "ecocash", label: "EcoCash" },
           ] as { id: Gateway; label: string }[]
         ).map((g) => (
           <div

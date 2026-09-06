@@ -159,12 +159,22 @@ const METHOD_STYLES: Record<PaymentMethod, { label: string; background: string; 
 
 export type PaymentBanners = Partial<Record<GuestGateway, string>>;
 
-// Payment method picker: wallet balance, Paynow, EcoCash Instant, and
-// Stripe are four equal options — none pre-selected, none the "default"
-// with the others as fallbacks. A logged-in user picking a gateway still
-// gets attributed to their account (not treated as an anonymous guest —
-// see startGuestCheckout); a guest only ever sees the 3 gateways. Wallet is
-// always the plain styled button (there's nothing to brand); the 3
+// EcoCash Instant is hidden from checkout — ECOCASH_USERNAME/BASE_URL are
+// still sandbox-only (no live merchant account yet), so every real
+// customer who picked it was guaranteed a failed payment attempt. This is
+// the one place to flip it back on: add "ecocash" back to the array below
+// once EcoCashUSERNAME/PASSWORD/BASE_URL are switched to live production
+// values in Vercel's env vars. The type, the backend RPC path, and
+// startGuestCheckout's gateway handling are all untouched — this only
+// changes what's offered in the UI.
+const ENABLED_GATEWAYS: readonly GuestGateway[] = ["paynow", "stripe"];
+
+// Payment method picker: wallet balance and whichever of the gateways
+// above are enabled — none pre-selected, none the "default" with the
+// others as fallbacks. A logged-in user picking a gateway still gets
+// attributed to their account (not treated as an anonymous guest — see
+// startGuestCheckout); a guest only ever sees the enabled gateways.
+// Wallet is always the plain styled button (there's nothing to brand);
 // gateways use an admin-uploaded banner image when one is set (see
 // /admin/settings), falling back to the styled button until one is.
 // Kept as its own component so bespoke flows don't have to duplicate the
@@ -190,7 +200,7 @@ export function PaymentMethodSection({
   guestPhone: string;
   setGuestPhone: (v: string) => void;
 }) {
-  const methods: PaymentMethod[] = showWallet ? ["wallet", "paynow", "ecocash", "stripe"] : ["paynow", "ecocash", "stripe"];
+  const methods: PaymentMethod[] = showWallet ? ["wallet", ...ENABLED_GATEWAYS] : [...ENABLED_GATEWAYS];
   const isGateway = method !== null && method !== "wallet";
 
   return (
