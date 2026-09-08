@@ -87,59 +87,52 @@ export default async function HomePage() {
                   does — a graceful truncation instead of a second row or split
                   text, kept for the narrowest outlier devices rather than the
                   normal case. */}
-              <div className="row mt-4" style={{ position: "relative", flexWrap: "nowrap", gap: 6, whiteSpace: "nowrap" }}>
+              <div className="row mt-4" style={{ position: "relative", gap: 8 }}>
                 <Link
                   href={profile ? "/wallet" : "/login"}
                   className="btn btn-primary tap"
-                  style={{ flex: "0 1 auto", minWidth: 0, height: 44, fontSize: 12.5, padding: "0 10px", gap: 5, textDecoration: "none" }}
+                  style={{ flex: 1, height: 44, fontSize: 13, padding: "0 12px", gap: 6, textDecoration: "none", minWidth: 0 }}
                 >
-                  <Icon name="wallet" size={15} stroke={2} />
-                  <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>Top Up</span>
+                  <Icon name="wallet" size={16} stroke={2} />
+                  <span>Top Up</span>
                 </Link>
                 <Link
                   href={profile ? "/pay/gift" : "/login"}
                   className="btn tap"
                   style={{
-                    flex: "0 1 auto",
-                    minWidth: 0,
+                    flex: 1,
                     height: 44,
-                    fontSize: 12.5,
-                    padding: "0 10px",
-                    gap: 5,
+                    fontSize: 13,
+                    padding: "0 12px",
+                    gap: 6,
                     textDecoration: "none",
                     background: "rgba(255,255,255,0.14)",
                     color: "#fff",
                     border: "1px solid rgba(255,255,255,0.24)",
+                    minWidth: 0,
                   }}
                 >
-                  <Icon name="gift" size={15} stroke={2} />
-                  <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>Gift</span>
+                  <Icon name="gift" size={16} stroke={2} />
+                  <span>Gift</span>
                 </Link>
                 <Link
                   href={profile ? "/pay/send?kind=red_packet" : "/login"}
                   className="btn tap"
                   style={{
-                    // Grows to absorb the row's remaining space (that's what
-                    // gives it room for the full "Red Packet" label on
-                    // mobile) but caps at 200px — comfortably more than the
-                    // label ever needs — so on a wide desktop layout it
-                    // reads as a normal-sized pill instead of stretching
-                    // across the leftover width.
-                    flex: "1 1 auto",
-                    maxWidth: 200,
-                    minWidth: 0,
+                    flex: 1,
                     height: 44,
-                    fontSize: 12.5,
-                    padding: "0 10px",
-                    gap: 5,
+                    fontSize: 13,
+                    padding: "0 12px",
+                    gap: 6,
                     textDecoration: "none",
                     background: "rgba(255,255,255,0.14)",
                     color: "#fff",
                     border: "1px solid rgba(255,255,255,0.24)",
+                    minWidth: 0,
                   }}
                 >
-                  <Icon name="packet" size={15} stroke={2} />
-                  <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>Red Packet</span>
+                  <Icon name="packet" size={16} stroke={2} />
+                  <span>Red Packet</span>
                 </Link>
               </div>
             </div>
@@ -253,6 +246,9 @@ export default async function HomePage() {
           )}
 
           {categories.map((c) => {
+            // Insurance has its own dedicated flow - skip in services listing
+            if (c.id === "insurance") return null;
+            
             const items = (servicesByCategory.get(c.id) ?? []).slice(0, 4);
             const total = servicesByCategory.get(c.id)?.length ?? 0;
             if (items.length === 0) return null;
@@ -317,7 +313,7 @@ export default async function HomePage() {
               {categories.map((c) => (
                 <Link
                   key={c.id}
-                  href={`/services/${c.id}`}
+                  href={c.id === "insurance" ? "/insurance" : `/services/${c.id}`}
                   className="tap browse-category-btn"
                   style={{ background: `linear-gradient(135deg, ${c.color}, ${shade(c.color, -25)})` }}
                 >

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Icon } from "@/components/icons";
 import { ProductCard } from "@/components/home/product-card";
 import { getAllServices, getCategories, getCategory, getServicesByCategory, shuffle } from "@/lib/data/queries";
@@ -8,6 +8,11 @@ export default async function CategoryPage({ params }: { params: Promise<{ categ
   const { categoryId } = await params;
   const category = await getCategory(categoryId);
   if (!category) notFound();
+
+  // Insurance has its own dedicated flow - redirect to /insurance
+  if (categoryId === "insurance") {
+    redirect("/insurance");
+  }
 
   const [items, allServices, categories] = await Promise.all([
     getServicesByCategory(categoryId),
