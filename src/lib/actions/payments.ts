@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { getFulfillmentProvider, hasRealCoverage } from "@/lib/fulfillment";
+import { validateElectricityMeter } from "@/lib/fulfillment/vitalpay";
 import { isFeatureEnabled } from "@/lib/data/flags";
 import { findProfileByPhone } from "@/lib/data/queries";
 import { sendEmail } from "@/lib/email/client";
@@ -203,6 +204,39 @@ export async function sendGiftVoucher(receiverPhone: string, amount: number, sen
 // can confirm "Sending to <name>" rather than typing blind.
 export async function lookupRecipient(phone: string) {
   return findProfileByPhone(phone.trim());
+}
+
+export type MeterCheckResult =
+  | { state: "ok"; customerName: string | null; address: string | null; meterNumber: string }
+  | { state: "invalid"; message: string }
+  // Validation service is down, not configured, or ZESA is on the simulated
+  // provider — the UI treats this as "couldn't check" and lets checkout
+  // proceed rather than hard-blocking on our side.
+  | { state: "skipped" };
+
+// Confirms a prepaid ZESA meter number against ZETDC (via VitalPay) and
+// returns the registered account holder, so the buyer can eyeball
+// "topping up <name>'s meter" before paying. Only runs when ZESA is
+// actually wired to a live VitalPay module.
+export async function validateMeter(meterNumber: string): Promise<MeterCheckResult> {
+  const meter = meterNumber.trim();
+  if (meter.length < 4) return { state: "invalid", message: "Enter your full ZESA meter number." };
+
+  const admin = createAdminClient();
+  const { data: modules } = await admin.from("api_modules_safe").select("*").eq("status", "active");
+  const provider = getFulfillmentProvider("zesa", (modules ?? []) as ApiModuleSafe[]);
+  if (provider.name !== "vitalpay") return { state: "skipped" };
+
+  try {
+    const check = await validateElectricityMeter(meter);
+    if (check.valid) {
+      return { state: "ok", customerName: check.customerName, address: check.address, meterNumber: check.meterNumber };
+    }
+    if (check.reason === "invalid_meter") return { state: "invalid", message: check.message };
+    return { state: "skipped" };
+  } catch {
+    return { state: "skipped" };
+  }
 }
 
 // Instant wallet-to-wallet transfer between two existing TopMe accounts

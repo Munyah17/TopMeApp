@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icons";
 import { hexA } from "@/lib/data/catalog-helpers";
 import { calculatePlatformFee } from "@/lib/fees";
-import { payService } from "@/lib/actions/payments";
+import { payService, validateMeter } from "@/lib/actions/payments";
 import { startGuestCheckout, type GuestGateway } from "@/lib/actions/guest-payments";
 import { addGuestActivity } from "@/lib/guest-activity";
 import { DenomTile, EditableRow, PaymentMethodSection, ReviewRow, type PaymentBanners, type PaymentMethod } from "./flow-shared";
@@ -39,6 +39,15 @@ export function ZesaFlow({
   const router = useRouter();
   const [step, setStep] = useState<Step>("meter");
   const [meter, setMeter] = useState("");
+  // Registered ZESA account holder for `owner.meter`, fetched from ZETDC via
+  // VitalPay before payment so the buyer can confirm the meter is right.
+  // `owner` null with a matching `checkedMeter` means the check ran but
+  // returned no name (service down / not wired / name field absent) — we
+  // don't re-nag or block in that case.
+  const [owner, setOwner] = useState<{ name: string | null; address: string | null } | null>(null);
+  const [checkedMeter, setCheckedMeter] = useState<string | null>(null);
+  const [meterChecking, setMeterChecking] = useState(false);
+  const [meterError, setMeterError] = useState<string | null>(null);
   const [denom, setDenom] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -49,6 +58,40 @@ export function ZesaFlow({
   const [method, setMethod] = useState<PaymentMethod | null>(null);
 
   const amount = denom ?? (parseFloat(customAmount) || 0);
+  const ownerName = checkedMeter === meter.trim() ? owner?.name ?? null : null;
+
+  // Returns true if checkout may proceed (valid meter, or the check couldn't
+  // run), false if it's a known-bad meter — in which case `meterError` is set
+  // and the caller should keep the customer on the meter step.
+  async function runMeterCheck(): Promise<boolean> {
+    const target = meter.trim();
+    if (checkedMeter === target) return true; // already checked this exact number
+    setMeterChecking(true);
+    setMeterError(null);
+    try {
+      const res = await validateMeter(target);
+      if (res.state === "invalid") {
+        setMeterError(res.message);
+        setOwner(null);
+        setCheckedMeter(null);
+        return false;
+      }
+      setOwner(res.state === "ok" ? { name: res.customerName, address: res.address } : null);
+      setCheckedMeter(target);
+      return true;
+    } catch {
+      // Network/unexpected — don't block the purchase on our own check failing.
+      setOwner(null);
+      setCheckedMeter(target);
+      return true;
+    } finally {
+      setMeterChecking(false);
+    }
+  }
+
+  async function continueFromMeter() {
+    if (await runMeterCheck()) setStep("amount");
+  }
 
   async function submitGateway() {
     setBusy(true);
@@ -167,12 +210,39 @@ export function ZesaFlow({
             <h2 style={{ fontSize: 20, marginTop: 14 }}>{service.name}</h2>
             <div className="muted mb-3">Enter your prepaid meter number</div>
             <label className="field-label">Meter Number</label>
-            <input className="field" placeholder={service.id_placeholder ?? ""} value={meter} onChange={(e) => setMeter(e.target.value)} />
-            <div className="mt-2 muted" style={{ lineHeight: 1.5 }}>
-              Double-check your meter number — nothing is charged until you confirm.
-            </div>
-            <button className="btn btn-primary btn-block mt-4" disabled={meter.trim().length < 3} onClick={() => setStep("amount")}>
-              Continue
+            <input
+              className="field"
+              placeholder={service.id_placeholder ?? ""}
+              value={meter}
+              inputMode="numeric"
+              onChange={(e) => {
+                setMeter(e.target.value);
+                setMeterError(null);
+              }}
+            />
+            {meterError ? (
+              <div className="mt-2" style={{ color: "var(--error)", fontSize: 13, lineHeight: 1.5 }}>
+                {meterError}
+              </div>
+            ) : ownerName ? (
+              <div
+                className="row gap-2 mt-2"
+                style={{ alignItems: "center", color: "var(--success)", fontSize: 13, fontWeight: 600 }}
+              >
+                <Icon name="check" size={15} stroke={2.4} />
+                <span>{ownerName}</span>
+              </div>
+            ) : (
+              <div className="mt-2 muted" style={{ lineHeight: 1.5 }}>
+                Double-check your meter number — nothing is charged until you confirm.
+              </div>
+            )}
+            <button
+              className="btn btn-primary btn-block mt-4"
+              disabled={meter.trim().length < 4 || meterChecking}
+              onClick={continueFromMeter}
+            >
+              {meterChecking ? "Checking meter…" : "Continue"}
             </button>
           </>
         )}
@@ -196,9 +266,9 @@ export function ZesaFlow({
               <div className="ibadge round" style={{ background: hexA(service.color, 0.12), color: service.color }}>
                 <Icon name={service.icon} size={20} stroke={1.8} />
               </div>
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 700, fontSize: 14.5 }}>{meter}</div>
-                <div className="muted">Meter Number</div>
+                <div className="muted">{ownerName ?? "Meter Number"}</div>
               </div>
             </div>
 
@@ -236,7 +306,19 @@ export function ZesaFlow({
                 <div style={{ fontSize: 34, fontWeight: 800, marginTop: 4, color: "#fff" }}>${total.toFixed(2)}</div>
               </div>
               <div style={{ padding: "6px 18px" }}>
-                <EditableRow label="Meter Number" value={meter} onSave={setMeter} placeholder={service.id_placeholder ?? ""} />
+                <EditableRow
+                  label="Meter Number"
+                  value={meter}
+                  onSave={(next) => {
+                    setMeter(next);
+                    if (next.trim() !== checkedMeter) {
+                      setOwner(null);
+                      setCheckedMeter(null);
+                    }
+                  }}
+                  placeholder={service.id_placeholder ?? ""}
+                />
+                {ownerName && <ReviewRow label="Account holder" value={ownerName} />}
                 <ReviewRow label="Amount" value={`$${amount.toFixed(2)}`} />
                 <ReviewRow label="Processing fee" value={`$${fee.toFixed(2)}`} />
                 {method === "wallet" && <ReviewRow label="Wallet balance" value={`$${walletBalance.toFixed(2)}`} />}
@@ -274,10 +356,18 @@ export function ZesaFlow({
 
             <button
               className="btn btn-primary btn-block mt-4"
-              disabled={busy || insufficient || guestMissingInfo || noMethodChosen}
-              onClick={() => { if (method === "wallet") setStep("processing"); submit(); }}
+              disabled={busy || meterChecking || insufficient || guestMissingInfo || noMethodChosen}
+              onClick={async () => {
+                // Meter may have been edited on this screen — re-confirm before charging.
+                if (!(await runMeterCheck())) {
+                  setStep("meter");
+                  return;
+                }
+                if (method === "wallet") setStep("processing");
+                submit();
+              }}
             >
-              {busy ? "Processing…" : method ? `Pay With ${PAY_VIA_LABEL[method]} ($${total.toFixed(2)})` : `Pay $${total.toFixed(2)}`}
+              {busy ? "Processing…" : meterChecking ? "Checking meter…" : method ? `Pay With ${PAY_VIA_LABEL[method]} ($${total.toFixed(2)})` : `Pay $${total.toFixed(2)}`}
             </button>
           </>
         )}

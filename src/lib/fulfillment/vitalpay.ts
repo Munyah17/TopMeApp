@@ -145,6 +145,106 @@ async function notMapped(serviceId: string): Promise<FulfillmentResult> {
   throw new Error(`No VitalPay endpoint mapped for service "${serviceId}" — see vitalpayCoverageNotes().`);
 }
 
+/**
+ * Prepaid ZESA meter validation — GET /electricity/validate?meter_number=..&country=ZW
+ * (confirmed live 2026-09-09: the route is GET-only and takes meter_number +
+ * country as query params). VitalPay proxies ZETDC's own lookup, so a
+ * successful response carries the registered customer name / address for
+ * that meter and an unknown meter comes back as a 422 with a
+ * `meter_number` field error. We surface the name in checkout so the buyer
+ * can confirm they're topping up the right meter before paying.
+ *
+ * The exact success-envelope field names weren't in any doc we have and a
+ * real meter wasn't on hand to capture one, so `pick()` below tries every
+ * plausible key (and one level of nesting) rather than trusting a single
+ * shape — worst case the name is null and checkout still works.
+ */
+export type ElectricityMeterCheck =
+  | {
+      valid: true;
+      meterNumber: string;
+      customerName: string | null;
+      address: string | null;
+      raw: Record<string, unknown>;
+    }
+  | { valid: false; reason: "invalid_meter" | "unavailable"; message: string };
+
+export async function validateElectricityMeter(meterNumber: string): Promise<ElectricityMeterCheck> {
+  const { baseUrl, secretKey } = config();
+  const meter = meterNumber.trim();
+
+  let res: Response;
+  try {
+    res = await fetch(
+      `${baseUrl}/electricity/validate?meter_number=${encodeURIComponent(meter)}&country=ZW`,
+      { headers: { Accept: "application/json", Authorization: `Bearer ${secretKey}` } }
+    );
+  } catch {
+    return { valid: false, reason: "unavailable", message: "Meter check is temporarily unavailable." };
+  }
+
+  const text = await res.text();
+  let parsed:
+    | (VitalPayEnvelope<Record<string, unknown>> & { errors?: Record<string, string[]> })
+    | null = null;
+  try {
+    parsed = text ? JSON.parse(text) : null;
+  } catch {
+    return { valid: false, reason: "unavailable", message: "Meter check is temporarily unavailable." };
+  }
+
+  if (res.ok && parsed?.success && parsed.data && typeof parsed.data === "object") {
+    const flat: Record<string, unknown> = { ...parsed.data };
+    for (const nestKey of ["customer", "meter", "details", "data"]) {
+      const nested = (parsed.data as Record<string, unknown>)[nestKey];
+      if (nested && typeof nested === "object") Object.assign(flat, nested);
+    }
+    const pick = (...keys: string[]) => {
+      for (const k of keys) {
+        const v = flat[k];
+        if (typeof v === "string" && v.trim()) return v.trim();
+      }
+      return null;
+    };
+    return {
+      valid: true,
+      meterNumber: pick("meter_number", "meterNumber", "meter") ?? meter,
+      customerName: pick(
+        "customer_name",
+        "customerName",
+        "name",
+        "account_name",
+        "accountName",
+        "customer",
+        "holder",
+        "owner",
+        "full_name"
+      ),
+      address: pick(
+        "customer_address",
+        "customerAddress",
+        "address",
+        "physical_address",
+        "physicalAddress",
+        "customer_addr"
+      ),
+      raw: parsed.data as Record<string, unknown>,
+    };
+  }
+
+  const fieldError =
+    parsed?.errors?.meter_number?.[0] ?? parsed?.errors?.meterNumber?.[0] ?? null;
+  if (res.status === 422 && fieldError) {
+    return {
+      valid: false,
+      reason: "invalid_meter",
+      message: "We couldn't find that meter number. Please double-check it and try again.",
+    };
+  }
+
+  return { valid: false, reason: "unavailable", message: "Meter check is temporarily unavailable." };
+}
+
 export class VitalPayProvider implements FulfillmentProvider {
   readonly name = "vitalpay";
   // Airtime (Econet/NetOne), the 4 confirmed billers, and ZESA electricity.
