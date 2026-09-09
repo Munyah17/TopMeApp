@@ -1,5 +1,6 @@
+import { NetworksManager } from "@/components/admin/networks-manager";
 import { ProductsClient } from "@/components/admin/products-client";
-import { getAllServices, getCategories } from "@/lib/data/queries";
+import { getAllServices, getCategories, getNetworks } from "@/lib/data/queries";
 import { getMyPermissions } from "@/lib/auth/permissions";
 
 export default async function ProductsPage() {
@@ -8,7 +9,11 @@ export default async function ProductsPage() {
     return <div className="muted">You don&apos;t have permission to manage the product catalog.</div>;
   }
 
-  const [categories, services] = await Promise.all([getCategories(), getAllServices(true)]);
+  const [categories, services, networks] = await Promise.all([
+    getCategories(),
+    getAllServices(true),
+    getNetworks(),
+  ]);
 
   return (
     <div>
@@ -19,6 +24,7 @@ export default async function ProductsPage() {
         immediately. Deleting only works for services with no transaction history, so
         deactivate anything that&apos;s ever been sold instead.
       </div>
+      <NetworksManager networks={networks} />
       <ProductsClient categories={categories} services={services} />
     </div>
   );

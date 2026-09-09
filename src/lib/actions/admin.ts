@@ -42,6 +42,36 @@ export async function uploadServiceImage(formData: FormData) {
   return data.publicUrl;
 }
 
+// Uploads a network operator logo (Econet/NetOne/…) to the same public
+// bucket and returns its public URL. Kept separate from uploadServiceImage
+// only so the storage path is tidy (networks/… vs services/…).
+export async function uploadNetworkLogo(formData: FormData) {
+  await requirePermission("catalog.manage");
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) throw new Error("Choose an image to upload.");
+  if (!file.type.startsWith("image/")) throw new Error("Please choose an image file.");
+  if (file.size > 2 * 1024 * 1024) throw new Error("Logos must be under 2MB.");
+
+  const admin = createAdminClient();
+  const ext = file.name.split(".").pop()?.toLowerCase() || "png";
+  const path = `networks/${randomUUID()}.${ext}`;
+  const { error } = await admin.storage.from("product-images").upload(path, file, { contentType: file.type });
+  if (error) throw new Error(error.message);
+
+  const { data } = admin.storage.from("product-images").getPublicUrl(path);
+  return data.publicUrl;
+}
+
+// Sets (or clears, with null) the logo shown for one network on the
+// airtime "Choose network" step.
+export async function setNetworkLogo(networkId: string, logoUrl: string | null) {
+  await requirePermission("catalog.manage");
+  const admin = createAdminClient();
+  const { error } = await admin.from("networks").update({ logo_url: logoUrl }).eq("id", networkId);
+  if (error) throw new Error(error.message);
+  revalidateCatalog();
+}
+
 export async function createApiModule(input: {
   name: string;
   provider: string;

@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Icon } from "@/components/icons";
-import { hexA } from "@/lib/data/catalog-helpers";
 import type { GuestGateway } from "@/lib/actions/guest-payments";
 import type { Network } from "@/types/database";
 
@@ -112,39 +111,56 @@ export function DenomTile({ amount, selected, onClick }: { amount: number; selec
 
 export function NetworkTile({ network, selected, onClick }: { network: Network; selected: boolean; onClick: () => void }) {
   return (
-    <div
+    <button
+      type="button"
       className="tap"
       onClick={onClick}
+      aria-pressed={selected}
       style={{
         flex: "1 1 100px",
-        padding: "16px 10px",
-        borderRadius: 16,
+        padding: "16px 12px",
+        borderRadius: 14,
         textAlign: "center",
         cursor: "pointer",
-        border: `1.5px solid ${selected ? network.color : "var(--border)"}`,
-        background: selected ? hexA(network.color, 0.08) : "var(--surface)",
-        boxShadow: selected ? `0 0 0 3px ${hexA(network.color, 0.14)}` : "none",
+        font: "inherit",
+        border: `1px solid ${selected ? "var(--green)" : "var(--border)"}`,
+        background: selected ? "var(--green-50)" : "var(--surface)",
+        boxShadow: selected ? "0 0 0 3px rgba(0, 200, 83, 0.12)" : "none",
+        transition: "border-color 160ms ease, background 160ms ease, box-shadow 160ms ease",
       }}
     >
       <div
         style={{
-          width: 40,
-          height: 40,
+          width: 44,
+          height: 44,
           borderRadius: 12,
           margin: "0 auto 8px",
-          background: network.color,
-          color: "#fff",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          overflow: "hidden",
+          background: network.logo_url ? "var(--surface)" : network.color,
+          border: network.logo_url ? "1px solid var(--border)" : "none",
+          color: "#fff",
           fontWeight: 800,
-          fontSize: 15,
+          fontSize: 16,
         }}
       >
-        {network.name.slice(0, 1)}
+        {network.logo_url ? (
+          // eslint-disable-next-line @next/next/no-img-element -- admin-uploaded operator logo, arbitrary host
+          <img
+            src={network.logo_url}
+            alt={network.name}
+            loading="lazy"
+            decoding="async"
+            style={{ width: "100%", height: "100%", objectFit: "contain" }}
+          />
+        ) : (
+          network.name.slice(0, 1)
+        )}
       </div>
-      <div style={{ fontWeight: 700, fontSize: 12.5 }}>{network.name}</div>
-    </div>
+      <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text-primary)" }}>{network.name}</div>
+    </button>
   );
 }
 
