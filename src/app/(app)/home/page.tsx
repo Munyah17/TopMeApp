@@ -4,7 +4,7 @@ import { FavoriteButton } from "@/components/home/favorite-button";
 import { GuestRecent } from "@/components/home/guest-recent";
 import { ProductCard } from "@/components/home/product-card";
 import { QuickSearch } from "@/components/home/quick-search";
-import { fmt, shade } from "@/lib/data/catalog-helpers";
+import { fmt } from "@/lib/data/catalog-helpers";
 import {
   getActivePromoBanner,
   getAllServices,
@@ -74,7 +74,7 @@ export default async function HomePage() {
                 <Link
                   href={profile ? "/wallet" : "/login"}
                   className="btn btn-primary tap"
-                  style={{ flex: 1, height: 44, fontSize: 13, padding: "0 12px", gap: 6, textDecoration: "none", minWidth: 0 }}
+                  style={{ flex: "30 1 0", height: 44, fontSize: 13, padding: "0 10px", gap: 6, textDecoration: "none", minWidth: 0, whiteSpace: "nowrap" }}
                 >
                   <Icon name="wallet" size={16} stroke={2} />
                   <span>Top Up</span>
@@ -83,16 +83,17 @@ export default async function HomePage() {
                   href={profile ? "/pay/gift" : "/login"}
                   className="btn tap"
                   style={{
-                    flex: 1,
+                    flex: "30 1 0",
                     height: 44,
                     fontSize: 13,
-                    padding: "0 12px",
+                    padding: "0 10px",
                     gap: 6,
                     textDecoration: "none",
                     background: "rgba(255,255,255,0.12)",
                     color: "#fff",
                     border: "1px solid rgba(255,255,255,0.2)",
                     minWidth: 0,
+                    whiteSpace: "nowrap",
                   }}
                 >
                   <Icon name="gift" size={16} stroke={2} />
@@ -102,16 +103,17 @@ export default async function HomePage() {
                   href={profile ? "/pay/send?kind=red_packet" : "/login"}
                   className="btn tap"
                   style={{
-                    flex: 1,
+                    flex: "40 1 0",
                     height: 44,
                     fontSize: 13,
-                    padding: "0 12px",
+                    padding: "0 10px",
                     gap: 6,
                     textDecoration: "none",
                     background: "rgba(255,255,255,0.12)",
                     color: "#fff",
                     border: "1px solid rgba(255,255,255,0.2)",
                     minWidth: 0,
+                    whiteSpace: "nowrap",
                   }}
                 >
                   <Icon name="packet" size={16} stroke={2} />
@@ -122,7 +124,7 @@ export default async function HomePage() {
 
             <div className="card card-pad quickpay-card">
               <div className="row between">
-                <span style={{ fontWeight: 800, fontSize: 19 }}>Quick Pay</span>
+                <span style={{ fontWeight: 600, fontSize: 17, letterSpacing: "-0.01em" }}>Quick Pay</span>
                 <Link href="/services" className="muted" style={{ textDecoration: "none" }}>
                   See all
                 </Link>
@@ -151,15 +153,11 @@ export default async function HomePage() {
                     >
                       <div
                         className="ibadge round"
-                        style={{
-                          background: cat?.bg,
-                          color: cat?.color,
-                          boxShadow: `0 6px 16px -6px ${cat?.color}66`,
-                        }}
+                        style={{ background: cat?.bg, color: cat?.color }}
                       >
-                        <Icon name={f.icon} size={23} stroke={1.8} />
+                        <Icon name={f.icon} size={22} stroke={1.8} />
                       </div>
-                      <span style={{ fontSize: 11.5, fontWeight: 700, textAlign: "center", lineHeight: 1.2, color: "var(--text-soft)" }}>
+                      <span style={{ fontSize: 12, fontWeight: 500, textAlign: "center", lineHeight: 1.2, color: "var(--text-secondary)" }}>
                         {f.name.split(" ")[0]}
                       </span>
                     </Link>
@@ -191,7 +189,18 @@ export default async function HomePage() {
           {!profile ? (
             <GuestRecent />
           ) : recent.length === 0 ? (
-            <div className="card card-pad muted">No transactions yet. Your recent activity will show up here.</div>
+            <div className="card">
+              <div className="empty-state">
+                <div className="empty-state-icon">
+                  <Icon name="clock" size={20} stroke={1.8} />
+                </div>
+                <div className="empty-state-title">No activity yet</div>
+                <div className="empty-state-text">Payments and top-ups you make will show up here.</div>
+                <Link href="/services" className="btn btn-secondary tap" style={{ marginTop: 8, height: 40, textDecoration: "none" }}>
+                  Browse services
+                </Link>
+              </div>
+            </div>
           ) : (
             <div className="card" style={{ overflow: "hidden" }}>
               {recent.map((t, i) => {
@@ -275,12 +284,12 @@ export default async function HomePage() {
 
                 {c.id === "gadgets" && promoBanner && (
                   promoBanner.link_url ? (
-                    <Link href={promoBanner.link_url} className="mt-3 tap" style={{ display: "block", borderRadius: 20, overflow: "hidden" }}>
+                    <Link href={promoBanner.link_url} className="mt-3 tap" style={{ display: "block", borderRadius: 16, overflow: "hidden" }}>
                       {/* eslint-disable-next-line @next/next/no-img-element -- admin-managed banner, arbitrary host */}
                       <img src={promoBanner.image_url ?? ""} alt="Promotion" style={{ width: "100%", display: "block" }} />
                     </Link>
                   ) : (
-                    <div className="mt-3" style={{ borderRadius: 20, overflow: "hidden" }}>
+                    <div className="mt-3" style={{ borderRadius: 16, overflow: "hidden" }}>
                       {/* eslint-disable-next-line @next/next/no-img-element -- admin-managed banner, arbitrary host */}
                       <img src={promoBanner.image_url ?? ""} alt="Promotion" style={{ width: "100%", display: "block" }} />
                     </div>
@@ -290,25 +299,26 @@ export default async function HomePage() {
             );
           })}
 
-          <div className="mt-4">
-            <div style={{ fontWeight: 800, fontSize: 18, textAlign: "center" }}>Browse by Category</div>
-            <div className="browse-category-grid mt-3">
+          <div style={{ marginTop: 40 }}>
+            <div className="row between mb-2">
+              <span className="section-title">Browse by category</span>
+              <Link href="/services" className="muted" style={{ textDecoration: "none" }}>
+                See all
+              </Link>
+            </div>
+            <div className="browse-category-grid">
               {categories.map((c) => (
                 <Link
                   key={c.id}
                   href={c.id === "insurance" ? "/insurance" : `/services/${c.id}`}
                   className="tap browse-category-btn"
-                  style={{ background: `linear-gradient(135deg, ${c.color}, ${shade(c.color, -25)})` }}
                 >
-                  <Icon name={c.icon} size={18} stroke={2} />
+                  <span className="browse-cat-icon" style={{ background: c.bg, color: c.color }}>
+                    <Icon name={c.icon} size={18} stroke={2} />
+                  </span>
                   <span>{c.name}</span>
                 </Link>
               ))}
-            </div>
-            <div style={{ textAlign: "center", marginTop: 16 }}>
-              <Link href="/services" className="muted" style={{ fontWeight: 700, textDecoration: "none" }}>
-                Show All Categories
-              </Link>
             </div>
           </div>
         </div>
@@ -328,7 +338,7 @@ export default async function HomePage() {
 
             <div className="card card-pad mt-2 desktop-only">
               <div className="muted">Recent activity</div>
-              <div style={{ fontSize: 26, fontWeight: 800, marginTop: 4 }}>{fmt(monthSpend)}</div>
+              <div style={{ fontSize: 22, fontWeight: 700, marginTop: 4, letterSpacing: "-0.02em" }}>{fmt(monthSpend)}</div>
               <div className="muted" style={{ marginTop: 2 }}>
                 Across your last {recent.length} payment{recent.length === 1 ? "" : "s"}
               </div>
@@ -339,7 +349,12 @@ export default async function HomePage() {
                 Saved beneficiaries
               </div>
               {beneficiaries.length === 0 ? (
-                <div className="muted mt-2">Recipients you pay often will be saved here for quick reuse.</div>
+                <div className="row gap-2 mt-3" style={{ alignItems: "center" }}>
+                  <div className="empty-state-icon" style={{ width: 36, height: 36, marginBottom: 0 }}>
+                    <Icon name="user" size={17} stroke={1.8} />
+                  </div>
+                  <div className="muted" style={{ flex: 1 }}>Recipients you pay often are saved here for quick reuse.</div>
+                </div>
               ) : (
                 beneficiaries.slice(0, 3).map((b) => (
                   <div className="row gap-2 mt-2" key={b.id}>
