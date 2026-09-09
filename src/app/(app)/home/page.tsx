@@ -51,42 +51,25 @@ export default async function HomePage() {
           <div className="quickpay-gift-row">
             <div
               style={{
-                background: "linear-gradient(120deg, var(--navy) 0%, #16324f 60%, #0f4c3a 130%)",
-                borderRadius: 20,
-                padding: "20px 22px",
+                background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
+                borderRadius: 16,
+                padding: "24px",
                 position: "relative",
                 overflow: "hidden",
               }}
             >
-              <div style={{ position: "absolute", right: -30, top: -30, width: 130, height: 130, borderRadius: "50%", background: "rgba(0,200,83,0.18)" }} />
-              <div style={{ position: "absolute", right: 30, bottom: -40, width: 90, height: 90, borderRadius: "50%", background: "rgba(56,189,248,0.14)" }} />
+              <div style={{ position: "absolute", right: -40, top: -40, width: 120, height: 120, borderRadius: "50%", background: "rgba(0,200,83,0.08)" }} />
+              <div style={{ position: "absolute", right: 40, bottom: -30, width: 80, height: 80, borderRadius: "50%", background: "rgba(56,189,248,0.06)" }} />
               <div className="eyebrow" style={{ color: "#7CF2AE", position: "relative" }}>
                 New
               </div>
-              <div style={{ color: "#fff", fontWeight: 800, fontSize: 22, marginTop: 6, position: "relative" }}>
+              <div style={{ color: "#fff", fontWeight: 700, fontSize: 20, marginTop: 4, position: "relative" }}>
                 Send a Gift Voucher
               </div>
-              <div className="muted" style={{ color: "rgba(255,255,255,0.65)", marginTop: 8, fontSize: 13.5, position: "relative", maxWidth: 460 }}>
+              <div className="muted" style={{ color: "rgba(255,255,255,0.7)", marginTop: 8, fontSize: 13, position: "relative", maxWidth: 440, lineHeight: 1.5 }}>
                 Send money straight to your family and friends&apos; TopMe wallets in seconds.
-                Perfect for birthdays, school fees, or just helping someone out. They&apos;ll
-                need a TopMe account to receive it, so make sure they&apos;re signed up.
+                Perfect for birthdays, school fees, or just helping someone out.
               </div>
-              {/* All three buttons stay on one row, always — flexWrap:"nowrap"
-                  (not "wrap") means a button can never drop to a second line the
-                  way "Red Packet" used to. Top Up and Gift size to their own
-                  content (flex:"0 1 auto") rather than splitting the row into
-                  forced equal thirds, because their labels are short — "Top Up"
-                  and "Gift" ("Gift Voucher" trimmed down: the heading two lines up
-                  already says "Send a Gift Voucher", and the gift icon is right
-                  there) — so claiming a full third for them would starve "Red
-                  Packet", the one label long enough to actually need the room.
-                  Red Packet gets flex:"1 1 auto" and absorbs whatever's left,
-                  which is enough for its full text down to ~360px-wide phones.
-                  minWidth:0 lets flexbox shrink any of them below content size if
-                  it truly must, and the span+ellipsis is the fallback for when it
-                  does — a graceful truncation instead of a second row or split
-                  text, kept for the narrowest outlier devices rather than the
-                  normal case. */}
               <div className="row mt-4" style={{ position: "relative", gap: 8 }}>
                 <Link
                   href={profile ? "/wallet" : "/login"}
@@ -106,9 +89,9 @@ export default async function HomePage() {
                     padding: "0 12px",
                     gap: 6,
                     textDecoration: "none",
-                    background: "rgba(255,255,255,0.14)",
+                    background: "rgba(255,255,255,0.12)",
                     color: "#fff",
-                    border: "1px solid rgba(255,255,255,0.24)",
+                    border: "1px solid rgba(255,255,255,0.2)",
                     minWidth: 0,
                   }}
                 >
@@ -125,9 +108,9 @@ export default async function HomePage() {
                     padding: "0 12px",
                     gap: 6,
                     textDecoration: "none",
-                    background: "rgba(255,255,255,0.14)",
+                    background: "rgba(255,255,255,0.12)",
                     color: "#fff",
-                    border: "1px solid rgba(255,255,255,0.24)",
+                    border: "1px solid rgba(255,255,255,0.2)",
                     minWidth: 0,
                   }}
                 >

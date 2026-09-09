@@ -62,10 +62,10 @@ const FIELD_TYPE_MAP: Record<string, InsuranceSignupField["type"]> = {
 export interface TariqifyProduct {
   id: string;
   name: string;
-  description: string;
-  category: string;
+  description: string | null;
+  category: string | null;
   currency: string;
-  image_url?: string;
+  image_url: string | null;
   signup_fields: Array<{
     key: string;
     label: string;
