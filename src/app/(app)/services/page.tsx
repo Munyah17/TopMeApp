@@ -12,10 +12,10 @@ export default async function ServicesPage() {
   return (
     <div className="screen active" style={{ position: "static" }}>
       <div className="topbar mobile-only" style={{ position: "static", background: "none", paddingTop: 6 }}>
-        <h2 style={{ fontSize: 20 }}>Services</h2>
+        <h2 style={{ fontSize: 22, letterSpacing: "-0.02em" }}>Services</h2>
       </div>
       <div className="px content-wrap">
-        <h2 className="desktop-only" style={{ fontSize: 22, marginBottom: 18 }}>
+        <h2 className="desktop-only" style={{ fontSize: 24, letterSpacing: "-0.02em", marginBottom: 24 }}>
           Services
         </h2>
         <div className="cats-grid">
@@ -24,16 +24,17 @@ export default async function ServicesPage() {
               key={c.id}
               href={`/services/${c.id}`}
               className="card tap row gap-2"
-              style={{ padding: 16, textDecoration: "none" }}
+              data-hover
+              style={{ padding: "var(--space-4)", textDecoration: "none", gap: "var(--space-3)" }}
             >
               <div className="ibadge" style={{ background: c.bg, color: c.color }}>
-                <Icon name={c.icon} size={22} stroke={1.8} />
+                <Icon name={c.icon} size={20} stroke={1.8} />
               </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, fontSize: 14.5, color: "var(--text)" }}>{c.name}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: 15, letterSpacing: "-0.01em", color: "var(--text-primary)" }}>{c.name}</div>
                 <div className="muted">{c.description}</div>
               </div>
-              <div style={{ color: "var(--text-faint)" }}>
+              <div style={{ color: "var(--text-tertiary)", flexShrink: 0 }}>
                 <Icon name="chevronR" size={18} stroke={2} />
               </div>
             </Link>

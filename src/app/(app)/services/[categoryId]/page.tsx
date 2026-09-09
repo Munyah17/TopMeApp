@@ -34,8 +34,8 @@ export default async function CategoryPage({ params }: { params: Promise<{ categ
             <Icon name={category.icon} size={17} stroke={1.8} />
           </div>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontWeight: 700, fontSize: 15.5, lineHeight: 1.25 }}>{category.name}</div>
-            <div className="muted" style={{ fontSize: 11.5 }}>
+            <div style={{ fontWeight: 600, fontSize: 16, letterSpacing: "-0.01em", lineHeight: 1.25 }}>{category.name}</div>
+            <div className="muted" style={{ fontSize: 12 }}>
               {items.length} service{items.length === 1 ? "" : "s"}
             </div>
           </div>

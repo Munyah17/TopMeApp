@@ -1085,17 +1085,17 @@ h4 {
 .topbar {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 14px 22px 6px;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5) var(--space-2);
   position: sticky;
   top: 0;
-  z-index: 20;
+  z-index: var(--z-sticky);
   background: linear-gradient(var(--bg) 65%, transparent);
 }
 .backbtn {
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
   background: var(--surface);
   border: 1px solid var(--border);
   display: flex;
@@ -1103,9 +1103,15 @@ h4 {
   justify-content: center;
   cursor: pointer;
   flex-shrink: 0;
+  color: var(--text-secondary);
+  transition: border-color var(--transition-normal), color var(--transition-normal);
+}
+.backbtn:hover {
+  border-color: var(--text-tertiary);
+  color: var(--text-primary);
 }
 .backbtn:active {
-  transform: scale(0.92);
+  transform: scale(0.96);
 }
 
 /* ---------- Product cards (catalog) ---------- */
