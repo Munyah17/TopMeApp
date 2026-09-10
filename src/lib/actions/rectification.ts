@@ -8,10 +8,15 @@ import { logTransactionEvent } from "@/lib/transaction-events";
 import type { Transaction } from "@/types/database";
 
 const FRIENDLY_ERRORS: Record<string, string> = {
-  forbidden: "You don't have permission to do that.",
+  forbidden: "You don't have permission to do that. (Your account needs the wallet.adjust / transactions.rectify permission.)",
+  not_authenticated: "Your session expired — sign in again and retry.",
   transaction_not_found: "That transaction couldn't be found.",
+  wallet_not_found: "That customer doesn't have a wallet yet.",
+  invalid_amount: "Enter an amount other than zero.",
+  insufficient_funds: "That deduction would take the balance below zero.",
   guest_refund_not_supported: "This was a guest checkout — there's no TopMe wallet to refund into. Use the gateway's own dashboard (Paynow/Stripe/EcoCash) for a real refund.",
   already_rectified: "This transaction has already been refunded.",
+  already_refunded: "This transaction has already been refunded.",
   refund_not_found: "That refund request couldn't be found.",
   already_resolved: "This refund has already been resolved.",
   not_approved: "This refund isn't in the approved state.",
@@ -19,7 +24,9 @@ const FRIENDLY_ERRORS: Record<string, string> = {
 
 function friendlyError(message: string) {
   const key = Object.keys(FRIENDLY_ERRORS).find((k) => message.includes(k));
-  return key ? FRIENDLY_ERRORS[key] : "Something went wrong. Please try again.";
+  // Fall through to the raw DB message rather than a vague "something went
+  // wrong" — staff tools need to show what actually failed.
+  return key ? FRIENDLY_ERRORS[key] : `Couldn't apply that: ${message}`;
 }
 
 function revalidate(transactionId: string) {
