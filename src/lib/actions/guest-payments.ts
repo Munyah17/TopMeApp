@@ -76,6 +76,16 @@ export async function startGuestCheckout(input: StartGuestCheckoutInput) {
     clientAmount: input.amount,
   });
 
+  // Airtime: enforce the network operator's amount rules before taking any
+  // money (see payService for the wallet-paid equivalent).
+  if (input.serviceId === "airtime" && input.networkId) {
+    const { getAirtimeOperatorRules } = await import("@/lib/data/queries");
+    const { checkAirtimeAmount } = await import("@/lib/fulfillment/vitalpay");
+    const rules = await getAirtimeOperatorRules();
+    const check = checkAirtimeAmount(rules[input.networkId], verifiedAmount);
+    if (!check.ok) throw new Error(check.message);
+  }
+
   const supabase = await createClient();
   // A logged-in user can pay a specific purchase directly via a gateway
   // instead of their wallet — when signed in, the resulting transaction is

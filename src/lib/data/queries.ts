@@ -42,6 +42,25 @@ export const getAllNetworks = unstable_cache(
   { tags: ["catalog"], revalidate: 300 }
 );
 
+// Per-network airtime amount rules (min / max / fixed denominations),
+// pulled from VitalPay's live operator catalogue. Cached an hour — these
+// change rarely, and a stale copy just means the server-side amount check
+// might miss once before the VitalPay 422 + auto-refund path catches it.
+// Returns {} if VitalPay is unreachable (checkout still works; validation
+// simply degrades to the fulfilment-time backstop).
+export const getAirtimeOperatorRules = unstable_cache(
+  async () => {
+    try {
+      const { fetchAirtimeOperatorRules } = await import("@/lib/fulfillment/vitalpay");
+      return await fetchAirtimeOperatorRules();
+    } catch {
+      return {};
+    }
+  },
+  ["airtime-operator-rules"],
+  { tags: ["catalog"], revalidate: 3600 }
+);
+
 // Customer-facing: only networks a provider can actually fulfil right now.
 export const getNetworks = unstable_cache(
   async (): Promise<Network[]> => {

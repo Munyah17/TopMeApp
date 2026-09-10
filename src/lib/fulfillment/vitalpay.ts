@@ -56,12 +56,78 @@ async function vitalpayRequest<T>(path: string, init: { method: "GET" | "POST"; 
 }
 
 // Operator ids confirmed live via GET /airtime/operators?country_iso=ZW.
-// Telecel is NOT in VitalPay's catalog yet — that network falls through to
-// the simulated provider until VitalPay (or another provider) adds it.
+// Telecel is NOT in VitalPay's catalog yet — that network is deactivated
+// (networks.is_active = false) so a customer can't select it.
 const AIRTIME_OPERATORS: Record<string, string> = {
   econet: "econet_zw",
   netone: "netone_zw",
 };
+
+/**
+ * Per-network amount constraints, pulled live from VitalPay's own catalog
+ * (GET /airtime/operators). Different operators are wired very differently:
+ * Econet takes any amount in a range; NetOne only sells a fixed set of
+ * denominations (like physical recharge cards). We must honour this
+ * BEFORE debiting the wallet — sending an unsupported amount got a 422
+ * back from VitalPay after the customer had already been charged.
+ */
+export interface AirtimeOperatorRule {
+  /** our network id (econet / netone) */
+  networkId: string;
+  min: number;
+  max: number;
+  /** Exact amounts the operator accepts, or null when any amount in [min,max] is fine. */
+  fixedAmounts: number[] | null;
+}
+
+const cents = (n: number) => Math.round(n * 100);
+
+export async function fetchAirtimeOperatorRules(): Promise<Record<string, AirtimeOperatorRule>> {
+  const { baseUrl, secretKey } = config();
+  const res = await fetch(`${baseUrl}/airtime/operators?country=ZW`, {
+    headers: { Accept: "application/json", Authorization: `Bearer ${secretKey}` },
+  });
+  if (!res.ok) throw new Error(`VitalPay /airtime/operators failed (${res.status})`);
+  const json = (await res.json()) as { data?: { operators?: Array<Record<string, unknown>> } };
+  const byVpId = new Map((json.data?.operators ?? []).map((o) => [String(o.id), o]));
+
+  const rules: Record<string, AirtimeOperatorRule> = {};
+  for (const [networkId, vpId] of Object.entries(AIRTIME_OPERATORS)) {
+    const op = byVpId.get(vpId);
+    if (!op) continue;
+    const rawFixed = Array.isArray(op.fixed_amounts)
+      ? (op.fixed_amounts as unknown[]).map(Number).filter((n) => Number.isFinite(n) && n > 0)
+      : [];
+    rules[networkId] = {
+      networkId,
+      min: Number(op.min) || 0.5,
+      max: Number(op.max) || 100,
+      fixedAmounts: rawFixed.length ? [...rawFixed].sort((a, b) => a - b) : null,
+    };
+  }
+  return rules;
+}
+
+/** Server-side gate: is `amount` valid for this operator? */
+export function checkAirtimeAmount(
+  rule: AirtimeOperatorRule | undefined,
+  amount: number
+): { ok: true } | { ok: false; message: string } {
+  if (!rule) return { ok: true }; // unknown operator — the fulfil handler is the backstop
+  if (rule.fixedAmounts) {
+    const allowed = rule.fixedAmounts.map(cents);
+    if (!allowed.includes(cents(amount))) {
+      return {
+        ok: false,
+        message: `This network only sells set amounts — pick one of ${rule.fixedAmounts.map((a) => `$${a}`).join(", ")}.`,
+      };
+    }
+    return { ok: true };
+  }
+  if (amount < rule.min) return { ok: false, message: `The minimum top-up for this network is $${rule.min.toFixed(2)}.` };
+  if (amount > rule.max) return { ok: false, message: `The maximum top-up for this network is $${rule.max.toFixed(2)}.` };
+  return { ok: true };
+}
 
 // Biller ids confirmed live via GET /bills/billers?country=ZW.
 const BILLERS: Record<string, { billerCode: string; billType: string }> = {

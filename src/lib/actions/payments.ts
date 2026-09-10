@@ -75,6 +75,18 @@ export async function payService(input: PayServiceInput) {
     clientAmount: input.amount,
   });
 
+  // Airtime: honour the network operator's own amount rules (NetOne only
+  // sells fixed denominations, Econet has a min/max) BEFORE the wallet is
+  // touched — an unsupported amount used to be charged and then bounced by
+  // VitalPay with a 422.
+  if (input.serviceId === "airtime" && input.networkId) {
+    const { getAirtimeOperatorRules } = await import("@/lib/data/queries");
+    const { checkAirtimeAmount } = await import("@/lib/fulfillment/vitalpay");
+    const rules = await getAirtimeOperatorRules();
+    const check = checkAirtimeAmount(rules[input.networkId], verifiedAmount);
+    if (!check.ok) throw new Error(check.message);
+  }
+
   const { data: txData, error } = await supabase.rpc("wallet_pay", {
     p_service_id: input.serviceId,
     p_amount: verifiedAmount,

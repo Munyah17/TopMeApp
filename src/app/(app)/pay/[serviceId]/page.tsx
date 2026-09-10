@@ -8,7 +8,7 @@ import { ZesaFlow } from "@/components/payment-flow/zesa-flow";
 import { ServiceUnavailable } from "@/components/service-unavailable";
 import { hasRealCoverage } from "@/lib/fulfillment";
 import { getPublicSetting } from "@/lib/data/flags";
-import { getCurrentProfile, getDataBundles, getNetworks, getService, getTvPackages, getWallet } from "@/lib/data/queries";
+import { getAirtimeOperatorRules, getCurrentProfile, getDataBundles, getNetworks, getService, getTvPackages, getWallet } from "@/lib/data/queries";
 import { createAdminClient } from "@/lib/supabase/server";
 import type { ApiModuleSafe } from "@/types/database";
 
@@ -36,13 +36,14 @@ export default async function PayPage({ params }: { params: Promise<{ serviceId:
   // an extra wait — worth it for collapsing a full sequential step off
   // every other service's checkout page load.
   const admin = createAdminClient();
-  const [apiModules, bundles, packages, networks, wallet, paymentBanners] = await Promise.all([
+  const [apiModules, bundles, packages, networks, wallet, paymentBanners, airtimeRules] = await Promise.all([
     service.is_gift ? Promise.resolve([]) : admin.from("api_modules_safe").select("*").eq("status", "active").then((r) => r.data ?? []),
     service.amount_mode === "bundles" ? getDataBundles() : Promise.resolve([]),
     service.amount_mode === "packages" ? getTvPackages() : Promise.resolve([]),
     service.needs_network ? getNetworks() : Promise.resolve([]),
     profile ? getWallet(profile.id) : Promise.resolve(null),
     getPublicSetting<Record<string, string>>("payment_method_banners"),
+    service.id === "airtime" ? getAirtimeOperatorRules() : Promise.resolve({}),
   ]);
 
   // Gift vouchers are wallet-to-wallet only (debit sender, mint a redeemable
@@ -69,7 +70,7 @@ export default async function PayPage({ params }: { params: Promise<{ serviceId:
   const banners = paymentBanners ?? {};
 
   if (AIRTIME_FLOW_SERVICES.has(service.id)) {
-    return <AirtimeFlow service={service} networks={networks} walletBalance={walletBalance} isGuest={isGuest} guestEmail={guestEmail} guestPhone={guestPhone} banners={banners} />;
+    return <AirtimeFlow service={service} networks={networks} operatorRules={airtimeRules} walletBalance={walletBalance} isGuest={isGuest} guestEmail={guestEmail} guestPhone={guestPhone} banners={banners} />;
   }
 
   if (service.id === "zesa") {

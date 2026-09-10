@@ -11,6 +11,7 @@ import { payService } from "@/lib/actions/payments";
 import { startGuestCheckout, type GuestGateway } from "@/lib/actions/guest-payments";
 import { addGuestActivity } from "@/lib/guest-activity";
 import { DenomTile, NetworkTile, PaymentMethodSection, ReviewRow, EditableRow, type PaymentBanners, type PaymentMethod } from "./flow-shared";
+import type { AirtimeOperatorRule } from "@/lib/fulfillment/vitalpay";
 import type { Network, Service, Transaction } from "@/types/database";
 
 type Step = "operator" | "recipient" | "amount" | "review" | "processing" | "guest-ecocash" | "success" | "receipt" | "error";
@@ -27,6 +28,7 @@ const PAY_VIA_LABEL: Record<PaymentMethod, string> = {
 export function AirtimeFlow({
   service,
   networks,
+  operatorRules = {},
   walletBalance,
   isGuest = false,
   guestEmail: initialGuestEmail = "",
@@ -35,6 +37,7 @@ export function AirtimeFlow({
 }: {
   service: Service;
   networks: Network[];
+  operatorRules?: Record<string, AirtimeOperatorRule>;
   walletBalance: number;
   isGuest?: boolean;
   guestEmail?: string;
@@ -59,6 +62,24 @@ export function AirtimeFlow({
 
   const unitPrice = denom ?? (parseFloat(customAmount) || 0);
   const amount = isVoucher(service) ? unitPrice * quantity : unitPrice;
+
+  // Network operator amount rules (from VitalPay's live catalogue). NetOne
+  // only sells fixed denominations; Econet takes any amount in a range.
+  const rule = networkId ? operatorRules[networkId] : undefined;
+  const fixedTiles = !isVoucher(service) ? rule?.fixedAmounts ?? null : null;
+  const denomChoices = fixedTiles ?? service.chips ?? [];
+  const amountError =
+    !isVoucher(service) && rule && unitPrice > 0
+      ? fixedTiles
+        ? fixedTiles.some((a) => Math.round(a * 100) === Math.round(unitPrice * 100))
+          ? null
+          : `Pick one of the set amounts above.`
+        : unitPrice < rule.min
+          ? `Minimum is $${rule.min.toFixed(2)} for ${networks.find((n) => n.id === networkId)?.name ?? "this network"}.`
+          : unitPrice > rule.max
+            ? `Maximum is $${rule.max.toFixed(2)} for ${networks.find((n) => n.id === networkId)?.name ?? "this network"}.`
+            : null
+      : null;
 
   useEffect(() => {
     if (step === "receipt" && result && qrRef.current) {
@@ -237,21 +258,33 @@ export function AirtimeFlow({
 
             <label className="field-label">{isVoucher(service) ? "Voucher denomination" : "Amount"}</label>
             <div className="row gap-2" style={{ flexWrap: "wrap" }}>
-              {(service.chips ?? []).map((c) => (
+              {denomChoices.map((c) => (
                 <DenomTile key={c} amount={c} selected={denom === c} onClick={() => { setDenom(c); setCustomAmount(""); }} />
               ))}
             </div>
 
             {!isVoucher(service) && (
               <>
-                <label className="field-label mt-2">Or enter custom amount</label>
+                <label className="field-label mt-2">
+                  {fixedTiles ? "Custom amount" : "Or enter custom amount"}
+                </label>
                 <input
                   className="field"
-                  placeholder="$0.00"
+                  placeholder={fixedTiles ? "Currently Not Available" : rule ? `$${rule.min.toFixed(2)} – $${rule.max.toFixed(2)}` : "$0.00"}
                   inputMode="decimal"
-                  value={customAmount}
+                  disabled={!!fixedTiles}
+                  style={fixedTiles ? { opacity: 0.5, cursor: "not-allowed", background: "var(--muted)" } : undefined}
+                  value={fixedTiles ? "" : customAmount}
                   onChange={(e) => { setCustomAmount(e.target.value.replace(/[^0-9.]/g, "")); setDenom(null); }}
                 />
+                {fixedTiles && (
+                  <div className="muted mt-1" style={{ fontSize: 12 }}>
+                    {networks.find((n) => n.id === networkId)?.name ?? "This network"} only sells the set amounts above.
+                  </div>
+                )}
+                {amountError && (
+                  <div className="mt-1" style={{ color: "var(--error)", fontSize: 12 }}>{amountError}</div>
+                )}
               </>
             )}
 
@@ -270,7 +303,7 @@ export function AirtimeFlow({
               </div>
             )}
 
-            <button className="btn btn-primary btn-block mt-4" disabled={!(amount > 0)} onClick={() => setStep("review")}>
+            <button className="btn btn-primary btn-block mt-4" disabled={!(amount > 0) || !!amountError} onClick={() => setStep("review")}>
               Continue{amount > 0 ? ` · $${amount.toFixed(2)}` : ""}
             </button>
           </>
