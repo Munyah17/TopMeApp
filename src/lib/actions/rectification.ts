@@ -171,12 +171,17 @@ export async function markRefundSettled(refundId: string, note: string) {
 export async function adjustWallet(userId: string, amount: number, reason: string) {
   await requirePermission("wallet.adjust");
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("admin_adjust_wallet", {
+  const { error } = await supabase.rpc("admin_adjust_wallet", {
     p_user_id: userId,
     p_amount: amount,
     p_reason: reason,
   });
   if (error) throw new Error(friendlyError(error.message));
+
+  const admin = createAdminClient();
+  const { data: wallet } = await admin.from("wallets").select("balance").eq("user_id", userId).single();
+
   revalidateAdminPath(`/users/${userId}`);
-  return data;
+  revalidateAdminPath("/users");
+  return { newBalance: (wallet?.balance as number) ?? 0, applied: amount };
 }

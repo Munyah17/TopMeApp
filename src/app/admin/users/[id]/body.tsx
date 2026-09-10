@@ -90,7 +90,7 @@ export async function UserDetailBody({ id, basePath }: { id: string; basePath: s
 
       {permissions.includes("wallet.adjust") && (
         <div className="mb-3">
-          <WalletAdjustForm userId={id} />
+          <WalletAdjustForm userId={id} currentBalance={wallet?.balance ?? 0} />
         </div>
       )}
 

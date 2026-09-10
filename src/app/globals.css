@@ -708,10 +708,22 @@ h4 {
   flex-shrink: 0;
   padding: 0 var(--space-8);
   border-bottom: 1px solid var(--border);
-  background: rgba(248, 250, 252, 0.95);
-  backdrop-filter: blur(8px);
+  /* Background + blur live on ::before, NOT on .app-header itself: a
+     backdrop-filter element clips its descendants to its own box in
+     Chromium, which was cutting off / washing out the avatar dropdown
+     where it overhangs the header. */
+  background: transparent;
   position: relative;
   z-index: var(--z-sticky);
+}
+.app-header::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: rgba(248, 250, 252, 0.95);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 .header-inner {
   display: flex;
