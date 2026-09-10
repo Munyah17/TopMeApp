@@ -246,6 +246,94 @@ export async function toggleAccountSuspension(userId: string, currentlySuspended
   revalidateAdminPath("/users");
 }
 
+// Edit a customer's account details from the support console. Name/phone
+// live on `profiles`; email lives on `auth.users` and is mirrored to
+// `profiles`. Phone is the P2P lookup key, so it stays unique.
+export async function updateCustomerProfile(
+  userId: string,
+  input: { fullName?: string; phone?: string; email?: string }
+) {
+  const { user: actingUser } = await requirePermission("users.suspend");
+  const admin = createAdminClient();
+
+  const { data: target } = await admin.from("profiles").select("role, email").eq("id", userId).single();
+  if (!target) throw new Error("That account couldn't be found.");
+  if (target.role !== "customer") throw new Error("Only customer accounts can be edited here.");
+
+  const patch: Record<string, string | null> = {};
+  const changed: Record<string, unknown> = {};
+
+  if (input.fullName !== undefined) {
+    const v = input.fullName.trim();
+    if (v && v.length > 120) throw new Error("Name is too long.");
+    patch.full_name = v || null;
+    changed.full_name = v || null;
+  }
+
+  if (input.phone !== undefined) {
+    const v = input.phone.trim().replace(/[\s-]/g, "");
+    if (v && !/^\+?\d{9,15}$/.test(v)) throw new Error("That doesn't look like a valid phone number.");
+    if (v) {
+      const { data: clash } = await admin.from("profiles").select("id").eq("phone", v).neq("id", userId).maybeSingle();
+      if (clash) throw new Error("Another account already uses that phone number.");
+    }
+    patch.phone = v || null;
+    changed.phone = v || null;
+  }
+
+  if (input.email !== undefined) {
+    const v = input.email.trim().toLowerCase();
+    if (v && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) throw new Error("Enter a valid email address.");
+    if (v && v !== (target.email ?? "").toLowerCase()) {
+      const { error: authErr } = await admin.auth.admin.updateUserById(userId, { email: v, email_confirm: true });
+      if (authErr) {
+        throw new Error(/already|registered|exists/i.test(authErr.message) ? "That email is already in use." : authErr.message);
+      }
+      patch.email = v;
+      changed.email = v;
+    }
+  }
+
+  if (Object.keys(patch).length === 0) return { changed: {} as Record<string, unknown> };
+
+  const { error } = await admin.from("profiles").update(patch).eq("id", userId);
+  if (error) throw new Error(error.message);
+
+  await logAdminAction(admin, {
+    actorId: actingUser.id,
+    action: "user.edit_profile",
+    targetTable: "profiles",
+    targetId: userId,
+    meta: changed,
+  });
+  revalidateAdminPath(`/users/${userId}`);
+  revalidateAdminPath("/users");
+  return { changed };
+}
+
+// Send the customer a password-reset email (same link the public
+// "forgot password" flow uses).
+export async function sendCustomerPasswordReset(userId: string) {
+  const { user: actingUser } = await requirePermission("users.suspend");
+  const admin = createAdminClient();
+  const { data: target } = await admin.from("profiles").select("email").eq("id", userId).single();
+  if (!target?.email) throw new Error("This account has no email address to send a reset to.");
+
+  const origin = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || "https://www.topme.co.zw";
+  const { error } = await admin.auth.resetPasswordForEmail(target.email as string, {
+    redirectTo: `${origin}/auth/confirm?type=recovery`,
+  });
+  if (error) throw new Error(error.message);
+
+  await logAdminAction(admin, {
+    actorId: actingUser.id,
+    action: "user.password_reset_sent",
+    targetTable: "profiles",
+    targetId: userId,
+  });
+  return { email: target.email as string };
+}
+
 function revalidateCatalog() {
   // getCategories/getAllServices/getNetworks are unstable_cache-wrapped
   // (see src/lib/data/queries.ts) precisely so customer pages don't

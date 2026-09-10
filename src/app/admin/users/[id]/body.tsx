@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Icon } from "@/components/icons";
 import { PromoteSuperadminForm } from "@/components/admin/promote-superadmin-form";
+import { UserEditForm } from "@/components/admin/user-edit-form";
 import { UserSuspendButton } from "@/components/admin/user-suspend-button";
 import { WalletAdjustForm } from "@/components/admin/wallet-adjust-form";
 import { fmt } from "@/lib/data/catalog-helpers";
@@ -87,6 +88,12 @@ export async function UserDetailBody({ id, basePath }: { id: string; basePath: s
           </div>
         )}
       </div>
+
+      {permissions.includes("users.suspend") && target.role === "customer" && (
+        <div className="mb-3">
+          <UserEditForm userId={id} fullName={target.full_name} phone={target.phone} email={target.email} />
+        </div>
+      )}
 
       {permissions.includes("wallet.adjust") && (
         <div className="mb-3">
