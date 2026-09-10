@@ -301,8 +301,9 @@ export function giftSentEmail(opts: { amount: number; receiverPhone: string; cod
           ["Amount", money(opts.amount)],
           ["Sent to", opts.receiverPhone],
         ])}
-        ${note("Anyone with this code can redeem it, so send it only to the person it's meant for. They'll need a TopMe account to receive it.")}
+        ${note("The recipient redeems it under Wallet → Gift card in the TopMe app (they'll need a TopMe account). Anyone with this code can redeem it, so send it only to the person it's meant for.")}
       `,
+      cta: { label: "Open TopMe", url: `${APP_URL}/wallet` },
     }),
   };
 }

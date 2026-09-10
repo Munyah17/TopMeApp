@@ -2,6 +2,7 @@
 import { AuthRequired } from "@/components/auth-required";
 import { Icon } from "@/components/icons";
 import { PaynowTopupStatus } from "@/components/wallet/paynow-topup-status";
+import { RedeemPanel } from "@/components/wallet/redeem-panel";
 import { TopupPanel } from "@/components/wallet/topup-panel";
 import { WithdrawPanel } from "@/components/wallet/withdraw-panel";
 import { fmt } from "@/lib/data/catalog-helpers";
@@ -74,6 +75,13 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
           </div>
           <div className="card card-pad">
             <TopupPanel userPhone={profile.phone} />
+          </div>
+
+          <div className="row between mt-3 mb-2">
+            <span className="section-title">Gift card</span>
+          </div>
+          <div className="card card-pad">
+            <RedeemPanel />
           </div>
 
           <div className="row between mt-3 mb-2">

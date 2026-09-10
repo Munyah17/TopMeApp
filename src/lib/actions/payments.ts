@@ -7,7 +7,7 @@ import { validateElectricityMeter } from "@/lib/fulfillment/vitalpay";
 import { isFeatureEnabled } from "@/lib/data/flags";
 import { findProfileByPhone } from "@/lib/data/queries";
 import { sendEmail } from "@/lib/email/client";
-import { giftSentEmail, moneyReceivedEmail, moneySentEmail, paymentReceiptEmail } from "@/lib/email/templates";
+import { giftRedeemedEmail, giftSentEmail, moneyReceivedEmail, moneySentEmail, paymentReceiptEmail } from "@/lib/email/templates";
 import { logTransactionEvent } from "@/lib/transaction-events";
 import { resolveVerifiedAmount } from "@/lib/pricing";
 import type { ApiModuleSafe, P2pTransfer, Transaction } from "@/types/database";
@@ -223,6 +223,48 @@ export async function sendGiftVoucher(receiverPhone: string, amount: number, sen
   }
 
   return data;
+}
+
+// Redeem a gift-card code into the caller's own wallet. The credited amount
+// is ring-fenced from cash-out (wallets.gift_locked) — gift balance spends
+// on TopMe services but can't be withdrawn.
+export async function redeemGiftVoucher(rawCode: string) {
+  const code = rawCode.trim().toUpperCase();
+  if (!/^GFT-?\d{6}$/.test(code)) throw new Error("That doesn't look like a gift code. It's in the form GFT-123456.");
+  const normalised = code.startsWith("GFT-") ? code : `GFT-${code.slice(3)}`;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error(FRIENDLY_ERRORS.not_authenticated);
+
+  const { data, error } = await supabase.rpc("wallet_gift_redeem", { p_code: normalised });
+  if (error) {
+    const msg = error.message.includes("voucher_not_found")
+      ? "No gift card found with that code."
+      : error.message.includes("voucher_already_redeemed")
+        ? "This gift card has already been redeemed."
+        : friendlyError(error.message);
+    throw new Error(msg);
+  }
+
+  const voucher = data as { amount: number; code: string };
+  revalidatePath("/wallet");
+  revalidatePath("/home");
+
+  if (user.email) {
+    const admin = createAdminClient();
+    const { data: wallet } = await admin.from("wallets").select("balance").eq("user_id", user.id).single();
+    const { subject, html } = giftRedeemedEmail({
+      amount: voucher.amount,
+      code: voucher.code,
+      balance: (wallet?.balance as number) ?? 0,
+    });
+    void sendEmail({ sender: "noreply", to: user.email, subject, html, replyTo: "accounts@topme.co.zw" });
+  }
+
+  return voucher;
 }
 
 // Looks up who a phone number belongs to before money moves, so the sender
