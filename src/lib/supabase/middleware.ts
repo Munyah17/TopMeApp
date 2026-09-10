@@ -43,12 +43,18 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  // getSession reads the cookie — no network round-trip. This is an optimistic
-  // check only; real authorization happens via RLS on every query.
+  // MUST be getUser(), not getSession(): getUser() validates the JWT against
+  // the auth server AND — crucially — refreshes an expired/expiring access
+  // token, writing the new token back through the setAll adapter above so
+  // both this request's downstream render and the browser get fresh cookies.
+  // getSession() only decodes the cookie and never refreshes, so once the
+  // ~1h access token lapsed, server-component RLS queries (getWallet,
+  // getRecentTransactions, …) started running unauthenticated — auth.uid()
+  // came back NULL and the customer's own wallet row was filtered out,
+  // showing a $0 balance while the DB held the real amount.
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  const user = session?.user ?? null;
+    data: { user },
+  } = await supabase.auth.getUser();
 
   const pathname = request.nextUrl.pathname;
 
