@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Icon } from "@/components/icons";
 import { fmt } from "@/lib/data/catalog-helpers";
 import { getAllServices, getCurrentProfile } from "@/lib/data/queries";
-import { getAttentionCount, getRecentFailures } from "@/lib/data/admin-queries";
+import { getAttentionCount, getPendingRefundCount, getRecentFailures } from "@/lib/data/admin-queries";
 import { createClient } from "@/lib/supabase/server";
 import type { IntegrationHealth, Transaction } from "@/types/database";
 
@@ -17,10 +17,11 @@ export async function AdminOverviewBody({ basePath }: { basePath: string }) {
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
 
-  const [{ data: recentTx }, services, attentionCount, { data: healthData }, recentFailures] = await Promise.all([
+  const [{ data: recentTx }, services, attentionCount, pendingRefunds, { data: healthData }, recentFailures] = await Promise.all([
     supabase.from("transactions").select("*").gte("created_at", since7d).order("created_at", { ascending: false }),
     getAllServices(true),
     getAttentionCount(),
+    getPendingRefundCount(),
     supabase.from("integration_health").select("*").order("id"),
     getRecentFailures(6),
   ]);
@@ -88,6 +89,23 @@ export async function AdminOverviewBody({ basePath }: { basePath: string }) {
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 700, fontSize: 13.5 }}>{attentionCount} item{attentionCount === 1 ? "" : "s"} need attention</div>
             <div className="muted" style={{ fontSize: 11.5 }}>Stuck payments or top-ups — open Operations Center</div>
+          </div>
+          <Icon name="chevronR" size={16} stroke={2} />
+        </Link>
+      )}
+
+      {pendingRefunds > 0 && (
+        <Link
+          href={`${basePath}/refunds`}
+          className="card card-pad tap row gap-2 mb-2"
+          style={{ textDecoration: "none", borderColor: "var(--warning)", background: "#FEF6E7" }}
+        >
+          <div className="ibadge round" style={{ width: 34, height: 34, background: "#fff", color: "var(--warning)" }}>
+            <Icon name="refresh" size={17} stroke={2} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 700, fontSize: 13.5 }}>{pendingRefunds} refund{pendingRefunds === 1 ? "" : "s"} awaiting a decision</div>
+            <div className="muted" style={{ fontSize: 11.5 }}>Payments that failed after charging — open Refunds</div>
           </div>
           <Icon name="chevronR" size={16} stroke={2} />
         </Link>

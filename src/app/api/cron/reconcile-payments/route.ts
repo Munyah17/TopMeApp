@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import { checkPaynowStatus } from "@/lib/payments/paynow";
 import { applyPaynowResult } from "@/lib/payments/paynow-result";
+import { reconcileFulfilments } from "@/lib/payments/reconcile-fulfilment";
 import { logTransactionEvent } from "@/lib/transaction-events";
 
 // Background reconciliation for Paynow — the safety net under an unreliable
@@ -137,10 +138,20 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  if (summary.settled || summary.noPollUrl) {
-    console.log(`[reconcile-payments] ${JSON.stringify(summary)}`);
+  // Backstop: refund any fulfilment that failed (or has been stuck pending
+  // for over a day) and doesn't already have a refund_request.
+  let fulfilment;
+  try {
+    fulfilment = await reconcileFulfilments();
+  } catch (e) {
+    console.error("[reconcile-payments] fulfilment sweep threw:", e);
+    fulfilment = { error: e instanceof Error ? e.message : "sweep failed" };
   }
-  return NextResponse.json({ ok: true, ...summary });
+
+  if (summary.settled || summary.noPollUrl || (fulfilment && "failedSwept" in fulfilment && (fulfilment.failedSwept || fulfilment.stalePendingSwept))) {
+    console.log(`[reconcile-payments] ${JSON.stringify({ ...summary, fulfilment })}`);
+  }
+  return NextResponse.json({ ok: true, ...summary, fulfilment });
 }
 
 // Same work, so a browser/curl check or an external scheduler that only does

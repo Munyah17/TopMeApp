@@ -77,6 +77,19 @@ export async function finalizeGuestCheckout(reference: string): Promise<Transact
     },
   });
 
+  // Gateway payment is captured. A failed fulfilment goes to the refund
+  // queue (guest checkouts have no wallet, so these are always manual —
+  // see 2026-09-10-fulfilment-auto-refund).
+  if (fulfillmentResult.status === "failed") {
+    const { recordFailedFulfilmentRefund } = await import("@/lib/payments/refunds");
+    await recordFailedFulfilmentRefund(admin, {
+      transactionId: tx.id,
+      reference: tx.reference,
+      serviceName: (service as { name: string } | null)?.name ?? tx.service_id,
+      reason: fulfillmentResult.message || `${provider.name} could not fulfil this order.`,
+    });
+  }
+
   const finalTx = (updatedTx as Transaction) ?? tx;
 
   if (finalTx.guest_email) {

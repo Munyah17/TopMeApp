@@ -156,6 +156,19 @@ export async function payService(input: PayServiceInput) {
     },
   });
 
+  // The wallet is already debited. If fulfilment failed outright, put the
+  // money back now — automatically for a small wallet failure, or into the
+  // staff approval queue otherwise (see 2026-09-10-fulfilment-auto-refund).
+  if (fulfillmentResult.status === "failed") {
+    const { recordFailedFulfilmentRefund } = await import("@/lib/payments/refunds");
+    await recordFailedFulfilmentRefund(admin, {
+      transactionId: tx.id,
+      reference: tx.reference,
+      serviceName: input.serviceName,
+      reason: fulfillmentResult.message || `${provider.name} could not fulfil this order.`,
+    });
+  }
+
   if (input.saveBeneficiary) {
     await supabase.from("beneficiaries").insert({
       user_id: user.id,

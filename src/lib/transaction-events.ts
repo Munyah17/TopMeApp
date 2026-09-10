@@ -12,7 +12,9 @@ export type TransactionEventType =
   | "fulfillment_started"
   | "fulfillment_success"
   | "fulfillment_failed"
-  | "webhook_received";
+  | "webhook_received"
+  | "refund"
+  | "refund_error";
 
 export async function logTransactionEvent(
   admin: SupabaseClient,

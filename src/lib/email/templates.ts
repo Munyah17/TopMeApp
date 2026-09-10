@@ -384,6 +384,87 @@ export function topupFailedEmail(opts: { amount: number; provider: string }) {
   };
 }
 
+// Fulfilment failed AFTER the wallet was charged, and we've automatically
+// put the money back. (Different from paymentFailedEmail, which is for a
+// failure where nothing was ever deducted.)
+export function refundIssuedEmail(opts: { serviceName: string; amount: number; reference: string; balance: number }) {
+  return {
+    subject: `Refunded: ${money(opts.amount)} back in your wallet`,
+    html: layout({
+      preheader: `We couldn't complete your ${opts.serviceName} order, so ${money(opts.amount)} is back in your TopMe wallet.`,
+      title: "Payment reversed",
+      accent: "success",
+      intro: `We couldn't complete your ${esc(opts.serviceName)} order, so we've put the full ${esc(money(opts.amount))} straight back into your TopMe wallet.`,
+      content: `
+        ${hero(opts.amount, "Refunded to wallet")}
+        ${rows([
+          ["Service", opts.serviceName],
+          ["Original reference", opts.reference],
+          ["New wallet balance", money(opts.balance)],
+          ["Status", "Refunded"],
+        ])}
+        ${note("Nothing more is needed from you. You can use the balance for another purchase, or withdraw it from your wallet.")}
+      `,
+      cta: { label: "Open wallet", url: `${APP_URL}/wallet` },
+    }),
+  };
+}
+
+// Fulfilment failed after payment and the refund is larger than the
+// auto-refund limit (or it was a guest checkout) — it's with the team.
+export function refundQueuedEmail(opts: { serviceName: string; amount: number; reference: string }) {
+  return {
+    subject: `We're sorting out your ${opts.serviceName} payment`,
+    html: layout({
+      preheader: `Your ${money(opts.amount)} ${opts.serviceName} order couldn't be completed — our team is processing your refund.`,
+      title: "We're on it",
+      accent: "warning",
+      intro: `Your ${esc(money(opts.amount))} ${esc(opts.serviceName)} order couldn't be completed. Because of the amount, a team member is reviewing your refund now.`,
+      content: `
+        ${rows([
+          ["Service", opts.serviceName],
+          ["Amount", money(opts.amount)],
+          ["Reference", opts.reference],
+          ["Status", "Refund in review"],
+        ])}
+        ${note("You'll get another email the moment it's done — usually within a few hours. No action needed from you.")}
+      `,
+      cta: { label: "View in TopMe", url: `${APP_URL}/history` },
+    }),
+  };
+}
+
+// Sent to the ops inbox whenever a fulfilment fails after payment.
+export function staffFulfilmentFailureEmail(opts: {
+  serviceName: string;
+  reference: string;
+  amount: number;
+  reason: string;
+  refundState: "auto-refunded" | "needs approval";
+  customer: string;
+}) {
+  return {
+    subject: `[Ops] Fulfilment failed — ${opts.reference} (${opts.refundState})`,
+    html: layout({
+      preheader: `${opts.serviceName} ${money(opts.amount)} failed after payment — ${opts.refundState}.`,
+      title: "Fulfilment failed after payment",
+      accent: opts.refundState === "auto-refunded" ? "warning" : "danger",
+      intro: `A ${esc(opts.serviceName)} order failed at the provider after the customer had paid.`,
+      content: `
+        ${rows([
+          ["Reference", opts.reference],
+          ["Service", opts.serviceName],
+          ["Amount", money(opts.amount)],
+          ["Customer", opts.customer],
+          ["Provider error", opts.reason],
+          ["Refund", opts.refundState === "auto-refunded" ? "Auto-refunded to wallet" : "Queued — needs an admin decision"],
+        ])}
+      `,
+      cta: { label: "Open Refunds console", url: `${APP_URL}/super-admin/refunds` },
+    }),
+  };
+}
+
 export function paymentFailedEmail(opts: { serviceName: string; amount: number; reason: string }) {
   return {
     subject: `Payment failed: ${opts.serviceName}`,

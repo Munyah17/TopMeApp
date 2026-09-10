@@ -184,3 +184,66 @@ export async function getAttentionCount(): Promise<number> {
   const { stuckTransactions, stuckTopups, stuckGuestCheckouts } = await getAttentionQueue();
   return stuckTransactions.length + stuckTopups.length + stuckGuestCheckouts.length;
 }
+
+export interface RefundRequestView {
+  id: string;
+  transaction_id: string;
+  user_id: string | null;
+  guest_email: string | null;
+  amount: number;
+  reason: string;
+  origin: string;
+  status: "pending" | "paid" | "approved" | "rejected";
+  auto_eligible: boolean;
+  refund_reference: string | null;
+  requested_at: string;
+  decided_at: string | null;
+  decision_note: string | null;
+  reference: string | null;
+  service_id: string | null;
+  customer_name: string | null;
+}
+
+// Refunds console (/super-admin/refunds + /admin/refunds). `since` limits
+// the settled history; the pending/approved queue is always returned in full.
+export async function getRefundRequests(sinceDays = 30): Promise<RefundRequestView[]> {
+  const supabase = await createClient();
+  const since = new Date(Date.now() - sinceDays * 86400_000).toISOString();
+
+  const { data, error } = await supabase
+    .from("refund_requests")
+    .select("*")
+    .or(`status.in.(pending,approved),requested_at.gte.${since}`)
+    .order("requested_at", { ascending: false })
+    .limit(300);
+  if (error) return []; // table not migrated yet
+
+  const rows = (data as Omit<RefundRequestView, "reference" | "service_id" | "customer_name">[]) ?? [];
+  if (rows.length === 0) return [];
+
+  const txIds = [...new Set(rows.map((r) => r.transaction_id))];
+  const userIds = [...new Set(rows.map((r) => r.user_id).filter((v): v is string => !!v))];
+  const [{ data: txs }, { data: profiles }] = await Promise.all([
+    supabase.from("transactions").select("id, reference, service_id").in("id", txIds),
+    userIds.length ? supabase.from("profiles").select("id, full_name").in("id", userIds) : Promise.resolve({ data: [] }),
+  ]);
+  const txById = new Map((txs ?? []).map((t) => [t.id, t]));
+  const nameById = new Map((profiles ?? []).map((p) => [p.id, p.full_name as string | null]));
+
+  return rows.map((r) => ({
+    ...r,
+    reference: txById.get(r.transaction_id)?.reference ?? null,
+    service_id: txById.get(r.transaction_id)?.service_id ?? null,
+    customer_name: r.user_id ? nameById.get(r.user_id) ?? null : null,
+  }));
+}
+
+export async function getPendingRefundCount(): Promise<number> {
+  const supabase = await createClient();
+  const { count, error } = await supabase
+    .from("refund_requests")
+    .select("id", { count: "exact", head: true })
+    .in("status", ["pending", "approved"]);
+  if (error) return 0; // table not migrated yet
+  return count ?? 0;
+}

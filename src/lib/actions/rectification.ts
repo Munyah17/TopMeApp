@@ -12,6 +12,9 @@ const FRIENDLY_ERRORS: Record<string, string> = {
   transaction_not_found: "That transaction couldn't be found.",
   guest_refund_not_supported: "This was a guest checkout — there's no TopMe wallet to refund into. Use the gateway's own dashboard (Paynow/Stripe/EcoCash) for a real refund.",
   already_rectified: "This transaction has already been refunded.",
+  refund_not_found: "That refund request couldn't be found.",
+  already_resolved: "This refund has already been resolved.",
+  not_approved: "This refund isn't in the approved state.",
 };
 
 function friendlyError(message: string) {
@@ -108,6 +111,20 @@ export async function retryFulfillment(transactionId: string, note: string) {
     },
   });
 
+  // Retry failed again — make sure a refund request exists for it (no-op if
+  // one already does).
+  if (fulfillmentResult.status === "failed") {
+    const { data: svc } = await admin.from("services").select("name").eq("id", transaction.service_id).single();
+    const { recordFailedFulfilmentRefund } = await import("@/lib/payments/refunds");
+    await recordFailedFulfilmentRefund(admin, {
+      transactionId: transaction.id,
+      reference: transaction.reference,
+      serviceName: (svc as { name: string } | null)?.name ?? transaction.service_id,
+      reason: fulfillmentResult.message || `${provider.name} could not fulfil this order.`,
+      origin: "staff",
+    });
+  }
+
   await admin.from("admin_audit_log").insert({
     actor_id: user.id,
     action: "transaction.retry_fulfillment",
@@ -118,6 +135,37 @@ export async function retryFulfillment(transactionId: string, note: string) {
 
   revalidate(transactionId);
   return (updated as Transaction) ?? transaction;
+}
+
+// Approve (pay) or reject a queued refund. A wallet-backed approval credits
+// the customer's wallet immediately; a guest approval just marks it
+// "approved" — staff then settle it on a rail and call markRefundSettled.
+export async function decideRefundRequest(refundId: string, approve: boolean, note: string) {
+  await requirePermission("transactions.rectify");
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("decide_refund_request", {
+    p_refund_id: refundId,
+    p_approve: approve,
+    p_note: note || null,
+  });
+  if (error) throw new Error(friendlyError(error.message));
+  revalidateAdminPath("/refunds");
+  revalidateAdminPath("/operations");
+  return data;
+}
+
+// Guest refunds only: mark an approved request as settled after paying the
+// customer out of band (EcoCash / bank / cash).
+export async function markRefundSettled(refundId: string, note: string) {
+  await requirePermission("transactions.rectify");
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("mark_refund_settled", {
+    p_refund_id: refundId,
+    p_note: note || null,
+  });
+  if (error) throw new Error(friendlyError(error.message));
+  revalidateAdminPath("/refunds");
+  return data;
 }
 
 export async function adjustWallet(userId: string, amount: number, reason: string) {
