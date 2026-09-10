@@ -72,6 +72,17 @@ export async function setNetworkLogo(networkId: string, logoUrl: string | null) 
   revalidateCatalog();
 }
 
+// Show / hide a network on the customer-facing airtime flow. Deactivate a
+// network with no working provider (e.g. Telecel) so a customer can never
+// start a purchase that's guaranteed to fail.
+export async function setNetworkActive(networkId: string, isActive: boolean) {
+  await requirePermission("catalog.manage");
+  const admin = createAdminClient();
+  const { error } = await admin.from("networks").update({ is_active: isActive }).eq("id", networkId);
+  if (error) throw new Error(error.message);
+  revalidateCatalog();
+}
+
 export async function createApiModule(input: {
   name: string;
   provider: string;

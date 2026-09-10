@@ -66,10 +66,11 @@ create index if not exists wallet_ledger_user_idx on public.wallet_ledger(user_i
 
 -- ── Catalog ─────────────────────────────────────────────
 create table if not exists public.networks (
-  id       text primary key,
-  name     text not null,
-  color    text not null,
-  logo_url text
+  id        text primary key,
+  name      text not null,
+  color     text not null,
+  logo_url  text,
+  is_active boolean not null default true
 );
 
 create table if not exists public.service_categories (

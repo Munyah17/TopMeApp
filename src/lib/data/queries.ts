@@ -29,11 +29,27 @@ import type {
 // already grants it broadly to any authenticated caller), and
 // unstable_cache's callback can't depend on the current request's cookies
 // the way the session-scoped client does.
+// Every network in the table, active or not — for the admin/super-admin
+// catalog screens only. `is_active` may be absent until the
+// 2026-09-10-network-active-toggle migration runs; treat missing as true.
+export const getAllNetworks = unstable_cache(
+  async (): Promise<Network[]> => {
+    const admin = createAdminClient();
+    const { data } = await admin.from("networks").select("*");
+    return ((data as Network[]) ?? []).map((n) => ({ ...n, is_active: n.is_active ?? true }));
+  },
+  ["networks-all"],
+  { tags: ["catalog"], revalidate: 300 }
+);
+
+// Customer-facing: only networks a provider can actually fulfil right now.
 export const getNetworks = unstable_cache(
   async (): Promise<Network[]> => {
     const admin = createAdminClient();
     const { data } = await admin.from("networks").select("*");
-    return (data as Network[]) ?? [];
+    return ((data as Network[]) ?? [])
+      .map((n) => ({ ...n, is_active: n.is_active ?? true }))
+      .filter((n) => n.is_active);
   },
   ["networks"],
   { tags: ["catalog"], revalidate: 300 }

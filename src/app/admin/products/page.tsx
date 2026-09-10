@@ -1,6 +1,6 @@
 import { NetworksManager } from "@/components/admin/networks-manager";
 import { ProductsClient } from "@/components/admin/products-client";
-import { getAllServices, getCategories, getNetworks } from "@/lib/data/queries";
+import { getAllNetworks, getAllServices, getCategories } from "@/lib/data/queries";
 import { getMyPermissions } from "@/lib/auth/permissions";
 
 export default async function ProductsPage() {
@@ -12,7 +12,7 @@ export default async function ProductsPage() {
   const [categories, services, networks] = await Promise.all([
     getCategories(),
     getAllServices(true),
-    getNetworks(),
+    getAllNetworks(),
   ]);
 
   return (

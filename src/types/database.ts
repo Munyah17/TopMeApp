@@ -53,6 +53,7 @@ export interface Network {
   name: string;
   color: string;
   logo_url: string | null;
+  is_active: boolean;
 }
 
 export interface ServiceCategory {

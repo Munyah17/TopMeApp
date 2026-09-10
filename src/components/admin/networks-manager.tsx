@@ -4,7 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icons";
 import { hexA } from "@/lib/data/catalog-helpers";
-import { setNetworkLogo, uploadNetworkLogo } from "@/lib/actions/admin";
+import { setNetworkActive, setNetworkLogo, uploadNetworkLogo } from "@/lib/actions/admin";
 import type { Network } from "@/types/database";
 
 function NetworkRow({ network }: { network: Network }) {
@@ -33,7 +33,7 @@ function NetworkRow({ network }: { network: Network }) {
   }
 
   return (
-    <div className="row gap-2" style={{ padding: "12px 16px", borderBottom: "1px solid var(--border)" }}>
+    <div className="row gap-2" style={{ padding: "12px 16px", borderBottom: "1px solid var(--border)", opacity: network.is_active ? 1 : 0.55 }}>
       <div
         style={{
           width: 44,
@@ -60,15 +60,42 @@ function NetworkRow({ network }: { network: Network }) {
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 700, fontSize: 13.5 }}>{network.name}</div>
+        <div style={{ fontWeight: 700, fontSize: 13.5 }}>
+          {network.name}
+          {!network.is_active && (
+            <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: "var(--warning)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+              Hidden
+            </span>
+          )}
+        </div>
         <div className="muted" style={{ fontSize: 11.5 }}>
-          {network.logo_url ? "Custom logo set" : "Using lettered fallback"}
+          {network.is_active ? "Live for customers" : "Not shown to customers"} · {network.logo_url ? "logo set" : "lettered fallback"}
         </div>
         {error && (
           <div className="muted" style={{ color: "var(--error)", fontSize: 11 }}>
             {error}
           </div>
         )}
+      </div>
+
+      <div
+        className={`toggle ${network.is_active ? "on" : ""} tap`}
+        title={network.is_active ? "Live: customers can select this network" : "Hidden from customers"}
+        onClick={() =>
+          startTransition(async () => {
+            setBusy(true);
+            try {
+              await setNetworkActive(network.id, !network.is_active);
+              router.refresh();
+            } catch (e) {
+              setError(e instanceof Error ? e.message : "Couldn't update.");
+            } finally {
+              setBusy(false);
+            }
+          })
+        }
+      >
+        <div className="knob" />
       </div>
 
       <input
