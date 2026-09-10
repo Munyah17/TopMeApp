@@ -508,10 +508,14 @@ create policy profiles_update_own on public.profiles for update using (auth.uid(
 -- wallets: read-only to the owner, all writes go through the RPCs above
 drop policy if exists wallets_select_own on public.wallets;
 create policy wallets_select_own on public.wallets for select using (auth.uid() = user_id);
+drop policy if exists wallets_select_admin on public.wallets;
+create policy wallets_select_admin on public.wallets for select using (public.is_admin(auth.uid()));
 
 -- wallet_ledger: read-only to the owner
 drop policy if exists wallet_ledger_select_own on public.wallet_ledger;
 create policy wallet_ledger_select_own on public.wallet_ledger for select using (auth.uid() = user_id);
+drop policy if exists wallet_ledger_select_admin on public.wallet_ledger;
+create policy wallet_ledger_select_admin on public.wallet_ledger for select using (public.is_admin(auth.uid()));
 
 -- catalog tables: readable by any authenticated user, writable only by superadmin
 drop policy if exists networks_select on public.networks;

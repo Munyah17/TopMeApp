@@ -6,7 +6,7 @@ import { RedeemPanel } from "@/components/wallet/redeem-panel";
 import { TopupPanel } from "@/components/wallet/topup-panel";
 import { WithdrawPanel } from "@/components/wallet/withdraw-panel";
 import { fmt } from "@/lib/data/catalog-helpers";
-import { getCurrentProfile, getMyWithdrawals, getWallet, getWalletLedger } from "@/lib/data/queries";
+import { getCurrentProfile, getMyWallet, getMyWithdrawals, getWalletLedger } from "@/lib/data/queries";
 
 const LEDGER_LABEL: Record<string, string> = {
   topup: "Wallet top up",
@@ -36,7 +36,7 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
     );
   }
   const [wallet, ledger, withdrawals] = await Promise.all([
-    getWallet(profile.id),
+    getMyWallet(profile.id),
     getWalletLedger(profile.id, 10),
     getMyWithdrawals(profile.id, 6),
   ]);

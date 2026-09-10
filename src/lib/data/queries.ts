@@ -100,6 +100,41 @@ export async function getWallet(userId: string): Promise<Wallet | null> {
   return (data as Wallet) ?? null;
 }
 
+// The logged-in customer's own wallet, for the pages where a wrong number
+// is a real problem (wallet screen, checkout). Tries the session client
+// first; if RLS returns nothing — which happens transiently when the
+// access token is mid-refresh — it re-reads with the service client.
+// `profileId` is only ever the caller's own id (resolved from their
+// validated session), so the fallback exposes nothing extra.
+export async function getMyWallet(profileId: string): Promise<Wallet | null> {
+  const own = await getWallet(profileId);
+  if (own) return own;
+  const admin = createAdminClient();
+  const { data } = await admin.from("wallets").select("*").eq("user_id", profileId).maybeSingle();
+  return (data as Wallet) ?? null;
+}
+
+// Admin-side reads of ANOTHER customer's wallet. `wallets` / `wallet_ledger`
+// only carry a *_select_own RLS policy, so the session-scoped client returns
+// nothing for a staff member looking at a customer — these use the service
+// client instead (the calling admin page already gates on getMyPermissions).
+export async function getWalletForAdmin(userId: string): Promise<Wallet | null> {
+  const admin = createAdminClient();
+  const { data } = await admin.from("wallets").select("*").eq("user_id", userId).maybeSingle();
+  return (data as Wallet) ?? null;
+}
+
+export async function getWalletLedgerForAdmin(userId: string, limit = 15) {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("wallet_ledger")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  return (data as import("@/types/database").WalletLedgerRow[]) ?? [];
+}
+
 export async function getMyWithdrawals(userId: string, limit = 8): Promise<Withdrawal[]> {
   const supabase = await createClient();
   const { data, error } = await supabase

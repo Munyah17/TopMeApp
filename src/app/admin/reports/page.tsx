@@ -1,7 +1,7 @@
 import { fmt } from "@/lib/data/catalog-helpers";
 import { getAllServices, getCategories } from "@/lib/data/queries";
 import { getMyPermissions } from "@/lib/auth/permissions";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 import type { Transaction, WalletLedgerRow } from "@/types/database";
 
 const RANGE_OPTIONS = [
@@ -23,9 +23,12 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const sinceIso = since.toISOString();
 
   const supabase = await createClient();
+  // wallet_ledger has no *_select_admin RLS policy, so the session client
+  // returns nothing here for staff — read it with the service client.
+  const admin = createAdminClient();
   const [{ data: txData }, { data: ledgerData }, { data: disputeData }, { data: ticketData }, services, categories] = await Promise.all([
     supabase.from("transactions").select("*").gte("created_at", sinceIso).order("created_at", { ascending: false }),
-    supabase.from("wallet_ledger").select("*").in("type", ["refund", "adjustment"]).gte("created_at", sinceIso),
+    admin.from("wallet_ledger").select("*").in("type", ["refund", "adjustment"]).gte("created_at", sinceIso),
     supabase.from("disputes").select("id, status").gte("created_at", sinceIso),
     supabase.from("support_tickets").select("id, status").gte("created_at", sinceIso),
     getAllServices(true),

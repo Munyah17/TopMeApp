@@ -5,7 +5,7 @@ import { PromoteSuperadminForm } from "@/components/admin/promote-superadmin-for
 import { UserSuspendButton } from "@/components/admin/user-suspend-button";
 import { WalletAdjustForm } from "@/components/admin/wallet-adjust-form";
 import { fmt } from "@/lib/data/catalog-helpers";
-import { getCurrentProfile, getRecentTransactions, getWallet, getWalletLedger } from "@/lib/data/queries";
+import { getCurrentProfile, getRecentTransactions, getWalletForAdmin, getWalletLedgerForAdmin } from "@/lib/data/queries";
 import { getMyPermissions } from "@/lib/auth/permissions";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile } from "@/types/database";
@@ -24,8 +24,8 @@ export async function UserDetailBody({ id, basePath }: { id: string; basePath: s
   const target = profile as Profile;
 
   const [wallet, ledger, transactions, { data: withdrawals }, { data: refunds }] = await Promise.all([
-    getWallet(id),
-    getWalletLedger(id, 15),
+    getWalletForAdmin(id),
+    getWalletLedgerForAdmin(id, 15),
     getRecentTransactions(id, 10),
     supabase.from("withdrawals").select("*").eq("user_id", id).order("requested_at", { ascending: false }).limit(5),
     supabase.from("refund_requests").select("*").eq("user_id", id).order("requested_at", { ascending: false }).limit(5),

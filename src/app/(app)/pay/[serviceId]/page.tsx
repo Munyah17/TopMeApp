@@ -8,7 +8,7 @@ import { ZesaFlow } from "@/components/payment-flow/zesa-flow";
 import { ServiceUnavailable } from "@/components/service-unavailable";
 import { hasRealCoverage } from "@/lib/fulfillment";
 import { getPublicSetting } from "@/lib/data/flags";
-import { getAirtimeOperatorRules, getCurrentProfile, getDataBundles, getNetworks, getService, getTvPackages, getWallet } from "@/lib/data/queries";
+import { getAirtimeOperatorRules, getCurrentProfile, getDataBundles, getMyWallet, getNetworks, getService, getTvPackages } from "@/lib/data/queries";
 import { createAdminClient } from "@/lib/supabase/server";
 import type { ApiModuleSafe } from "@/types/database";
 
@@ -41,7 +41,7 @@ export default async function PayPage({ params }: { params: Promise<{ serviceId:
     service.amount_mode === "bundles" ? getDataBundles() : Promise.resolve([]),
     service.amount_mode === "packages" ? getTvPackages() : Promise.resolve([]),
     service.needs_network ? getNetworks() : Promise.resolve([]),
-    profile ? getWallet(profile.id) : Promise.resolve(null),
+    profile ? getMyWallet(profile.id) : Promise.resolve(null),
     getPublicSetting<Record<string, string>>("payment_method_banners"),
     service.id === "airtime" ? getAirtimeOperatorRules() : Promise.resolve({}),
   ]);
