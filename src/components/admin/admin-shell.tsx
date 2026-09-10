@@ -25,6 +25,7 @@ const NAV: NavGroup[] = [
     items: [
       { label: "Operations Center", href: "/admin/operations", icon: "zap", perm: "transactions.view" },
       { label: "Refunds", href: "/admin/refunds", icon: "refresh", perm: "transactions.rectify" },
+      { label: "Withdrawals", href: "/admin/withdrawals", icon: "arrowUpR", perm: "wallet.adjust" },
       { label: "Transactions", href: "/admin/transactions", icon: "wallet", perm: "transactions.view" },
       { label: "Disputes", href: "/admin/disputes", icon: "shield", perm: "disputes.manage" },
       { label: "Support Tickets", href: "/admin/support", icon: "headset", perm: "support.manage" },

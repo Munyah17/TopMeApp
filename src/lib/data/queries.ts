@@ -15,6 +15,7 @@ import type {
   Transaction,
   TvPackage,
   Wallet,
+  Withdrawal,
 } from "@/types/database";
 
 // Networks/categories/all-services barely ever change (an admin editing the
@@ -97,6 +98,18 @@ export async function getWallet(userId: string): Promise<Wallet | null> {
   const supabase = await createClient();
   const { data } = await supabase.from("wallets").select("*").eq("user_id", userId).single();
   return (data as Wallet) ?? null;
+}
+
+export async function getMyWithdrawals(userId: string, limit = 8): Promise<Withdrawal[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("withdrawals")
+    .select("*")
+    .eq("user_id", userId)
+    .order("requested_at", { ascending: false })
+    .limit(limit);
+  if (error) return []; // table not migrated yet
+  return (data as Withdrawal[]) ?? [];
 }
 
 export const getCategories = unstable_cache(

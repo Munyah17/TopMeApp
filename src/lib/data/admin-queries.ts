@@ -247,3 +247,53 @@ export async function getPendingRefundCount(): Promise<number> {
   if (error) return 0; // table not migrated yet
   return count ?? 0;
 }
+
+export interface WithdrawalView {
+  id: string;
+  user_id: string;
+  amount: number;
+  fee: number;
+  net: number;
+  rail: string;
+  rail_details: Record<string, string>;
+  status: "requested" | "approved" | "paid" | "rejected" | "cancelled";
+  reference: string;
+  external_ref: string | null;
+  requested_at: string;
+  decided_at: string | null;
+  note: string | null;
+  customer_name: string | null;
+  customer_phone: string | null;
+}
+
+export async function getWithdrawals(sinceDays = 30): Promise<WithdrawalView[]> {
+  const supabase = await createClient();
+  const since = new Date(Date.now() - sinceDays * 86400_000).toISOString();
+  const { data, error } = await supabase
+    .from("withdrawals")
+    .select("*")
+    .or(`status.in.(requested,approved),requested_at.gte.${since}`)
+    .order("requested_at", { ascending: false })
+    .limit(300);
+  if (error) return [];
+  const rows = (data as Omit<WithdrawalView, "customer_name" | "customer_phone">[]) ?? [];
+  if (rows.length === 0) return [];
+  const userIds = [...new Set(rows.map((r) => r.user_id))];
+  const { data: profiles } = await supabase.from("profiles").select("id, full_name, phone").in("id", userIds);
+  const byId = new Map((profiles ?? []).map((p) => [p.id, p]));
+  return rows.map((r) => ({
+    ...r,
+    customer_name: (byId.get(r.user_id)?.full_name as string) ?? null,
+    customer_phone: (byId.get(r.user_id)?.phone as string) ?? null,
+  }));
+}
+
+export async function getPendingWithdrawalCount(): Promise<number> {
+  const supabase = await createClient();
+  const { count, error } = await supabase
+    .from("withdrawals")
+    .select("id", { count: "exact", head: true })
+    .in("status", ["requested", "approved"]);
+  if (error) return 0;
+  return count ?? 0;
+}

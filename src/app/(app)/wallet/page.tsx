@@ -3,8 +3,9 @@ import { AuthRequired } from "@/components/auth-required";
 import { Icon } from "@/components/icons";
 import { PaynowTopupStatus } from "@/components/wallet/paynow-topup-status";
 import { TopupPanel } from "@/components/wallet/topup-panel";
+import { WithdrawPanel } from "@/components/wallet/withdraw-panel";
 import { fmt } from "@/lib/data/catalog-helpers";
-import { getCurrentProfile, getWallet, getWalletLedger } from "@/lib/data/queries";
+import { getCurrentProfile, getMyWithdrawals, getWallet, getWalletLedger } from "@/lib/data/queries";
 
 const LEDGER_LABEL: Record<string, string> = {
   topup: "Wallet top up",
@@ -14,6 +15,9 @@ const LEDGER_LABEL: Record<string, string> = {
   gift_redeem: "Gift voucher redeemed",
   p2p_send: "Money sent",
   p2p_receive: "Money received",
+  adjustment: "Balance adjustment",
+  withdrawal: "Withdrawal",
+  withdrawal_reversal: "Withdrawal reversed",
 };
 
 export default async function WalletPage({ searchParams }: { searchParams: Promise<{ paynow_ref?: string }> }) {
@@ -30,7 +34,13 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
       </div>
     );
   }
-  const [wallet, ledger] = await Promise.all([getWallet(profile.id), getWalletLedger(profile.id, 10)]);
+  const [wallet, ledger, withdrawals] = await Promise.all([
+    getWallet(profile.id),
+    getWalletLedger(profile.id, 10),
+    getMyWithdrawals(profile.id, 6),
+  ]);
+  const giftLocked = wallet?.gift_locked ?? 0;
+  const withdrawable = Math.max(0, (wallet?.balance ?? 0) - giftLocked);
 
   return (
     <div className="px content-wrap" style={{ paddingTop: 6 }}>
@@ -64,6 +74,13 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
           </div>
           <div className="card card-pad">
             <TopupPanel userPhone={profile.phone} />
+          </div>
+
+          <div className="row between mt-3 mb-2">
+            <span className="section-title">Withdraw</span>
+          </div>
+          <div className="card card-pad">
+            <WithdrawPanel withdrawable={withdrawable} giftLocked={giftLocked} withdrawals={withdrawals} />
           </div>
         </div>
 

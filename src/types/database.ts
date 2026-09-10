@@ -33,13 +33,41 @@ export interface Profile {
 export interface Wallet {
   user_id: string;
   balance: number;
+  /** Portion of `balance` that came from gift vouchers — spendable on TopMe, not withdrawable. Absent until the withdrawals migration runs. */
+  gift_locked?: number;
   updated_at: string;
+}
+
+export interface Withdrawal {
+  id: string;
+  user_id: string;
+  amount: number;
+  fee: number;
+  net: number;
+  rail: "bank_transfer" | "zipit" | "ecocash" | "innbucks" | "omari";
+  rail_details: Record<string, string>;
+  status: "requested" | "approved" | "paid" | "rejected" | "cancelled";
+  reference: string;
+  external_ref: string | null;
+  requested_at: string;
+  decided_at: string | null;
+  note: string | null;
 }
 
 export interface WalletLedgerRow {
   id: string;
   user_id: string;
-  type: "topup" | "debit" | "refund" | "gift_send" | "gift_redeem" | "p2p_send" | "p2p_receive" | "adjustment";
+  type:
+    | "topup"
+    | "debit"
+    | "refund"
+    | "gift_send"
+    | "gift_redeem"
+    | "p2p_send"
+    | "p2p_receive"
+    | "adjustment"
+    | "withdrawal"
+    | "withdrawal_reversal";
   amount: number;
   provider: string | null;
   reference: string | null;
