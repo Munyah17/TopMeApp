@@ -110,17 +110,24 @@ export function DenomTile({ amount, selected, onClick }: { amount: number; selec
 }
 
 export function NetworkTile({ network, selected, onClick }: { network: Network; selected: boolean; onClick: () => void }) {
+  const hasLogo = !!network.logo_url;
   return (
     <button
       type="button"
       className="tap"
       onClick={onClick}
       aria-pressed={selected}
+      aria-label={network.name}
       style={{
         flex: "1 1 100px",
-        padding: "16px 12px",
+        minHeight: 88,
+        padding: hasLogo ? "14px 16px" : "16px 12px",
         borderRadius: 14,
-        textAlign: "center",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: hasLogo ? 0 : 8,
         cursor: "pointer",
         font: "inherit",
         border: `1px solid ${selected ? "var(--green)" : "var(--border)"}`,
@@ -129,37 +136,36 @@ export function NetworkTile({ network, selected, onClick }: { network: Network; 
         transition: "border-color 160ms ease, background 160ms ease, box-shadow 160ms ease",
       }}
     >
-      <div
-        style={{
-          width: 44,
-          height: 44,
-          borderRadius: 12,
-          margin: "0 auto 8px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          overflow: "hidden",
-          background: network.logo_url ? "var(--surface)" : network.color,
-          border: network.logo_url ? "1px solid var(--border)" : "none",
-          color: "#fff",
-          fontWeight: 800,
-          fontSize: 16,
-        }}
-      >
-        {network.logo_url ? (
-          // eslint-disable-next-line @next/next/no-img-element -- admin-uploaded operator logo, arbitrary host
-          <img
-            src={network.logo_url}
-            alt={network.name}
-            loading="lazy"
-            decoding="async"
-            style={{ width: "100%", height: "100%", objectFit: "contain" }}
-          />
-        ) : (
-          network.name.slice(0, 1)
-        )}
-      </div>
-      <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text-primary)" }}>{network.name}</div>
+      {hasLogo ? (
+        // eslint-disable-next-line @next/next/no-img-element -- admin-uploaded operator logo, own Supabase Storage
+        <img
+          src={network.logo_url!}
+          alt={network.name}
+          loading="lazy"
+          decoding="async"
+          style={{ width: "100%", height: 44, objectFit: "contain" }}
+        />
+      ) : (
+        <>
+          <div
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 12,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: network.color,
+              color: "#fff",
+              fontWeight: 800,
+              fontSize: 16,
+            }}
+          >
+            {network.name.slice(0, 1)}
+          </div>
+          <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text-primary)" }}>{network.name}</div>
+        </>
+      )}
     </button>
   );
 }

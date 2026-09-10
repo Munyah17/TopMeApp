@@ -39,7 +39,7 @@ export const getAllNetworks = unstable_cache(
     const { data } = await admin.from("networks").select("*");
     return ((data as Network[]) ?? []).map((n) => ({ ...n, is_active: n.is_active ?? true }));
   },
-  ["networks-all"],
+  ["networks-all-2"],
   { tags: ["catalog"], revalidate: 300 }
 );
 
@@ -71,7 +71,7 @@ export const getNetworks = unstable_cache(
       .map((n) => ({ ...n, is_active: n.is_active ?? true }))
       .filter((n) => n.is_active);
   },
-  ["networks"],
+  ["networks-2"],
   { tags: ["catalog"], revalidate: 300 }
 );
 
