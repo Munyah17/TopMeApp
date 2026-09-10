@@ -54,27 +54,16 @@ export default async function HistoryPage({
 
   return (
     <div className="px content-wrap" style={{ paddingTop: 6 }}>
-      <h2 style={{ fontSize: 20 }}>History</h2>
+      <h2 style={{ fontSize: 22, letterSpacing: "-0.02em" }}>History</h2>
 
-      <form method="get" className="row gap-2 mt-2 mb-2">
-        <div
-          style={{
-            flex: 1,
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            background: "#fff",
-            border: "1.5px solid var(--border)",
-            borderRadius: 14,
-            padding: "11px 14px",
-          }}
-        >
+      <form method="get" className="row gap-2 mt-3 mb-2">
+        <div className="header-search" style={{ flex: 1, maxWidth: "none", cursor: "text" }}>
           <Icon name="search" size={16} stroke={2} />
           <input
             name="q"
             defaultValue={q}
             placeholder="Search history"
-            style={{ border: "none", outline: "none", fontFamily: "inherit", fontWeight: 600, fontSize: 13.5, flex: 1, background: "transparent" }}
+            style={{ border: "none", outline: "none", fontFamily: "inherit", fontWeight: 500, fontSize: 13.5, flex: 1, background: "transparent", color: "var(--text-primary)" }}
           />
         </div>
         <input type="hidden" name="filter" value={filter} />
@@ -97,24 +86,24 @@ export default async function HistoryPage({
       </div>
 
       {groups.size === 0 ? (
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "50px 20px" }}>
-          <div
-            style={{
-              width: 74,
-              height: 74,
-              borderRadius: 22,
-              background: "var(--badge-neutral-bg)",
-              color: "var(--text-faint)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Icon name="search" size={32} stroke={1.6} />
-          </div>
-          <div style={{ fontWeight: 700, fontSize: 15, marginTop: 16 }}>No transactions found</div>
-          <div className="muted mt-1" style={{ maxWidth: 230 }}>
-            Try a different search term or filter.
+        <div className="card">
+          <div className="empty-state">
+            <div className="empty-state-icon">
+              <Icon name={transactions.length === 0 ? "clock" : "search"} size={20} stroke={1.8} />
+            </div>
+            <div className="empty-state-title">
+              {transactions.length === 0 ? "No transactions yet" : "Nothing matches"}
+            </div>
+            <div className="empty-state-text">
+              {transactions.length === 0
+                ? "Payments and top-ups you make will show up here."
+                : "Try a different search term or filter."}
+            </div>
+            {transactions.length === 0 && (
+              <Link href="/services" className="btn btn-secondary tap" style={{ marginTop: 8, height: 40, textDecoration: "none" }}>
+                Browse services
+              </Link>
+            )}
           </div>
         </div>
       ) : (
@@ -136,17 +125,34 @@ export default async function HistoryPage({
                       <Icon name={svc?.icon || "wallet"} size={20} stroke={1.8} />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 13.5 }}>{svc?.name || t.service_id}</div>
+                      <div style={{ fontWeight: 600, fontSize: 13.5, letterSpacing: "-0.01em" }}>{svc?.name || t.service_id}</div>
                       <div className="muted">
                         {new Date(t.created_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })} · {t.reference}
                       </div>
                     </div>
-                    <div style={{ textAlign: "right" }}>
-                      <div style={{ fontWeight: 800, fontSize: 14 }}>-{fmt(t.amount)}</div>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: t.status === "success" ? "var(--success)" : t.status === "pending" ? "var(--warning)" : "var(--error)" }}>
-                        {t.status === "success" ? "Success" : t.status === "pending" ? "Pending" : "Failed"}
-                      </div>
-                    </div>
+                    {(() => {
+                      const refunded = (t.receipt as { refunded?: boolean } | null)?.refunded === true;
+                      const label = refunded
+                        ? "Refunded"
+                        : t.status === "success"
+                          ? "Success"
+                          : t.status === "pending"
+                            ? "Pending"
+                            : "Failed";
+                      const color = refunded
+                        ? "var(--info)"
+                        : t.status === "success"
+                          ? "var(--success)"
+                          : t.status === "pending"
+                            ? "var(--warning)"
+                            : "var(--error)";
+                      return (
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ fontWeight: 700, fontSize: 14 }}>-{fmt(t.amount)}</div>
+                          <div style={{ fontSize: 11, fontWeight: 600, color }}>{label}</div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })}

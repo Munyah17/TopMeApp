@@ -43,13 +43,13 @@ export default async function AccountPage() {
 
   return (
     <div className="px content-narrow" style={{ paddingTop: 6 }}>
-      <h2 style={{ fontSize: 20 }}>Account</h2>
+      <h2 style={{ fontSize: 22, letterSpacing: "-0.02em" }}>Account</h2>
       <div className="card card-pad row gap-2 mt-3">
         <div
           style={{
             width: 52,
             height: 52,
-            borderRadius: 16,
+            borderRadius: 14,
             background: "var(--navy)",
             color: "#fff",
             display: "flex",
@@ -62,7 +62,7 @@ export default async function AccountPage() {
           {initials(profile.full_name)}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 800, fontSize: 15 }}>{profile.full_name || "Your name"}</div>
+          <div style={{ fontWeight: 600, fontSize: 16, letterSpacing: "-0.01em" }}>{profile.full_name || "Your name"}</div>
           <div className="muted">{profile.phone || profile.email}</div>
         </div>
       </div>
@@ -76,7 +76,7 @@ export default async function AccountPage() {
             <Icon name="users" size={17} stroke={1.8} />
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, fontSize: 13.5 }}>Saved Beneficiaries</div>
+            <div style={{ fontWeight: 600, fontSize: 13.5, letterSpacing: "-0.01em" }}>Saved Beneficiaries</div>
             <div className="muted">{beneficiaries.length} saved</div>
           </div>
           <Icon name="chevronR" size={17} stroke={2} />
@@ -86,7 +86,7 @@ export default async function AccountPage() {
             <Icon name="bell" size={17} stroke={1.8} />
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, fontSize: 13.5 }}>Notifications</div>
+            <div style={{ fontWeight: 600, fontSize: 13.5, letterSpacing: "-0.01em" }}>Notifications</div>
           </div>
           <NotificationsToggle initial={profile.notifications_enabled} />
         </div>
@@ -101,7 +101,7 @@ export default async function AccountPage() {
             <Icon name="sun" size={17} stroke={1.8} />
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, fontSize: 13.5 }}>Dark Mode</div>
+            <div style={{ fontWeight: 600, fontSize: 13.5, letterSpacing: "-0.01em" }}>Dark Mode</div>
             <div className="muted">Off follows your device automatically until you choose</div>
           </div>
           <ThemeToggle />
@@ -117,7 +117,7 @@ export default async function AccountPage() {
             <Icon name="wallet" size={17} stroke={1.8} />
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, fontSize: 13.5, color: "var(--text)" }}>Wallet & Top Up</div>
+            <div style={{ fontWeight: 600, fontSize: 13.5, letterSpacing: "-0.01em", color: "var(--text-primary)" }}>Wallet & Top Up</div>
             <div className="muted">Balance, top up, send money</div>
           </div>
           <Icon name="chevronR" size={17} stroke={2} />
@@ -142,7 +142,7 @@ export default async function AccountPage() {
               <Icon name={row.icon} size={17} stroke={1.8} />
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 700, fontSize: 13.5 }}>{row.label}</div>
+              <div style={{ fontWeight: 600, fontSize: 13.5, letterSpacing: "-0.01em" }}>{row.label}</div>
               {row.sub && <div className="muted">{row.sub}</div>}
             </div>
             <Icon name="chevronR" size={17} stroke={2} />
