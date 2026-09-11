@@ -8,6 +8,11 @@ import { WithdrawPanel } from "@/components/wallet/withdraw-panel";
 import { fmt } from "@/lib/data/catalog-helpers";
 import { getCurrentProfile, getMyWallet, getMyWithdrawals, getWalletLedger } from "@/lib/data/queries";
 
+// Money on screen must always be a fresh read, never a cached one — no
+// static rendering, no fetch caching, for this page.
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 const LEDGER_LABEL: Record<string, string> = {
   topup: "Wallet top up",
   debit: "Payment",

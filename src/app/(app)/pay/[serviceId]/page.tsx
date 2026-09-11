@@ -22,6 +22,11 @@ const AIRTIME_FLOW_SERVICES = new Set(["airtime", "airtimevouchers"]);
 // custom amount), branched inside BroadbandFlow itself.
 const BROADBAND_FLOW_SERVICES = new Set(["telone", "zol", "starlink", "utande", "africom"]);
 
+// Checkout shows the wallet balance and takes payment — never statically
+// rendered or fetch-cached, always a fresh read for every visit.
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 export default async function PayPage({ params }: { params: Promise<{ serviceId: string }> }) {
   const { serviceId } = await params;
   const [service, profile] = await Promise.all([getService(serviceId), getCurrentProfile()]);

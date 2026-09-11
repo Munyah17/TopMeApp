@@ -2,6 +2,9 @@ import { redirect } from "next/navigation";
 import { SendMoneyFlow } from "@/components/payment-flow/send-money-flow";
 import { getCurrentProfile, getMyWallet } from "@/lib/data/queries";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 export default async function SendMoneyPage({ searchParams }: { searchParams: Promise<{ to?: string; kind?: string }> }) {
   const [profile, params] = await Promise.all([getCurrentProfile(), searchParams]);
   if (!profile) redirect("/login");
