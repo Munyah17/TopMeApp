@@ -6,6 +6,7 @@ import { checkPaynowStatus, initiatePaynowPayment } from "@/lib/payments/paynow"
 import { applyPaynowResult } from "@/lib/payments/paynow-result";
 import { createTopupCheckoutSession } from "@/lib/payments/stripe";
 import { initiateEcocashPush } from "@/lib/payments/ecocash";
+import { calculateTopupFee } from "@/lib/fees";
 
 async function requireUser() {
   const supabase = await createClient();
@@ -31,12 +32,13 @@ export async function startPaynowTopup(amount: number) {
   const { supabase, user } = await requireUser();
   const admin = createAdminClient();
   const reference = newReference("PNW");
+  const fee = calculateTopupFee("paynow", amount);
 
-  await supabase.from("topup_intents").insert({ user_id: user.id, amount, provider: "paynow", reference });
+  await supabase.from("topup_intents").insert({ user_id: user.id, amount, fee, provider: "paynow", reference });
 
   const result = await initiatePaynowPayment({
     reference,
-    amount,
+    amount: amount + fee,
     authEmail: user.email || "",
     returnUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/wallet?paynow_ref=${encodeURIComponent(reference)}`,
   });
@@ -54,10 +56,11 @@ export async function startStripeTopup(amount: number) {
   const { supabase, user } = await requireUser();
   const admin = createAdminClient();
   const reference = newReference("STR");
+  const fee = calculateTopupFee("stripe", amount);
 
-  await supabase.from("topup_intents").insert({ user_id: user.id, amount, provider: "stripe", reference });
+  await supabase.from("topup_intents").insert({ user_id: user.id, amount, fee, provider: "stripe", reference });
 
-  const session = await createTopupCheckoutSession({ amount, reference, userId: user.id, customerEmail: user.email });
+  const session = await createTopupCheckoutSession({ amount: amount + fee, reference, userId: user.id, customerEmail: user.email });
   if (!session.url) throw new Error("Could not start Stripe checkout.");
   await admin.from("topup_intents").update({ meta: { sessionId: session.id } }).eq("reference", reference);
   return { redirectUrl: session.url };
@@ -67,10 +70,11 @@ export async function startEcocashTopup(amount: number, phone: string) {
   const { supabase, user } = await requireUser();
   const admin = createAdminClient();
   const reference = newReference("ECO");
+  const fee = calculateTopupFee("ecocash", amount);
 
-  await supabase.from("topup_intents").insert({ user_id: user.id, amount, provider: "ecocash", reference, meta: { phone } });
+  await supabase.from("topup_intents").insert({ user_id: user.id, amount, fee, provider: "ecocash", reference, meta: { phone } });
 
-  const result = await initiateEcocashPush({ phone, amount, reference });
+  const result = await initiateEcocashPush({ phone, amount: amount + fee, reference });
   if (!result.ok) {
     await admin.from("topup_intents").update({ status: "failed" }).eq("reference", reference);
     throw new Error(result.error || "Could not start EcoCash payment.");

@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icons";
 import { startEcocashTopup, startPaynowTopup, startStripeTopup } from "@/lib/actions/wallet";
+import { calculateTopupFee } from "@/lib/fees";
 
 type Gateway = "paynow" | "stripe" | "ecocash";
 
@@ -21,6 +22,8 @@ export function TopupPanel({ userPhone }: { userPhone?: string | null }) {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const amt = amount ?? (parseFloat(customAmount) || 0);
+  const fee = calculateTopupFee(gateway, amt);
+  const total = amt + fee;
 
   async function submit() {
     setBusy(true);
@@ -70,7 +73,7 @@ export function TopupPanel({ userPhone }: { userPhone?: string | null }) {
         <div className="spinner-ring" />
         <div style={{ fontWeight: 700, marginTop: 20, fontSize: 15 }}>Approve on your phone</div>
         <div className="muted mt-1" style={{ maxWidth: 260 }}>
-          We sent a USSD prompt to {phone}. Enter your EcoCash PIN to approve the ${amt.toFixed(2)} top up.
+          We sent a USSD prompt to {phone}. Enter your EcoCash PIN to approve the ${total.toFixed(2)} top up.
         </div>
       </div>
     );
@@ -132,6 +135,21 @@ export function TopupPanel({ userPhone }: { userPhone?: string | null }) {
         </>
       )}
 
+      {amt > 0 && (
+        <div className="mt-3" style={{ fontSize: 13 }}>
+          <div className="row between"><span className="muted">Added to wallet</span><span>${amt.toFixed(2)}</span></div>
+          <div className="row between mt-1">
+            <span className="muted">
+              {gateway === "paynow" ? "Paynow" : gateway === "stripe" ? "Card" : "EcoCash"} processing fee
+            </span>
+            <span>${fee.toFixed(2)}</span>
+          </div>
+          <div className="row between mt-1" style={{ fontWeight: 700, paddingTop: 6, borderTop: "1px solid var(--border)" }}>
+            <span>You pay</span><span>${total.toFixed(2)}</span>
+          </div>
+        </div>
+      )}
+
       {error && (
         <div className="muted mt-2" style={{ color: "var(--error)" }}>
           {error}
@@ -143,7 +161,7 @@ export function TopupPanel({ userPhone }: { userPhone?: string | null }) {
         disabled={busy || !(amt > 0) || (gateway === "ecocash" && !phone)}
         onClick={submit}
       >
-        {busy ? "Starting…" : `Top up $${amt > 0 ? amt.toFixed(2) : "0.00"}`}
+        {busy ? "Starting…" : `Pay $${total > 0 ? total.toFixed(2) : "0.00"}`}
       </button>
       <div className="muted mt-2" style={{ fontSize: 11.5, display: "flex", alignItems: "center", gap: 6 }}>
         <Icon name="lock" size={13} stroke={2} /> Secured by {gateway === "paynow" ? "Paynow Zimbabwe" : gateway === "stripe" ? "Stripe" : "EcoCash"}

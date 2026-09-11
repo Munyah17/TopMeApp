@@ -184,6 +184,7 @@ create table if not exists public.topup_intents (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid not null references public.profiles(id) on delete cascade,
   amount      numeric(12,2) not null,
+  fee         numeric(12,2) not null default 0,
   provider    text not null check (provider in ('paynow','stripe','ecocash')),
   reference   text unique not null,
   status      text not null default 'pending' check (status in ('pending','completed','failed')),
