@@ -50,10 +50,27 @@ export default async function InsuranceProductPage({ params }: { params: Promise
           />
         )}
         <div className="row between" style={{ marginBottom: 12 }}>
-          <div style={{ fontSize: 22, fontWeight: 800 }}>
-            ${premium.toFixed(2)}<span className="muted" style={{ fontWeight: 500, fontSize: 13 }}>/mo</span>
-          </div>
-          {product.cover_amount != null && (
+          {product.is_purchasable ? (
+            <div style={{ fontSize: 22, fontWeight: 800 }}>
+              ${premium.toFixed(2)}<span className="muted" style={{ fontWeight: 500, fontSize: 13 }}>/mo</span>
+            </div>
+          ) : (
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 800,
+                textTransform: "uppercase",
+                letterSpacing: "0.04em",
+                color: "var(--warning)",
+                background: "#FEF6E7",
+                padding: "5px 10px",
+                borderRadius: 7,
+              }}
+            >
+              Coming soon
+            </span>
+          )}
+          {product.is_purchasable && product.cover_amount != null && (
             <div style={{ textAlign: "right" }}>
               <div className="muted" style={{ fontSize: 11 }}>Cover amount</div>
               <div style={{ fontWeight: 700, fontSize: 14 }}>${product.cover_amount.toFixed(0)}</div>
@@ -76,7 +93,25 @@ export default async function InsuranceProductPage({ params }: { params: Promise
           </div>
         )}
 
-        <InsurancePurchaseForm product={product} />
+        {product.is_purchasable ? (
+          <InsurancePurchaseForm product={product} />
+        ) : (
+          <div
+            className="row gap-2"
+            style={{ background: "var(--card-bg)", borderRadius: 14, padding: 16, alignItems: "flex-start" }}
+          >
+            <div className="ibadge round" style={{ width: 34, height: 34, background: "#FEF6E7", color: "var(--warning)", flexShrink: 0 }}>
+              <Icon name="clock" size={17} stroke={2} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 13.5 }}>Not available to buy yet</div>
+              <div className="muted" style={{ fontSize: 12, lineHeight: 1.5, marginTop: 2 }}>
+                We&apos;re finalising this with our underwriting partner. You&apos;ll be able to buy it, and get your
+                disc delivered, straight from this screen once it&apos;s ready.
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

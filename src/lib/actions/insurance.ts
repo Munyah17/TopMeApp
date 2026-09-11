@@ -19,6 +19,15 @@ export async function getInsuranceQuote(params: {
     return { error: "Authentication required" };
   }
 
+  const { data: product } = await supabase
+    .from("insurance_products")
+    .select("provider, is_purchasable")
+    .eq("id", params.productId)
+    .single();
+  if (!product || !product.is_purchasable) {
+    return { error: "This product isn't available to buy yet." };
+  }
+
   try {
     const quote = await getQuote({
       product_id: params.productId,
@@ -62,6 +71,9 @@ export async function purchaseInsurancePolicy(params: {
 
     if (productError || !product) {
       return { error: "Product not found or inactive" };
+    }
+    if (!product.is_purchasable) {
+      return { error: "This product isn't available to buy yet." };
     }
 
     // 2. Get or create client in TariqifyIMS

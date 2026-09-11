@@ -16,7 +16,7 @@ export default async function InsurancePage() {
       </div>
       <div className="px content-wrap">
         <div className="muted mb-3" style={{ fontSize: 13, lineHeight: 1.5 }}>
-          Protect what matters most with our comprehensive insurance policies powered by TariqifyIMS.
+          Protect what matters most — medical, funeral, farming, legal, travel and vehicle cover, all from your wallet.
         </div>
 
         {products.length === 0 ? (
@@ -87,10 +87,27 @@ export default async function InsurancePage() {
                         {description}
                       </div>
                       <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                        <span style={{ fontSize: 13, fontWeight: 700 }}>
-                          ${premium.toFixed(2)}<span className="muted" style={{ fontWeight: 500, fontSize: 11 }}>/mo</span>
-                        </span>
-                        {product.cover_amount != null && (
+                        {product.is_purchasable ? (
+                          <span style={{ fontSize: 13, fontWeight: 700 }}>
+                            ${premium.toFixed(2)}<span className="muted" style={{ fontWeight: 500, fontSize: 11 }}>/mo</span>
+                          </span>
+                        ) : (
+                          <span
+                            style={{
+                              fontSize: 10.5,
+                              fontWeight: 800,
+                              textTransform: "uppercase",
+                              letterSpacing: "0.04em",
+                              color: "var(--warning)",
+                              background: "#FEF6E7",
+                              padding: "3px 8px",
+                              borderRadius: 6,
+                            }}
+                          >
+                            Coming soon
+                          </span>
+                        )}
+                        {product.is_purchasable && product.cover_amount != null && (
                           <span className="muted" style={{ fontSize: 11 }}>· ${product.cover_amount.toFixed(0)} cover</span>
                         )}
                         {product.category && (

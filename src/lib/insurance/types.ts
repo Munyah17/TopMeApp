@@ -37,6 +37,19 @@ export interface InsuranceProduct {
   image_url: string | null;
   display_image_url: string | null;
   markup_percent: number;
+  // Which underwriter API this product is fulfilled through — 'tariqify'
+  // (Motions Microinsurance: medical, funeral, farming, legal, travel) or
+  // 'enpassent' (vehicle insurance — no key configured yet, see
+  // is_purchasable below). Lets the sync job and the purchase actions tell
+  // which products they're even allowed to touch, now that the catalog
+  // isn't single-provider any more.
+  provider: string;
+  // A product can be listed (is_active) before its provider is actually
+  // wired up — e.g. vehicle insurance is shown today as a USP preview
+  // while EnpassentIMS isn't connected yet. is_purchasable is what the
+  // buy flow actually gates on; is_active only controls whether it shows
+  // in the catalog at all.
+  is_purchasable: boolean;
   premium: number;
   cover_amount: number | null;
   waiting_period_days: number | null;
