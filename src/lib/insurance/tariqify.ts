@@ -16,11 +16,22 @@ function config() {
   return { baseUrl, apiKey };
 }
 
+// Confirmed against the real live API (2026-09-12): responses are NOT the
+// {success, message, error, data} envelope originally assumed here — that
+// assumption was written before real credentials existed to check it
+// against, and it was wrong. A real 200 from GET /products comes back as
+// bare `{"data": [...]}` with no `success` key at all, so the old check
+// `!parsed.success` was truthy on every single successful call and this
+// client threw "failed" on 100% of requests — the actual root cause of
+// "no insurance product has ever been fetched successfully", not a wrong
+// endpoint or a bad key. Success is now judged by HTTP status alone, which
+// is the only thing every documented endpoint is guaranteed to set
+// consistently; `data` is unwrapped if present, else the raw body is used
+// as-is so an endpoint that returns its payload unwrapped still works.
 interface TariqifyEnvelope<T> {
-  success: boolean;
   message?: string;
   error?: string;
-  data: T;
+  data?: T;
 }
 
 async function tariqifyRequest<T>(
@@ -37,16 +48,18 @@ async function tariqifyRequest<T>(
     body: init.body ? JSON.stringify(init.body) : undefined,
   });
   const text = await res.text();
-  let parsed: TariqifyEnvelope<T>;
+  let parsed: TariqifyEnvelope<T> | T;
   try {
-    parsed = text ? JSON.parse(text) : { success: false, data: undefined as T };
+    parsed = text ? JSON.parse(text) : ({} as T);
   } catch {
     throw new Error(`TariqifyIMS returned a non-JSON response from ${path} (${res.status}): ${text.slice(0, 300)}`);
   }
-  if (!res.ok || !parsed.success) {
-    throw new Error(`TariqifyIMS ${path} failed (${res.status}): ${parsed.error || parsed.message || text.slice(0, 300)}`);
+  if (!res.ok) {
+    const envelope = parsed as TariqifyEnvelope<T>;
+    throw new Error(`TariqifyIMS ${path} failed (${res.status}): ${envelope?.error || envelope?.message || text.slice(0, 300)}`);
   }
-  return parsed.data;
+  const envelope = parsed as TariqifyEnvelope<T>;
+  return (envelope && typeof envelope === "object" && "data" in envelope ? envelope.data : parsed) as T;
 }
 
 // Product field types from TariqifyIMS mapped to our InsuranceFieldType
@@ -66,6 +79,16 @@ export interface TariqifyProduct {
   category: string | null;
   currency: string;
   image_url: string | null;
+  // Real GET /products fields (confirmed live 2026-09-12) — no signup_fields,
+  // currency, image_url or is_active come back from this endpoint at all;
+  // those four are filled in with sane defaults below rather than modelled
+  // from a response that doesn't carry them.
+  premium: number;
+  cover_amount: number | null;
+  waiting_period_days: number | null;
+  min_age: number | null;
+  max_age: number | null;
+  features: string[];
   signup_fields: Array<{
     key: string;
     label: string;
@@ -124,8 +147,17 @@ export async function getProducts(): Promise<TariqifyProduct[]> {
     name: String(item.name),
     description: item.description ? String(item.description) : null,
     category: item.category ? String(item.category) : null,
-    currency: item.currency ? String(item.currency) : "USD",
-    image_url: item.image_url ? String(item.image_url) : null,
+    // Not returned by this endpoint — every product Tariqify sells is USD
+    // and this listing has no image field, so these are fixed defaults
+    // rather than a mapping from a response field that doesn't exist.
+    currency: "USD",
+    image_url: null,
+    premium: Number(item.premium) || 0,
+    cover_amount: item.coverAmount != null ? Number(item.coverAmount) : null,
+    waiting_period_days: item.waitingPeriodDays != null ? Number(item.waitingPeriodDays) : null,
+    min_age: item.minAge != null ? Number(item.minAge) : null,
+    max_age: item.maxAge != null ? Number(item.maxAge) : null,
+    features: Array.isArray(item.features) ? (item.features as unknown[]).map(String) : [],
     signup_fields: Array.isArray(item.signup_fields)
       ? (item.signup_fields as Record<string, unknown>[]).map((field) => ({
           key: String(field.key),
@@ -136,7 +168,10 @@ export async function getProducts(): Promise<TariqifyProduct[]> {
           options: Array.isArray(field.options) ? (field.options as string[]) : undefined,
         }))
       : [],
-    is_active: item.is_active === true,
+    // GET /products is documented as "list active insurance products" — it
+    // doesn't hand back an is_active flag because everything it returns
+    // already is active.
+    is_active: true,
     raw: item,
   }));
 }

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Icon } from "@/components/icons";
 import { getInsuranceProducts } from "@/lib/actions/insurance";
-import { displayName, displayDescription, displayImage } from "@/lib/insurance/types";
+import { displayName, displayDescription, displayImage, displayPremium } from "@/lib/insurance/types";
 
 export default async function InsurancePage() {
   const products = await getInsuranceProducts();
@@ -31,6 +31,7 @@ export default async function InsurancePage() {
               const name = displayName(product);
               const description = displayDescription(product);
               const image = displayImage(product);
+              const premium = displayPremium(product);
 
               return (
                 <Link
@@ -85,18 +86,25 @@ export default async function InsurancePage() {
                       <div className="muted" style={{ fontSize: 12, lineHeight: 1.4 }}>
                         {description}
                       </div>
-                      {product.category && (
-                        <div
-                          style={{
-                            marginTop: 8,
-                            fontSize: 11,
-                            color: "var(--accent)",
-                            fontWeight: 500,
-                          }}
-                        >
-                          {product.category}
-                        </div>
-                      )}
+                      <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        <span style={{ fontSize: 13, fontWeight: 700 }}>
+                          ${premium.toFixed(2)}<span className="muted" style={{ fontWeight: 500, fontSize: 11 }}>/mo</span>
+                        </span>
+                        {product.cover_amount != null && (
+                          <span className="muted" style={{ fontSize: 11 }}>· ${product.cover_amount.toFixed(0)} cover</span>
+                        )}
+                        {product.category && (
+                          <span
+                            style={{
+                              fontSize: 11,
+                              color: "var(--accent)",
+                              fontWeight: 500,
+                            }}
+                          >
+                            · {product.category}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div style={{ flexShrink: 0, paddingTop: 4, color: "var(--muted)" }}>
                       <Icon name="chevronR" size={18} stroke={2} />

@@ -37,6 +37,12 @@ export interface InsuranceProduct {
   image_url: string | null;
   display_image_url: string | null;
   markup_percent: number;
+  premium: number;
+  cover_amount: number | null;
+  waiting_period_days: number | null;
+  min_age: number | null;
+  max_age: number | null;
+  features: string[];
   signup_fields: InsuranceSignupField[];
   is_active: boolean;
   sort_order: number;
@@ -51,4 +57,9 @@ export function displayDescription(p: Pick<InsuranceProduct, "description" | "di
 }
 export function displayImage(p: Pick<InsuranceProduct, "image_url" | "display_image_url">) {
   return p.display_image_url?.trim() || p.image_url?.trim() || null;
+}
+
+/** What TopMe actually charges: Tariqify's premium plus this product's markup — always computed here, never stored. */
+export function displayPremium(p: Pick<InsuranceProduct, "premium" | "markup_percent">) {
+  return p.premium * (1 + p.markup_percent / 100);
 }
