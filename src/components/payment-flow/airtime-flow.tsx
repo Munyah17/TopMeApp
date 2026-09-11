@@ -256,6 +256,22 @@ export function AirtimeFlow({
               </div>
             </div>
 
+            {fixedTiles && !isVoucher(service) && (
+              <div
+                className="row gap-2 mb-3"
+                style={{ alignItems: "flex-start", padding: "12px 14px", borderRadius: 12, background: "var(--warning-bg)", border: "1px solid transparent" }}
+              >
+                <span style={{ color: "var(--warning)", marginTop: 1, flexShrink: 0, display: "inline-flex" }}>
+                  <Icon name="alert" size={16} stroke={2} />
+                </span>
+                <div style={{ fontSize: 12.5, lineHeight: 1.5, color: "var(--text-primary)" }}>
+                  {network?.name} only sells set amounts, and there&apos;s no voucher code — picking one below
+                  recharges <strong>{phone}</strong> immediately. If this is for someone else, go back and
+                  make sure you entered <em>their</em> number, not yours.
+                </div>
+              </div>
+            )}
+
             <label className="field-label">{isVoucher(service) ? "Voucher denomination" : "Amount"}</label>
             <div className="row gap-2" style={{ flexWrap: "wrap" }}>
               {denomChoices.map((c) => (
