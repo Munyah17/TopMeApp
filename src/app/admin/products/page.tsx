@@ -1,7 +1,10 @@
+import { InsuranceProductsManager } from "@/components/admin/insurance-products-manager";
 import { NetworksManager } from "@/components/admin/networks-manager";
 import { ProductsClient } from "@/components/admin/products-client";
 import { getAllNetworks, getAllServices, getCategories } from "@/lib/data/queries";
 import { getMyPermissions } from "@/lib/auth/permissions";
+import { createClient } from "@/lib/supabase/server";
+import type { InsuranceProduct } from "@/lib/insurance/types";
 
 export default async function ProductsPage() {
   const permissions = await getMyPermissions();
@@ -9,11 +12,14 @@ export default async function ProductsPage() {
     return <div className="muted">You don&apos;t have permission to manage the product catalog.</div>;
   }
 
-  const [categories, services, networks] = await Promise.all([
+  const supabase = await createClient();
+  const [categories, services, networks, { data: insuranceData }] = await Promise.all([
     getCategories(),
     getAllServices(true),
     getAllNetworks(),
+    supabase.from("insurance_products").select("*").order("sort_order"),
   ]);
+  const insuranceProducts = (insuranceData as InsuranceProduct[]) ?? [];
 
   return (
     <div>
@@ -25,6 +31,7 @@ export default async function ProductsPage() {
         deactivate anything that&apos;s ever been sold instead.
       </div>
       <NetworksManager networks={networks} />
+      <InsuranceProductsManager products={insuranceProducts} />
       <ProductsClient categories={categories} services={services} />
     </div>
   );

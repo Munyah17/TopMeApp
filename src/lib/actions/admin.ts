@@ -535,6 +535,45 @@ export async function adminMarkPendingFailed(kind: "topup" | "guest", reference:
   revalidateAdminPath("/operations");
 }
 
+// Insurance products are synced from the underwriter (TariqifyIMS/Motions,
+// or EnpassentIMS once that key exists — see src/lib/insurance/tariqify.ts
+// and the sync cron) into insurance_products, but that table never had an
+// admin UI of its own — this is it. Only the owner-editable override
+// columns are writable here; name/description/premium/etc. are the
+// underwriter's own data and get overwritten by the next sync regardless
+// (see 2026-09-08-insurance-services.sql's comment on display_name).
+export interface InsuranceProductPatch {
+  displayName?: string | null;
+  displayDescription?: string | null;
+  markupPercent?: number;
+  isActive?: boolean;
+  isPurchasable?: boolean;
+  sortOrder?: number;
+}
+export async function updateInsuranceProduct(id: string, patch: InsuranceProductPatch) {
+  const { user: actingUser } = await requirePermission("catalog.manage");
+  const admin = createAdminClient();
+
+  const dbPatch: Record<string, unknown> = {};
+  if (patch.displayName !== undefined) dbPatch.display_name = patch.displayName?.trim() || null;
+  if (patch.displayDescription !== undefined) dbPatch.display_description = patch.displayDescription?.trim() || null;
+  if (patch.markupPercent !== undefined) {
+    if (!(patch.markupPercent >= 0)) throw new Error("Markup can't be negative.");
+    dbPatch.markup_percent = patch.markupPercent;
+  }
+  if (patch.isActive !== undefined) dbPatch.is_active = patch.isActive;
+  if (patch.isPurchasable !== undefined) dbPatch.is_purchasable = patch.isPurchasable;
+  if (patch.sortOrder !== undefined) dbPatch.sort_order = patch.sortOrder;
+
+  const { error } = await admin.from("insurance_products").update(dbPatch).eq("id", id);
+  if (error) throw new Error(error.message);
+
+  await logAdminAction(admin, { actorId: actingUser.id, action: "insurance_product.update", targetTable: "insurance_products", targetId: id, meta: dbPatch });
+  revalidateAdminPath("/products");
+  revalidatePath("/insurance");
+  revalidatePath("/insurance/[productId]", "page");
+}
+
 function revalidateCatalog() {
   // getCategories/getAllServices/getNetworks are unstable_cache-wrapped
   // (see src/lib/data/queries.ts) precisely so customer pages don't
