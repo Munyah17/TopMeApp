@@ -1517,7 +1517,7 @@ h4 {
   gap: 12px;
   height: 58px;
   padding: 0 14px;
-  background: linear-gradient(135deg, #075e54, #128c7e);
+  background: #0c7c6c;
   position: sticky;
   top: 0;
   z-index: 50;
@@ -1588,6 +1588,69 @@ h4 {
 }
 .chat-send-btn:not(:disabled):active {
   transform: scale(0.92);
+}
+
+/* ---------- Chat & Pay: WhatsApp-style master-detail shell ---------- */
+/* Mobile: one column at a time — the list at plain /chat, a full-screen
+   thread at /chat/<id> (or /new, /topme). Desktop: the list is a
+   permanent ~1/3 left pane next to whichever thread is open, same as
+   WhatsApp Web/Desktop. See src/components/chat/chat-shell.tsx for the
+   pathname check that adds .chat-shell-thread-open on mobile. */
+.chat-shell {
+  display: flex;
+  min-height: 100dvh;
+}
+.chat-list-pane {
+  width: 100%;
+  min-width: 0;
+  overflow-y: auto;
+}
+.chat-thread-pane {
+  display: none;
+  width: 100%;
+  min-width: 0;
+  flex-direction: column;
+}
+.chat-shell-thread-open .chat-list-pane {
+  display: none;
+}
+.chat-shell-thread-open .chat-thread-pane {
+  display: flex;
+}
+@media (min-width: 900px) {
+  .chat-shell {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  .chat-list-pane {
+    display: block !important;
+    flex: 0 0 34%;
+    max-width: 400px;
+    border-right: 1px solid var(--border);
+    height: 100dvh;
+    position: sticky;
+    top: 0;
+  }
+  .chat-thread-pane {
+    display: flex !important;
+    flex: 1;
+    min-width: 0;
+  }
+  .chat-thread-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    text-align: center;
+    padding: 40px;
+  }
+}
+.chat-thread-empty {
+  display: none;
+}
+.chat-pinned-row {
+  background: var(--green-50);
 }
 
 /* ---------- Admin command center shell ---------- */
