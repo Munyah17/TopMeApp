@@ -19,7 +19,7 @@ interface NavGroup {
 }
 
 const NAV: NavGroup[] = [
-  { label: "Cockpit", items: [{ label: "Main Instruments", href: "/admin", icon: "grid" }] },
+  { label: "Dashboard", items: [{ label: "Dashboard", href: "/admin", icon: "grid" }] },
   {
     label: "Operations",
     items: [

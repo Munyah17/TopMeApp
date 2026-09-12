@@ -75,7 +75,7 @@ export async function AdminOverviewBody({ basePath }: { basePath: string }) {
 
   return (
     <div>
-      <h2 style={{ fontSize: 19 }}>Main Instruments</h2>
+      <h2 style={{ fontSize: 19 }}>Dashboard</h2>
       <div className="muted mb-3">Today&apos;s snapshot — see Reports for the full picture.</div>
 
       {attentionCount > 0 && (
@@ -267,16 +267,40 @@ export async function AdminOverviewBody({ basePath }: { basePath: string }) {
           {top.length === 0 ? (
             <div className="muted">No transactions yet.</div>
           ) : (
-            top.map((t) => (
-              <div className="row gap-2 mb-2" key={t.id}>
-                <div style={{ width: 8, height: 8, borderRadius: "50%", background: t.color }} />
-                <div style={{ flex: 1, fontSize: 13, fontWeight: 700 }}>{t.name}</div>
-                <div style={{ width: 120, height: 8, background: "#F1F4F9", borderRadius: 100, overflow: "hidden" }}>
-                  <div style={{ width: `${(t.count / topTotal) * 100}%`, height: "100%", background: t.color }} />
+            <div className="row gap-3" style={{ alignItems: "center", flexWrap: "wrap" }}>
+              <div
+                style={{
+                  width: 110,
+                  height: 110,
+                  borderRadius: "50%",
+                  flexShrink: 0,
+                  background: `conic-gradient(${(() => {
+                    let acc = 0;
+                    return top
+                      .map((t) => {
+                        const from = acc;
+                        acc += (t.count / topTotal) * 100;
+                        return `${t.color} ${from}% ${acc}%`;
+                      })
+                      .join(", ");
+                  })()})`,
+                }}
+              >
+                <div style={{ width: "100%", height: "100%", borderRadius: "50%", background: "var(--surface)", transform: "scale(0.6)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column" }}>
+                  <div style={{ fontWeight: 800, fontSize: 15 }}>{topTotal}</div>
+                  <div className="muted" style={{ fontSize: 9 }}>sales</div>
                 </div>
-                <div style={{ width: 30, textAlign: "right", fontSize: 12, fontWeight: 700, color: "var(--text-soft)" }}>{t.count}</div>
               </div>
-            ))
+              <div style={{ flex: "1 1 200px", minWidth: 0 }}>
+                {top.map((t) => (
+                  <div className="row gap-2 mb-2" key={t.id}>
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: t.color, flexShrink: 0 }} />
+                    <div style={{ flex: 1, fontSize: 13, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.name}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-soft)" }}>{t.count}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
     </div>

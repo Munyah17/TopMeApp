@@ -27,7 +27,7 @@ export async function SupportBody({ searchParams, basePath }: { searchParams: Pr
           <Link
             key={s || "all"}
             href={s ? `${basePath}/support?status=${s}` : `${basePath}/support`}
-            className={`chip tap ${((params.status ?? "") === s) ? "selected" : ""}`}
+            className={`filter-pill tap ${((params.status ?? "") === s) ? "selected" : ""}`}
             style={{ textDecoration: "none", textTransform: "capitalize" }}
           >
             {(s || "all").replace("_", " ")}

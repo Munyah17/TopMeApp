@@ -29,7 +29,7 @@ export default async function ChatInboxPage() {
   if (!profile) {
     return (
       <div className="px content-wrap" style={{ paddingTop: 6 }}>
-        <h2 style={{ fontSize: 20 }}>Chat</h2>
+        <h2 style={{ fontSize: 20 }}>Chat & Pay</h2>
         <AuthRequired title="Log in to chat" message="Message friends and family, and send money or a red packet right in the conversation." />
       </div>
     );
@@ -40,7 +40,7 @@ export default async function ChatInboxPage() {
   return (
     <div className="px content-wrap" style={{ paddingTop: 6 }}>
       <div className="row between">
-        <h2 style={{ fontSize: 20 }}>Chat</h2>
+        <h2 style={{ fontSize: 20 }}>Chat & Pay</h2>
         <Link href="/chat/new" className="btn btn-primary" style={{ height: 38, padding: "0 14px", fontSize: 13 }}>
           <Icon name="plus" size={15} stroke={2.4} /> New chat
         </Link>

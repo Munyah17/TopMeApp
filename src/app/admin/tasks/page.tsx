@@ -21,7 +21,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
           <Link
             key={s || "all"}
             href={s ? `/admin/tasks?status=${s}` : "/admin/tasks"}
-            className={`chip tap ${((params.status ?? "") === s) ? "selected" : ""}`}
+            className={`filter-pill tap ${((params.status ?? "") === s) ? "selected" : ""}`}
             style={{ textDecoration: "none", textTransform: "capitalize" }}
           >
             {(s || "all").replace("_", " ")}

@@ -11,7 +11,7 @@ import type { Profile } from "@/types/database";
 const NAVTABS = [
   { id: "home", href: "/home", label: "Home", icon: "home" },
   { id: "services", href: "/services", label: "Services", icon: "grid" },
-  { id: "chat", href: "/chat", label: "Chat", icon: "chat" },
+  { id: "chat", href: "/chat", label: "Chat & Pay", icon: "chat" },
   { id: "history", href: "/history", label: "History", icon: "clock" },
   { id: "account", href: "/account", label: "Account", icon: "user" },
 ];

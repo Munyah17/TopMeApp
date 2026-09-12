@@ -73,7 +73,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
       <div className="row gap-2 mb-3">
         {RANGE_OPTIONS.map((r) => (
-          <a key={r.days} href={`/admin/reports?days=${r.days}`} className={`chip tap ${days === r.days ? "selected" : ""}`} style={{ textDecoration: "none" }}>
+          <a key={r.days} href={`/admin/reports?days=${r.days}`} className={`filter-pill tap ${days === r.days ? "selected" : ""}`} style={{ textDecoration: "none" }}>
             {r.label}
           </a>
         ))}

@@ -27,7 +27,7 @@ export async function DisputesBody({ searchParams, basePath }: { searchParams: P
           <Link
             key={s || "all"}
             href={s ? `${basePath}/disputes?status=${s}` : `${basePath}/disputes`}
-            className={`chip tap ${((params.status ?? "") === s) ? "selected" : ""}`}
+            className={`filter-pill tap ${((params.status ?? "") === s) ? "selected" : ""}`}
             style={{ textDecoration: "none", textTransform: "capitalize" }}
           >
             {s || "All"}

@@ -1611,11 +1611,11 @@ h4 {
   flex-direction: column;
   min-height: 100dvh;
   font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, sans-serif;
-  --adm-sidebar-bg: #0d1712;
-  --adm-sidebar-border: #1c2a21;
-  --adm-sidebar-ink: #dfeae4;
-  --adm-sidebar-ink-soft: #8ea297;
-  --adm-sidebar-active: #17301f;
+  --adm-sidebar-bg: #0c1110;
+  --adm-sidebar-border: #1e2725;
+  --adm-sidebar-ink: #eaf0ee;
+  --adm-sidebar-ink-soft: #8a968f;
+  --adm-sidebar-active: #182220;
   --adm-green-tile: #e2faec;
   --adm-blue: #2f6fed;
   --adm-blue-tile: #eaf1ff;
@@ -1743,7 +1743,7 @@ h4 {
 }
 .admin-sidebar-item.active {
   background: var(--adm-sidebar-active);
-  color: #4ed67c;
+  color: #39e67b;
   font-weight: 700;
 }
 .admin-sidebar-exit {
@@ -1766,6 +1766,34 @@ h4 {
   min-width: 0;
   padding: 16px 16px calc(32px + env(safe-area-inset-bottom));
   background: var(--bg);
+}
+
+/* Filter pills (status/date-range filters on Disputes, Reports, Support,
+   Tasks, ...) were reusing .chip — sized for a money-amount picker, which
+   read oversized and inconsistent next to plain text-link filters
+   elsewhere. One small, consistent size for every filter pill in the
+   console instead. */
+.filter-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 13px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-weight: 600;
+  font-size: 12.5px;
+  color: var(--text-soft);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.filter-pill:hover {
+  border-color: var(--green);
+}
+.filter-pill.selected {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
 }
 @media (min-width: 900px) {
   .admin-shell {
