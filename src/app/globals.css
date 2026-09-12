@@ -1770,8 +1770,19 @@ h4 {
 .admin-content {
   flex: 1;
   min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+  overflow-wrap: anywhere;
   padding: 16px 16px calc(32px + env(safe-area-inset-bottom));
   background: var(--bg);
+}
+.admin-content .row {
+  min-width: 0;
+}
+@media (max-width: 480px) {
+  .admin-content .card-pad {
+    padding: 14px;
+  }
 }
 
 /* Filter pills (status/date-range filters on Disputes, Reports, Support,
