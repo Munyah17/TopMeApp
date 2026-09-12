@@ -36,3 +36,19 @@ export function calculateTopupFee(gateway: TopupGateway, amount: number): number
   const { pct, flat } = TOPUP_FEE[gateway];
   return Math.round((amount * pct + flat) * 100) / 100;
 }
+
+// A wallet payment never pays this — the customer already covered
+// Paynow/EcoCash/Stripe's cut back when they funded the wallet via
+// calculateTopupFee. A guest (or logged-in customer) paying a specific
+// purchase directly by gateway instead has no such funding step for that
+// cost to have been recovered at (see startGuestCheckout in
+// src/lib/actions/guest-payments.ts — real gap found and fixed
+// 2026-09-12, TopMe was absorbing this on every direct-gateway sale) — so
+// it's charged here instead, on top of the service's own platform fee.
+// Every payment-flow component uses this so the review screen shows the
+// real total before the customer picks how they're paying, not a number
+// that changes underneath them once a non-wallet method is picked.
+export function calculateGatewaySurcharge(method: "wallet" | TopupGateway | null, amount: number): number {
+  if (!method || method === "wallet") return 0;
+  return calculateTopupFee(method, amount);
+}

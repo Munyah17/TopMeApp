@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icons";
 import { hexA } from "@/lib/data/catalog-helpers";
-import { calculatePlatformFee } from "@/lib/fees";
+import { calculatePlatformFee, calculateGatewaySurcharge } from "@/lib/fees";
 import { payService, validateMeter } from "@/lib/actions/payments";
 import { startGuestCheckout, type GuestGateway } from "@/lib/actions/guest-payments";
 import { addGuestActivity } from "@/lib/guest-activity";
@@ -168,7 +168,7 @@ export function ZesaFlow({
 
   const stepIndex = ["meter", "amount", "review"].indexOf(step);
   const showTop = !["processing", "guest-ecocash", "success"].includes(step);
-  const fee = calculatePlatformFee(service.id, amount);
+  const fee = calculatePlatformFee(service.id, amount) + calculateGatewaySurcharge(method, amount);
   const total = amount + fee;
   const insufficient = method === "wallet" && total > walletBalance;
   const noMethodChosen = method === null;

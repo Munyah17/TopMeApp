@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
 import { Icon } from "@/components/icons";
 import { hexA } from "@/lib/data/catalog-helpers";
-import { calculatePlatformFee } from "@/lib/fees";
+import { calculatePlatformFee, calculateGatewaySurcharge } from "@/lib/fees";
 import { payService, sendGiftVoucher } from "@/lib/actions/payments";
 import { startGuestCheckout, type GuestGateway } from "@/lib/actions/guest-payments";
 import { addGuestActivity } from "@/lib/guest-activity";
@@ -665,7 +665,7 @@ function ReviewStep({
     const p = packages.find((x) => x.id === pkgId);
     if (p) detailLabel = `${p.name} Package`;
   }
-  const fee = service.is_gift ? 0 : calculatePlatformFee(service.id, amount);
+  const fee = service.is_gift ? 0 : calculatePlatformFee(service.id, amount) + calculateGatewaySurcharge(method, amount);
   const total = amount + fee;
   const insufficient = method === "wallet" && total > walletBalance;
   const noMethodChosen = method === null;

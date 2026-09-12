@@ -8,7 +8,7 @@ import { createGuestCheckoutSession } from "@/lib/payments/stripe";
 import { initiateEcocashPush } from "@/lib/payments/ecocash";
 import { failGuestCheckout } from "@/lib/payments/guest-checkout";
 import { hasRealCoverage } from "@/lib/fulfillment";
-import { calculatePlatformFee } from "@/lib/fees";
+import { calculatePlatformFee, calculateTopupFee } from "@/lib/fees";
 import { resolveVerifiedAmount } from "@/lib/pricing";
 import type { ApiModuleSafe } from "@/types/database";
 
@@ -94,12 +94,21 @@ export async function startGuestCheckout(input: StartGuestCheckoutInput) {
     data: { user },
   } = await supabase.auth.getUser();
   const reference = newReference();
-  // Platform processing fee, absorbed by the payer on top of the service
-  // amount — charged to the gateway as part of the same payment, and
-  // remembered here so finalize_guest_payment can split it back out onto
-  // the transaction without recomputing (it must always match what the
-  // gateway actually collected).
-  const fee = calculatePlatformFee(input.serviceId, verifiedAmount);
+  // Two fees stack here, and guest checkout used to only charge the first
+  // one — a real, unconditional leak (found 2026-09-12): a wallet top-up
+  // recovers Paynow/EcoCash/Stripe's own cut via calculateTopupFee at
+  // funding time, but a guest paying by gateway directly has no wallet
+  // funding step for that cost to have been recovered at — without this,
+  // TopMe absorbed the full gateway cut on every guest sale, on top of
+  // whatever this specific service's platform fee was ever meant to cover.
+  // Same rates as a top-up, applied here instead. Combined into one number
+  // (not split) because finalize_guest_payment copies `fee` onto the
+  // resulting transaction verbatim — see 2026-08-06-authenticated-gateway-
+  // checkout.sql — and always must match what the gateway actually
+  // collected regardless of how many components make it up.
+  const platformFee = calculatePlatformFee(input.serviceId, verifiedAmount);
+  const gatewayFee = calculateTopupFee(input.gateway, verifiedAmount);
+  const fee = platformFee + gatewayFee;
   const totalCharge = verifiedAmount + fee;
 
   const { error: insertError } = await supabase.from("guest_checkout_intents").insert({
