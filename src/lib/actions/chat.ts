@@ -2,10 +2,11 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { findProfileByPhone } from "@/lib/data/queries";
 import { isFeatureEnabled } from "@/lib/data/flags";
 import { sendMoney } from "@/lib/actions/payments";
+import { sendPushToUser } from "@/lib/push/send";
 import type { ChatMessage, Conversation } from "@/types/database";
 
 const FRIENDLY_ERRORS: Record<string, string> = {
@@ -51,6 +52,21 @@ async function touchConversation(conversationId: string, preview: string) {
     .eq("id", conversationId);
 }
 
+// Push notifications go to whoever *isn't* sending — reads the
+// conversation with the admin client because RLS on push_subscriptions is
+// owner-only, and the recipient here is never the calling user.
+async function notifyOtherParticipant(conversationId: string, senderId: string, body: string) {
+  const admin = createAdminClient();
+  const [{ data: convo }, { data: sender }] = await Promise.all([
+    admin.from("conversations").select("user_a, user_b").eq("id", conversationId).single(),
+    admin.from("profiles").select("full_name, phone").eq("id", senderId).single(),
+  ]);
+  if (!convo) return;
+  const recipientId = convo.user_a === senderId ? convo.user_b : convo.user_a;
+  const title = sender?.full_name || sender?.phone || "TopMe";
+  void sendPushToUser(admin, recipientId, { title, body, url: `/chat/${conversationId}` });
+}
+
 export async function sendTextMessage(conversationId: string, body: string): Promise<ChatMessage> {
   const { supabase, user } = await requireUser();
   const trimmed = body.trim();
@@ -71,6 +87,7 @@ export async function sendTextMessage(conversationId: string, body: string): Pro
   if (error) throw new Error(friendlyError(error.message));
 
   await touchConversation(conversationId, trimmed);
+  void notifyOtherParticipant(conversationId, user.id, trimmed);
   revalidatePath(`/chat/${conversationId}`);
   revalidatePath("/chat");
   return data as ChatMessage;
@@ -98,6 +115,7 @@ export async function sendImageMessage(conversationId: string, formData: FormDat
   if (error) throw new Error(friendlyError(error.message));
 
   await touchConversation(conversationId, "📷 Photo");
+  void notifyOtherParticipant(conversationId, user.id, "📷 Sent a photo");
   revalidatePath(`/chat/${conversationId}`);
   revalidatePath("/chat");
   return data as ChatMessage;
@@ -125,6 +143,9 @@ export async function sendMoneyMessage(conversationId: string, receiverPhone: st
     .single();
   if (error) throw new Error(friendlyError(error.message));
 
+  // No separate push trigger here — sendMoney() above already sends one to
+  // the receiver, covering this chat-embedded path and the standalone
+  // Send Money/Red Packet page identically from one place.
   await touchConversation(conversationId, preview);
   revalidatePath(`/chat/${conversationId}`);
   revalidatePath("/chat");

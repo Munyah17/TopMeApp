@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Icon } from "@/components/icons";
 import { ChatShell } from "@/components/chat/chat-shell";
+import { PushSubscribeButton } from "@/components/push/push-subscribe-button";
 import { getConversations } from "@/lib/data/chat-queries";
 import { getCurrentProfile } from "@/lib/data/queries";
 
@@ -53,6 +54,8 @@ export default async function ChatLayout({ children }: { children: React.ReactNo
         </Link>
       </div>
       <div className="muted mb-3">Talk and pay — send money or a red packet right in the conversation</div>
+
+      <PushSubscribeButton />
 
       <div className="card" style={{ overflow: "hidden" }}>
         <Link

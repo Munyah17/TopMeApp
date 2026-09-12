@@ -10,6 +10,7 @@ import { sendEmail } from "@/lib/email/client";
 import { giftRedeemedEmail, giftSentEmail, moneyReceivedEmail, moneySentEmail, paymentReceiptEmail } from "@/lib/email/templates";
 import { logTransactionEvent } from "@/lib/transaction-events";
 import { resolveVerifiedAmount } from "@/lib/pricing";
+import { sendPushToUser } from "@/lib/push/send";
 import type { ApiModuleSafe, P2pTransfer, Transaction } from "@/types/database";
 
 const FRIENDLY_ERRORS: Record<string, string> = {
@@ -348,6 +349,14 @@ export async function sendMoney(receiverPhone: string, amount: number, note?: st
     const { subject, html } = moneyReceivedEmail({ amount, senderName: senderProfile?.full_name || "A TopMe user", kind });
     void sendEmail({ sender: "noreply", to: receiverProfile.email, subject, html });
   }
+  // Covers both this standalone Send Money/Red Packet flow and the
+  // chat-embedded one (sendMoneyMessage in chat.ts calls this same
+  // function) from one place, instead of notifying twice.
+  void sendPushToUser(admin, transfer.receiver_id, {
+    title: senderProfile?.full_name || "TopMe",
+    body: kind === "red_packet" ? "Sent you a red packet 🧧" : `Sent you $${amount.toFixed(2)}`,
+    url: "/wallet",
+  });
 
   return transfer;
 }
