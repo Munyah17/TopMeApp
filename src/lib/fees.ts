@@ -20,14 +20,33 @@ export type TopupGateway = "paynow" | "stripe" | "ecocash";
 // is credited exactly `amount` (what they asked to top up) — same shape as
 // the platform fee above. Priced per rail rather than one blended number,
 // so an EcoCash top-up doesn't subsidise a pricier Stripe one: roughly
-// gateway cost + a thin margin, not maximum extraction. Rates confirmed
-// against EcoCash's ~1.7% and Paynow's ~3% merchant fees; revisit if either
-// changes. The authoritative charge is recomputed server-side wherever
-// money actually moves (startPaynowTopup / startStripeTopup /
-// startEcocashTopup) using this same function.
+// gateway cost + a thin margin, not maximum extraction.
+//
+// Re-verified 2026-09-13 against each provider's own published rates
+// (not a guess — see paynow.co.zw/Home/Fees directly):
+//   - EcoCash direct (initiateEcocashPush, not through Paynow): their own
+//     merchant fee is ~1.4%, plus Zimbabwe's 2% IMTT tax applies to
+//     electronic transactions over $5 — 2.0% was under both combined.
+//     Bumped to 2.5%, which is also exactly what Paynow itself charges
+//     for reselling the same EcoCash rail — a safe, published ceiling.
+//   - Paynow (their own hosted checkout — customer can pick EcoCash/
+//     OneMoney/Telecash at 2.5% flat, OR card at 3.5% + $0.50; TopMe
+//     can't know which until the customer is on Paynow's page, so this
+//     has to be one blended number). 3.3% flat covered the mobile-money
+//     path fine but left the card path's fixed $0.50 completely
+//     unrecovered. Added a small flat component for that, without
+//     jumping all the way to card's full $0.50.
+//   - Stripe: left unverified against a public source (their real cost
+//     depends on card-issuing country / currency-conversion surcharges,
+//     which aren't published per-corridor) — check actual Stripe payout
+//     statements for Zimbabwean cards specifically before trusting this
+//     one blind.
+// The authoritative charge is recomputed server-side wherever money
+// actually moves (startPaynowTopup / startStripeTopup / startEcocashTopup)
+// using this same function — never trust a client-supplied fee.
 const TOPUP_FEE: Record<TopupGateway, { pct: number; flat: number }> = {
-  ecocash: { pct: 0.02, flat: 0 },
-  paynow: { pct: 0.033, flat: 0 },
+  ecocash: { pct: 0.025, flat: 0 },
+  paynow: { pct: 0.033, flat: 0.3 },
   stripe: { pct: 0.032, flat: 0.3 },
 };
 
