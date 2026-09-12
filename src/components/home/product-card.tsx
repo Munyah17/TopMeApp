@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { Icon } from "@/components/icons";
-import { shade } from "@/lib/data/catalog-helpers";
 import type { Service } from "@/types/database";
 
 export function ProductCard({ service, categoryColor }: { service: Service; categoryColor: string }) {
@@ -24,7 +23,7 @@ export function ProductCard({ service, categoryColor }: { service: Service; cate
         ) : (
           <span
             className="prod-icon-tile"
-            style={{ background: `linear-gradient(135deg, ${color}, ${shade(color, -22)})` }}
+            style={{ background: color }}
           >
             <Icon name={service.icon} size={34} stroke={1.6} />
           </span>

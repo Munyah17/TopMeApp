@@ -301,7 +301,7 @@ export function ZesaFlow({
             <h2 style={{ fontSize: 19, marginTop: 6 }}>Review purchase</h2>
             <div className="muted mb-3">Tap the pencil to fix anything</div>
             <div className="card" style={{ overflow: "hidden" }}>
-              <div className="card-pad" style={{ textAlign: "center", borderBottom: "1px dashed var(--border)", background: `linear-gradient(135deg, var(--navy), ${service.color})` }}>
+              <div className="card-pad" style={{ textAlign: "center", borderBottom: "1px dashed var(--border)", background: service.color }}>
                 <div className="muted" style={{ color: "rgba(255,255,255,0.75)" }}>You&apos;re buying</div>
                 <div style={{ fontSize: 34, fontWeight: 800, marginTop: 4, color: "#fff" }}>${total.toFixed(2)}</div>
               </div>

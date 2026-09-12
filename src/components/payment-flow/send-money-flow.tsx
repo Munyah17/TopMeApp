@@ -14,7 +14,7 @@ const THEME: Record<Kind, { accent: string; accentSoft: string; gradient: string
   transfer: {
     accent: "var(--green)",
     accentSoft: "var(--green-50)",
-    gradient: "linear-gradient(135deg, var(--navy), #16324f)",
+    gradient: "var(--navy)",
     title: "Send Money",
     icon: "arrowUpR",
     sentLabel: "sent",
@@ -22,7 +22,7 @@ const THEME: Record<Kind, { accent: string; accentSoft: string; gradient: string
   red_packet: {
     accent: "#EF4444",
     accentSoft: "var(--error-bg)",
-    gradient: "linear-gradient(135deg, #B91C1C, #EF4444 65%, #F59E0B 130%)",
+    gradient: "#D8434B",
     title: "Send a Red Packet",
     icon: "packet",
     sentLabel: "sent as a red packet",

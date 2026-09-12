@@ -57,7 +57,7 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
 
       <div className="wallet-grid">
         <div className="col-main">
-          <div className="card card-pad" style={{ background: "linear-gradient(135deg, var(--navy), #16324f)", border: "none" }}>
+          <div className="card card-pad" style={{ background: "var(--navy)", border: "none" }}>
             <div className="muted" style={{ color: "rgba(255,255,255,0.55)" }}>
               Available balance
             </div>

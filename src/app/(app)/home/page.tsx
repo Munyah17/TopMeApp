@@ -51,7 +51,7 @@ export default async function HomePage() {
           <div className="quickpay-gift-row">
             <div
               style={{
-                background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
+                background: "#0f172a",
                 borderRadius: 16,
                 padding: "24px",
                 position: "relative",

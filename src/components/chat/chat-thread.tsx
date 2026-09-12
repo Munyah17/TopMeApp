@@ -193,7 +193,7 @@ export function ChatThread({
                       padding: 16,
                       color: "#fff",
                       boxShadow: "0 1px 3px rgba(15,23,42,0.15)",
-                      background: isRedPacket ? "linear-gradient(135deg, #B91C1C, #EF4444 65%, #F59E0B 130%)" : "linear-gradient(135deg, var(--navy), #16324f)",
+                      background: isRedPacket ? "#D8434B" : "var(--navy)",
                     }}
                   >
                     <div className="row gap-2" style={{ alignItems: "center" }}>
