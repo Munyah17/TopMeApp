@@ -6,6 +6,8 @@ import { checkPaynowStatus, initiatePaynowPayment } from "@/lib/payments/paynow"
 import { applyPaynowResult } from "@/lib/payments/paynow-result";
 import { createTopupCheckoutSession } from "@/lib/payments/stripe";
 import { initiateEcocashPush } from "@/lib/payments/ecocash";
+import { initializeVitalPayGatewayPayment, verifyVitalPayGatewayPayment } from "@/lib/payments/vitalpay-gateway";
+import { applyVitalPayGatewayResult } from "@/lib/payments/vitalpay-gateway-result";
 import { calculateTopupFee } from "@/lib/fees";
 
 async function requireUser() {
@@ -86,6 +88,46 @@ export async function startEcocashTopup(amount: number, phone: string) {
   return { reference };
 }
 
+// Not wired into the top-up UI yet — VITALPAY_GATEWAY_SECRET_KEY isn't
+// configured (see src/lib/payments/vitalpay-gateway.ts), so this throws a
+// clear "not configured" error the moment it's called. Built ahead of the
+// key existing so turning it on is just adding the env var + a button,
+// not writing this from scratch under pressure once the key arrives.
+export async function startVitalPayTopup(amount: number) {
+  const { supabase, user } = await requireUser();
+  const admin = createAdminClient();
+  const reference = newReference("VPY");
+  const fee = calculateTopupFee("vitalpay", amount);
+
+  await supabase.from("topup_intents").insert({ user_id: user.id, amount, fee, provider: "vitalpay", reference });
+
+  const result = await initializeVitalPayGatewayPayment({
+    amount: amount + fee,
+    currency: "USD",
+    email: user.email || "",
+    reference,
+    name: undefined,
+    callbackUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/wallet?vitalpay_ref=${encodeURIComponent(reference)}`,
+    description: "TopMe wallet top up",
+  });
+
+  if (result.status === "successful") {
+    // Test-mode sandbox scenario resolves synchronously with no redirect —
+    // apply it immediately instead of sending the customer to a blank page.
+    await applyVitalPayGatewayResult(reference, "successful");
+    return { redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/wallet?vitalpay_ref=${encodeURIComponent(reference)}`, reference };
+  }
+  if (result.status === "failed") {
+    await admin.from("topup_intents").update({ status: "failed" }).eq("reference", reference);
+    throw new Error("VitalPay declined this payment.");
+  }
+  if (!result.payment_url) {
+    throw new Error("VitalPay didn't return a checkout link — try again shortly.");
+  }
+  await admin.from("topup_intents").update({ meta: { platformReference: result.platform_reference } }).eq("reference", reference);
+  return { redirectUrl: result.payment_url, reference };
+}
+
 export async function checkTopupStatus(reference: string) {
   const { supabase } = await requireUser();
   const { data } = await supabase.from("topup_intents").select("status").eq("reference", reference).single();
@@ -105,7 +147,18 @@ export async function checkTopupPaymentNow(reference: string): Promise<{ checked
     .single();
   if (!intent) return { checked: false, error: "We couldn't find that payment." };
   if (intent.status !== "pending") return { checked: true };
-  if (intent.provider !== "paynow") return { checked: false, error: "Manual check is only available for Paynow payments." };
+
+  if (intent.provider === "vitalpay") {
+    try {
+      const verify = await verifyVitalPayGatewayPayment(reference);
+      await applyVitalPayGatewayResult(reference, verify.status);
+      return { checked: true };
+    } catch (e) {
+      return { checked: false, error: e instanceof Error ? e.message : "VitalPay didn't respond. Try again shortly." };
+    }
+  }
+
+  if (intent.provider !== "paynow") return { checked: false, error: "Manual check is only available for Paynow and VitalPay payments." };
 
   const pollUrl = (intent.meta as { pollUrl?: string } | null)?.pollUrl;
   if (!pollUrl) return { checked: false, error: "This payment doesn't have a status handle yet — try again in a moment." };

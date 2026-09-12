@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { checkTopupPaymentNow, checkTopupStatus } from "@/lib/actions/wallet";
 
-export function PaynowTopupStatus({ reference }: { reference: string }) {
+export function PaynowTopupStatus({ reference, providerLabel = "Paynow" }: { reference: string; providerLabel?: string }) {
   const router = useRouter();
   const [status, setStatus] = useState<"pending" | "timeout" | "completed" | "failed">("pending");
   const [checkingNow, setCheckingNow] = useState(false);
@@ -80,7 +80,7 @@ export function PaynowTopupStatus({ reference }: { reference: string }) {
   if (status === "failed") {
     return (
       <div className="card card-pad mb-3" style={{ borderColor: "var(--error)" }}>
-        <div style={{ fontWeight: 700, color: "var(--error)" }}>This Paynow payment didn&apos;t go through. No funds were added.</div>
+        <div style={{ fontWeight: 700, color: "var(--error)" }}>This {providerLabel} payment didn&apos;t go through. No funds were added.</div>
       </div>
     );
   }
@@ -90,7 +90,7 @@ export function PaynowTopupStatus({ reference }: { reference: string }) {
       <div className="card card-pad mb-3" style={{ borderColor: "var(--warning)" }}>
         <div style={{ fontWeight: 700, color: "var(--warning)" }}>This is taking longer than expected.</div>
         <div className="muted mt-1">
-          We&apos;ve stopped checking automatically. If Paynow already took payment, tap below to pick it up — otherwise
+          We&apos;ve stopped checking automatically. If {providerLabel} already took payment, tap below to pick it up — otherwise
           contact support with reference <strong>{reference}</strong>.
         </div>
         <button className="btn btn-secondary btn-block mt-2" disabled={checkingNow} onClick={handleCheckPayment}>
@@ -109,9 +109,9 @@ export function PaynowTopupStatus({ reference }: { reference: string }) {
     <div className="card card-pad mb-3">
       <div className="row gap-2" style={{ alignItems: "center" }}>
         <div className="spinner-ring" style={{ width: 22, height: 22 }} />
-        <div style={{ fontWeight: 700, fontSize: 14 }}>Confirming your Paynow top up…</div>
+        <div style={{ fontWeight: 700, fontSize: 14 }}>Confirming your {providerLabel} top up…</div>
       </div>
-      <div className="muted mt-1">Paynow can take a moment. If it&apos;s taking too long, check directly.</div>
+      <div className="muted mt-1">{providerLabel} can take a moment. If it&apos;s taking too long, check directly.</div>
       <button className="btn btn-secondary btn-block mt-2" disabled={checkingNow} onClick={handleCheckPayment}>
         {checkingNow ? "Checking…" : "Check Payment"}
       </button>

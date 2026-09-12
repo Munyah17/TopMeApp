@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type IntegrationId = "paynow" | "stripe" | "ecocash" | "vitalpay";
+export type IntegrationId = "paynow" | "stripe" | "ecocash" | "vitalpay" | "vitalpay_gateway";
 
 /**
  * Records a real success/failure for one of the four payment/fulfillment

@@ -14,7 +14,7 @@ export function calculatePlatformFee(serviceId: string, amount: number): number 
   return Math.round((0.5 + amount * 0.015) * 100) / 100;
 }
 
-export type TopupGateway = "paynow" | "stripe" | "ecocash";
+export type TopupGateway = "paynow" | "stripe" | "ecocash" | "vitalpay";
 
 // Wallet top-up processing fee: the customer pays amount + fee, the wallet
 // is credited exactly `amount` (what they asked to top up) — same shape as
@@ -44,10 +44,17 @@ export type TopupGateway = "paynow" | "stripe" | "ecocash";
 // The authoritative charge is recomputed server-side wherever money
 // actually moves (startPaynowTopup / startStripeTopup / startEcocashTopup)
 // using this same function — never trust a client-supplied fee.
+//   - VitalPay Payments Gateway: their own rate card was never given to
+//     us (see [[vitalpay-postpaid-gateway-deal]] memory) — 0% is a real
+//     placeholder, not a guess dressed up as a real number. Update this
+//     the moment VitalPay states their actual fee; until then this rail
+//     runs at a loss if their cut is anything but zero, which is a known,
+//     deliberate, temporary state — not an oversight.
 const TOPUP_FEE: Record<TopupGateway, { pct: number; flat: number }> = {
   ecocash: { pct: 0.025, flat: 0 },
   paynow: { pct: 0.033, flat: 0.3 },
   stripe: { pct: 0.032, flat: 0.3 },
+  vitalpay: { pct: 0, flat: 0 },
 };
 
 export function calculateTopupFee(gateway: TopupGateway, amount: number): number {

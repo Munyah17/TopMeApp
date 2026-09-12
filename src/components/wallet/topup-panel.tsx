@@ -3,14 +3,18 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icons";
-import { startEcocashTopup, startPaynowTopup, startStripeTopup } from "@/lib/actions/wallet";
+import { startEcocashTopup, startPaynowTopup, startStripeTopup, startVitalPayTopup } from "@/lib/actions/wallet";
 import { calculateTopupFee } from "@/lib/fees";
 
-type Gateway = "paynow" | "stripe" | "ecocash";
+type Gateway = "paynow" | "stripe" | "ecocash" | "vitalpay";
 
 const AMOUNT_CHIPS = [5, 10, 20, 50, 100];
 
-export function TopupPanel({ userPhone }: { userPhone?: string | null }) {
+// vitalPayEnabled is passed from the server (wallet/page.tsx), computed
+// from whether VITALPAY_GATEWAY_SECRET_KEY actually exists — the button
+// only ever appears once that key is real, so this never shows a rail
+// that's guaranteed to error out.
+export function TopupPanel({ userPhone, vitalPayEnabled }: { userPhone?: string | null; vitalPayEnabled?: boolean }) {
   const router = useRouter();
   const [gateway, setGateway] = useState<Gateway>("paynow");
   const [amount, setAmount] = useState<number | null>(20);
@@ -36,6 +40,11 @@ export function TopupPanel({ userPhone }: { userPhone?: string | null }) {
       }
       if (gateway === "stripe") {
         const { redirectUrl } = await startStripeTopup(amt);
+        window.location.href = redirectUrl;
+        return;
+      }
+      if (gateway === "vitalpay") {
+        const { redirectUrl } = await startVitalPayTopup(amt);
         window.location.href = redirectUrl;
         return;
       }
@@ -89,6 +98,7 @@ export function TopupPanel({ userPhone }: { userPhone?: string | null }) {
           [
             { id: "paynow", label: "Paynow" },
             { id: "stripe", label: "Card (Stripe)" },
+            ...(vitalPayEnabled ? [{ id: "vitalpay" as const, label: "VitalPay" }] : []),
           ] as { id: Gateway; label: string }[]
         ).map((g) => (
           <div
@@ -140,7 +150,7 @@ export function TopupPanel({ userPhone }: { userPhone?: string | null }) {
           <div className="row between"><span className="muted">Added to wallet</span><span>${amt.toFixed(2)}</span></div>
           <div className="row between mt-1">
             <span className="muted">
-              {gateway === "paynow" ? "Paynow" : gateway === "stripe" ? "Card" : "EcoCash"} processing fee
+              {gateway === "paynow" ? "Paynow" : gateway === "stripe" ? "Card" : gateway === "vitalpay" ? "VitalPay" : "EcoCash"} processing fee
             </span>
             <span>${fee.toFixed(2)}</span>
           </div>
@@ -164,7 +174,7 @@ export function TopupPanel({ userPhone }: { userPhone?: string | null }) {
         {busy ? "Starting…" : `Pay $${total > 0 ? total.toFixed(2) : "0.00"}`}
       </button>
       <div className="muted mt-2" style={{ fontSize: 11.5, display: "flex", alignItems: "center", gap: 6 }}>
-        <Icon name="lock" size={13} stroke={2} /> Secured by {gateway === "paynow" ? "Paynow Zimbabwe" : gateway === "stripe" ? "Stripe" : "EcoCash"}
+        <Icon name="lock" size={13} stroke={2} /> Secured by {gateway === "paynow" ? "Paynow Zimbabwe" : gateway === "stripe" ? "Stripe" : gateway === "vitalpay" ? "VitalPay" : "EcoCash"}
       </div>
     </div>
   );

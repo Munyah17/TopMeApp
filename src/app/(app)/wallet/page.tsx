@@ -26,8 +26,8 @@ const LEDGER_LABEL: Record<string, string> = {
   withdrawal_reversal: "Withdrawal reversed",
 };
 
-export default async function WalletPage({ searchParams }: { searchParams: Promise<{ paynow_ref?: string }> }) {
-  const { paynow_ref: paynowRef } = await searchParams;
+export default async function WalletPage({ searchParams }: { searchParams: Promise<{ paynow_ref?: string; vitalpay_ref?: string }> }) {
+  const { paynow_ref: paynowRef, vitalpay_ref: vitalPayRef } = await searchParams;
   const profile = await getCurrentProfile();
   if (!profile) {
     return (
@@ -54,6 +54,7 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
       <div className="muted mb-3">Top up once, pay for anything instantly</div>
 
       {paynowRef && <PaynowTopupStatus reference={paynowRef} />}
+      {vitalPayRef && <PaynowTopupStatus reference={vitalPayRef} providerLabel="VitalPay" />}
 
       <div className="wallet-grid">
         <div className="col-main">
@@ -79,7 +80,7 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
             <span className="section-title">Top up</span>
           </div>
           <div className="card card-pad">
-            <TopupPanel userPhone={profile.phone} />
+            <TopupPanel userPhone={profile.phone} vitalPayEnabled={!!process.env.VITALPAY_GATEWAY_SECRET_KEY} />
           </div>
 
           <div className="row between mt-3 mb-2">
