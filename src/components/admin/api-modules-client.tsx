@@ -13,7 +13,7 @@ export function ApiModulesClient({ modules }: { modules: ApiModuleSafe[] }) {
 
   return (
     <>
-      <button className="btn btn-primary" style={{ height: 40, padding: "0 16px" }} onClick={() => setOpen((v) => !v)}>
+      <button className="btn btn-primary mb-3" style={{ height: 40, padding: "0 16px" }} onClick={() => setOpen((v) => !v)}>
         <Icon name={open ? "x" : "plus"} size={15} stroke={2.4} /> {open ? "Close" : "Add API"}
       </button>
 

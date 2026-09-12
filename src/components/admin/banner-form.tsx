@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { createPromoBanner, updatePromoBanner, type PromoBannerInput } from "@/lib/actions/admin";
+import { useRef, useState, useTransition } from "react";
+import { createPromoBanner, updatePromoBanner, uploadBannerImage, type PromoBannerInput } from "@/lib/actions/admin";
 import type { PromoBanner } from "@/types/database";
 
 function toInput(b: PromoBanner | undefined): PromoBannerInput {
@@ -20,8 +20,28 @@ function toInput(b: PromoBanner | undefined): PromoBannerInput {
 export function BannerForm({ existing, onDone }: { existing?: PromoBanner; onDone: () => void }) {
   const [form, setForm] = useState<PromoBannerInput>(toInput(existing));
   const [pending, startTransition] = useTransition();
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isEdit = !!existing;
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setError(null);
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.set("file", file);
+      const url = await uploadBannerImage(formData);
+      set("imageUrl", url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't upload that image.");
+    } finally {
+      setUploading(false);
+    }
+  }
 
   function set<K extends keyof PromoBannerInput>(key: K, value: PromoBannerInput[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -65,8 +85,14 @@ export function BannerForm({ existing, onDone }: { existing?: PromoBanner; onDon
             </div>
           </div>
           <div>
-            <label className="field-label">Image URL</label>
-            <input className="field" placeholder="https://…/banner.png" value={form.imageUrl} onChange={(e) => set("imageUrl", e.target.value)} />
+            <label className="field-label">Banner image</label>
+            <input ref={fileRef} type="file" accept="image/*" hidden onChange={onPickFile} />
+            <div className="row gap-2">
+              <input className="field" style={{ flex: 1 }} placeholder="https://…/banner.png, or upload one" value={form.imageUrl} onChange={(e) => set("imageUrl", e.target.value)} />
+              <button type="button" className="btn btn-secondary" style={{ height: 44, padding: "0 14px", flexShrink: 0 }} disabled={uploading} onClick={() => fileRef.current?.click()}>
+                {uploading ? "Uploading…" : "Upload"}
+              </button>
+            </div>
           </div>
           <div>
             <label className="field-label">Link URL (where tapping the banner goes, optional)</label>

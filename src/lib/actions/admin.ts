@@ -75,6 +75,26 @@ export async function uploadNetworkLogo(formData: FormData) {
   return data.publicUrl;
 }
 
+// Uploads a Home-page promo banner image the owner picks from their own
+// device — the banner form previously only took a pasted URL, with
+// nowhere to actually upload one from.
+export async function uploadBannerImage(formData: FormData) {
+  await requirePermission("announcements.manage");
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) throw new Error("Choose an image to upload.");
+  if (!file.type.startsWith("image/")) throw new Error("Please choose an image file.");
+  if (file.size > 5 * 1024 * 1024) throw new Error("Banner images must be under 5MB.");
+
+  const admin = createAdminClient();
+  const ext = file.name.split(".").pop()?.toLowerCase() || "png";
+  const path = `banners/${randomUUID()}.${ext}`;
+  const { error } = await admin.storage.from("product-images").upload(path, file, { contentType: file.type });
+  if (error) throw new Error(error.message);
+
+  const { data } = admin.storage.from("product-images").getPublicUrl(path);
+  return data.publicUrl;
+}
+
 // Sets (or clears, with null) the logo shown for one network on the
 // airtime "Choose network" step.
 export async function setNetworkLogo(networkId: string, logoUrl: string | null) {
