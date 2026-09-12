@@ -1595,18 +1595,42 @@ h4 {
    not a horizontal scroll strip — the same nav list the desktop sidebar
    uses, just off-canvas until opened. Desktop (>=900px) turns that same
    .admin-sidebar into a static in-flow column instead of an overlay. */
+/* Martfury/Botble-style console shell (approved 2026-09-13): a permanent
+   dark sidebar against a light content canvas, regardless of the
+   customer-facing light/dark toggle — staff never reach that toggle at all
+   (/admin, /super-admin redirect away from /account entirely), so this is
+   a fixed identity, not a themeable one. Scoped entirely under
+   .admin-shell — none of this touches .app-shell's own tokens or the
+   customer-facing pages the owner asked not to change yet. Typography is
+   deliberately just Inter (the same body font already used everywhere in
+   TopMe, --font-inter, loaded in src/app/layout.tsx) at heavier weights
+   for hierarchy — no separate display face, which is what actually reads
+   as "clean" for a dense data console versus a marketing page. */
 .admin-shell {
   display: flex;
   flex-direction: column;
   min-height: 100dvh;
+  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, sans-serif;
+  --adm-sidebar-bg: #0d1712;
+  --adm-sidebar-border: #1c2a21;
+  --adm-sidebar-ink: #dfeae4;
+  --adm-sidebar-ink-soft: #8ea297;
+  --adm-sidebar-active: #17301f;
+  --adm-green-tile: #e7f5ea;
+  --adm-blue: #2f6fed;
+  --adm-blue-tile: #eaf1ff;
+  --adm-amber-tile: #fdf3e3;
+  --adm-coral: #d8434b;
+  --adm-coral-tile: #fcedee;
 }
 .admin-mobile-bar {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: calc(env(safe-area-inset-top) + 12px) 16px 12px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
+  border-bottom: 1px solid var(--adm-sidebar-border);
+  background: var(--adm-sidebar-bg);
+  color: var(--adm-sidebar-ink);
   position: sticky;
   top: 0;
   z-index: 40;
@@ -1616,7 +1640,7 @@ h4 {
   border: none;
   padding: 6px;
   margin: -6px;
-  color: var(--text);
+  color: var(--adm-sidebar-ink);
   display: flex;
 }
 .admin-mobile-bar-title {
@@ -1640,13 +1664,13 @@ h4 {
   bottom: 0;
   width: 82vw;
   max-width: 300px;
-  background: var(--surface);
+  background: var(--adm-sidebar-bg);
   z-index: 200;
   padding: calc(env(safe-area-inset-top) + 14px) 14px 14px;
   transform: translateX(-100%);
   transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
   overflow-y: auto;
-  box-shadow: 10px 0 34px rgba(15, 23, 42, 0.2);
+  box-shadow: 10px 0 34px rgba(0, 0, 0, 0.35);
 }
 .admin-sidebar.admin-sidebar-open {
   transform: translateX(0);
@@ -1656,14 +1680,15 @@ h4 {
   align-items: center;
   justify-content: space-between;
   padding: 4px 8px 12px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--adm-sidebar-border);
   margin-bottom: 8px;
+  color: var(--adm-sidebar-ink);
 }
 .admin-sidebar-close {
   background: none;
   border: none;
   padding: 6px;
-  color: var(--text-faint);
+  color: var(--adm-sidebar-ink-soft);
 }
 .admin-nav-group {
   margin-bottom: 6px;
@@ -1673,7 +1698,7 @@ h4 {
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--text-faint);
+  color: var(--adm-sidebar-ink-soft);
   padding: 10px 8px 4px;
 }
 .admin-sidebar-item {
@@ -1682,25 +1707,26 @@ h4 {
   gap: 10px;
   padding: 11px 10px;
   border-radius: 10px;
-  color: var(--text-soft);
+  color: var(--adm-sidebar-ink-soft);
   text-decoration: none;
   font-size: 13.5px;
   font-weight: 600;
   transition: background 0.15s, color 0.15s;
 }
 .admin-sidebar-item:hover {
-  background: var(--bg);
+  background: var(--adm-sidebar-active);
+  color: var(--adm-sidebar-ink);
 }
 .admin-sidebar-item.active {
-  background: var(--green-50);
-  color: var(--green);
+  background: var(--adm-sidebar-active);
+  color: #4ed67c;
   font-weight: 700;
 }
 .admin-sidebar-exit {
   margin-top: 10px;
   padding-top: 12px;
-  border-top: 1px solid var(--border);
-  color: var(--text-faint);
+  border-top: 1px solid var(--adm-sidebar-border);
+  color: var(--adm-sidebar-ink-soft);
 }
 .admin-sidebar-logout {
   width: 100%;
@@ -1709,12 +1735,13 @@ h4 {
   font-family: inherit;
   cursor: pointer;
   text-align: left;
-  color: var(--error);
+  color: #ee6b70;
 }
 .admin-content {
   flex: 1;
   min-width: 0;
   padding: 16px 16px calc(32px + env(safe-area-inset-bottom));
+  background: var(--bg);
 }
 @media (min-width: 900px) {
   .admin-shell {
@@ -1739,17 +1766,18 @@ h4 {
     max-width: none;
     flex-shrink: 0;
     max-height: calc(100dvh - 48px);
-    background: var(--surface);
-    border: 1px solid var(--border);
+    background: var(--adm-sidebar-bg);
+    border: 1px solid var(--adm-sidebar-border);
     border-radius: 18px;
     padding: 14px;
     transform: none;
-    box-shadow: none;
+    box-shadow: 0 12px 32px -16px rgba(0, 0, 0, 0.3);
   }
   .admin-sidebar-header {
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--adm-sidebar-border);
   }
   .admin-content {
     padding: 0;
+    background: transparent;
   }
 }

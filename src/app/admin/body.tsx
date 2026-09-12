@@ -176,17 +176,26 @@ export async function AdminOverviewBody({ basePath }: { basePath: string }) {
         </>
       )}
 
-      <div className="row gap-2 mt-2">
-        <div className="card card-pad" style={{ flex: 1 }}>
-            <div className="muted">Today&apos;s gross volume</div>
+      <div className="row gap-2 mt-2" style={{ flexWrap: "wrap" }}>
+          <div className="card card-pad" style={{ flex: "1 1 160px" }}>
+            <div className="ibadge round" style={{ width: 32, height: 32, background: "var(--green-50)", color: "var(--green-600)" }}>
+              <Icon name="wallet" size={16} stroke={2} />
+            </div>
+            <div className="muted mt-2">Today&apos;s gross volume</div>
             <div style={{ fontWeight: 800, fontSize: 19, marginTop: 2 }}>{fmt(todayGross)}</div>
           </div>
-          <div className="card card-pad" style={{ flex: 1 }}>
-            <div className="muted">Today&apos;s net revenue</div>
+          <div className="card card-pad" style={{ flex: "1 1 160px" }}>
+            <div className="ibadge round" style={{ width: 32, height: 32, background: "var(--blue-50)", color: "var(--blue)" }}>
+              <Icon name="book" size={16} stroke={2} />
+            </div>
+            <div className="muted mt-2">Today&apos;s net revenue</div>
             <div style={{ fontWeight: 800, fontSize: 19, marginTop: 2, color: "var(--success)" }}>{fmt(todayRevenue)}</div>
           </div>
-          <div className="card card-pad" style={{ flex: 1 }}>
-            <div className="muted">Transactions today</div>
+          <div className="card card-pad" style={{ flex: "1 1 160px" }}>
+            <div className="ibadge round" style={{ width: 32, height: 32, background: "#FEF6E7", color: "var(--warning)" }}>
+              <Icon name="zap" size={16} stroke={2} />
+            </div>
+            <div className="muted mt-2">Transactions today</div>
             <div style={{ fontWeight: 800, fontSize: 19, marginTop: 2 }}>{todayTx.length}</div>
           </div>
         </div>
@@ -216,7 +225,7 @@ export async function AdminOverviewBody({ basePath }: { basePath: string }) {
                     maxWidth: 22,
                     height: Math.max(4, (b / maxBar) * 100),
                     borderRadius: "6px 6px 3px 3px",
-                    background: "linear-gradient(180deg, var(--green), var(--green-600))",
+                    background: "var(--green)",
                   }}
                 />
                 <span style={{ fontSize: 10.5, color: "var(--text-faint)", fontWeight: 700 }}>
