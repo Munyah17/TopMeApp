@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Icon } from "@/components/icons";
 import { PromoteSuperadminForm } from "@/components/admin/promote-superadmin-form";
+import { UserDeleteButton } from "@/components/admin/user-delete-button";
 import { UserEditForm } from "@/components/admin/user-edit-form";
 import { UserSuspendButton } from "@/components/admin/user-suspend-button";
 import { WalletAdjustForm } from "@/components/admin/wallet-adjust-form";
@@ -43,9 +44,13 @@ export async function UserDetailBody({ id, basePath }: { id: string; basePath: s
 
       <div className="card card-pad mb-3">
         <div className="row gap-2">
-          <div className="ibadge round" style={{ width: 46, height: 46, background: "#F1F4F9", color: "var(--text-soft)", fontWeight: 700 }}>
-            {(target.full_name || target.phone || target.email || "?").slice(0, 2).toUpperCase()}
-          </div>
+          {target.avatar_url ? (
+            <img src={target.avatar_url} alt="" style={{ width: 46, height: 46, borderRadius: 14, objectFit: "cover" }} />
+          ) : (
+            <div className="ibadge round" style={{ width: 46, height: 46, background: "#F1F4F9", color: "var(--text-soft)", fontWeight: 700 }}>
+              {(target.full_name || target.phone || target.email || "?").slice(0, 2).toUpperCase()}
+            </div>
+          )}
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 700, fontSize: 15 }}>{target.full_name || "Unnamed"}</div>
             <div className="muted" style={{ fontSize: 12 }}>
@@ -91,7 +96,7 @@ export async function UserDetailBody({ id, basePath }: { id: string; basePath: s
 
       {permissions.includes("users.suspend") && target.role === "customer" && (
         <div className="mb-3">
-          <UserEditForm userId={id} fullName={target.full_name} phone={target.phone} email={target.email} />
+          <UserEditForm userId={id} fullName={target.full_name} phone={target.phone} email={target.email} avatarUrl={target.avatar_url} />
         </div>
       )}
 
@@ -104,6 +109,12 @@ export async function UserDetailBody({ id, basePath }: { id: string; basePath: s
       {viewer?.role === "superadmin" && target.role === "admin" && (
         <div className="mb-3">
           <PromoteSuperadminForm userId={id} email={target.email ?? ""} />
+        </div>
+      )}
+
+      {permissions.includes("users.suspend") && target.role === "customer" && viewer?.id !== id && (
+        <div className="mb-3">
+          <UserDeleteButton userId={id} email={target.email ?? ""} basePath={basePath} />
         </div>
       )}
 

@@ -24,6 +24,7 @@ export interface Profile {
   full_name: string | null;
   phone: string | null;
   email: string | null;
+  avatar_url: string | null;
   role: UserRole;
   notifications_enabled: boolean;
   is_suspended: boolean;

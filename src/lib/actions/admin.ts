@@ -117,25 +117,48 @@ export async function toggleApiModule(id: string, currentStatus: "active" | "ina
   revalidateAdminPath("/apis");
 }
 
-export async function inviteTeamMember(input: { name: string; email: string; role: string }) {
+// Directly creates a real, ready-to-use staff account — no email-invite
+// round trip. The owner wanted staff to be added the way any admin panel
+// lets you add a teammate, not "invited" like a guest to someone else's
+// platform: this is their own app, so the account exists and can log in
+// immediately, password handed to the owner once to pass on however they
+// like (WhatsApp, in person, whatever) — never logged, never stored
+// anywhere but the one return value.
+export async function addTeamMember(input: { name: string; email: string; role: string }) {
   const { user } = await requirePermission("staff.manage");
   const admin = createAdminClient();
 
-  const { data: invited, error } = await admin.auth.admin.inviteUserByEmail(input.email, {
-    data: { full_name: input.name },
+  const password = randomUUID().replace(/-/g, "").slice(0, 12);
+
+  const { data: created, error } = await admin.auth.admin.createUser({
+    email: input.email,
+    password,
+    email_confirm: true,
+    user_metadata: { full_name: input.name },
   });
   if (error) throw new Error(error.message);
+  if (!created.user) throw new Error("Could not create the account.");
 
   await admin.from("team_members").insert({
     owner_id: user.id,
-    user_id: invited.user?.id ?? null,
+    user_id: created.user.id,
     invited_email: input.email,
     name: input.name,
     role: input.role,
-    status: "invited",
+    status: "active",
   });
 
+  // handle_new_user() defaults every new auth user to role 'customer' — flip
+  // it to 'admin' immediately, same write activateTeamMember used to do,
+  // since there's no separate accept-the-invite step to wait for any more.
+  const { data: updatedProfile, error: roleError } = await admin.from("profiles").update({ role: "admin" }).eq("id", created.user.id).select("role").single();
+  if (roleError) throw new Error(roleError.message);
+  if (updatedProfile?.role !== "admin") throw new Error("Account was created but the role change didn't take — please check Staff & Access.");
+
+  await logAdminAction(admin, { actorId: user.id, action: "staff.add", targetTable: "team_members", targetId: created.user.id, meta: { email: input.email } });
+
   revalidateAdminPath("/staff");
+  return { email: input.email, password };
 }
 
 export async function togglePermission(memberId: string, permission: string, currentPermissions: string[]) {
@@ -332,6 +355,86 @@ export async function sendCustomerPasswordReset(userId: string) {
     targetId: userId,
   });
   return { email: target.email as string };
+}
+
+// Sets the password directly — no email round trip, for when the owner
+// wants to hand someone working credentials right now rather than wait on
+// a reset email (same reasoning as addTeamMember below).
+export async function setCustomerPassword(userId: string, newPassword: string) {
+  const { user: actingUser } = await requirePermission("users.suspend");
+  if (newPassword.length < 8) throw new Error("Password must be at least 8 characters.");
+  const admin = createAdminClient();
+
+  const { data: target } = await admin.from("profiles").select("role").eq("id", userId).single();
+  if (!target) throw new Error("That account couldn't be found.");
+  if (target.role !== "customer") throw new Error("Only customer accounts can be edited here.");
+
+  const { error } = await admin.auth.admin.updateUserById(userId, { password: newPassword });
+  if (error) throw new Error(error.message);
+
+  await logAdminAction(admin, { actorId: actingUser.id, action: "user.password_set", targetTable: "profiles", targetId: userId });
+}
+
+// Uploads a profile picture for a user the admin is editing — same public
+// bucket and size/type checks as uploadServiceImage, just its own path
+// prefix so avatars don't mix in with catalog images.
+export async function uploadUserAvatar(formData: FormData) {
+  await requirePermission("users.suspend");
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) throw new Error("Choose an image to upload.");
+  if (!file.type.startsWith("image/")) throw new Error("Please choose an image file.");
+  if (file.size > 3 * 1024 * 1024) throw new Error("Profile pictures must be under 3MB.");
+
+  const admin = createAdminClient();
+  const ext = file.name.split(".").pop()?.toLowerCase() || "png";
+  const path = `avatars/${randomUUID()}.${ext}`;
+  const { error } = await admin.storage.from("product-images").upload(path, file, { contentType: file.type });
+  if (error) throw new Error(error.message);
+
+  const { data } = admin.storage.from("product-images").getPublicUrl(path);
+  return data.publicUrl;
+}
+
+export async function setUserAvatar(userId: string, avatarUrl: string | null) {
+  const { user: actingUser } = await requirePermission("users.suspend");
+  const admin = createAdminClient();
+  const { error } = await admin.from("profiles").update({ avatar_url: avatarUrl }).eq("id", userId);
+  if (error) throw new Error(error.message);
+  await logAdminAction(admin, { actorId: actingUser.id, action: "user.avatar_set", targetTable: "profiles", targetId: userId });
+  revalidateAdminPath(`/users/${userId}`);
+}
+
+// Permanently deletes a customer account. Deliberately the most guarded
+// action on this page after promoteToSuperadmin: deleting auth.users
+// cascades to profiles -> wallets/wallet_ledger/transactions (see
+// supabase/schema.sql's `on delete cascade` chain), so this doesn't just
+// remove a login, it erases their entire financial history. Refuses
+// outright if there's still money on the account (get it to zero first —
+// withdraw or adjust it away deliberately, not as a side effect of
+// deleting someone), and requires retyping their email, same confirmation
+// pattern as granting superadmin.
+export async function deleteCustomerAccount(userId: string, confirmEmail: string) {
+  const { user: actingUser } = await requirePermission("users.suspend");
+  const admin = createAdminClient();
+
+  const { data: target } = await admin.from("profiles").select("role, email").eq("id", userId).single();
+  if (!target) throw new Error("That account couldn't be found.");
+  if (target.role !== "customer") throw new Error("Only customer accounts can be deleted here.");
+  if ((target.email || "").trim().toLowerCase() !== confirmEmail.trim().toLowerCase()) {
+    throw new Error("That email doesn't match — please retype it exactly to confirm.");
+  }
+
+  const { data: wallet } = await admin.from("wallets").select("balance, gift_locked").eq("user_id", userId).maybeSingle();
+  if (wallet && (Number(wallet.balance) !== 0 || Number(wallet.gift_locked ?? 0) !== 0)) {
+    throw new Error(`This account still has money on it ($${Number(wallet.balance).toFixed(2)}) — settle or withdraw it first, then delete.`);
+  }
+
+  await logAdminAction(admin, { actorId: actingUser.id, action: "user.delete", targetTable: "profiles", targetId: userId, meta: { email: target.email } });
+
+  const { error } = await admin.auth.admin.deleteUser(userId);
+  if (error) throw new Error(error.message);
+
+  revalidateAdminPath("/users");
 }
 
 function revalidateCatalog() {

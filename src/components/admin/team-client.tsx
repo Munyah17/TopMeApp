@@ -3,23 +3,42 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icons";
-import { activateTeamMember, deactivateTeamMember, inviteTeamMember, togglePermission } from "@/lib/actions/admin";
+import { activateTeamMember, addTeamMember, deactivateTeamMember, togglePermission } from "@/lib/actions/admin";
 import { PERMISSION_GROUPS, PERMISSION_LABEL } from "@/lib/auth/permission-keys";
 import type { TeamMember } from "@/types/database";
 
 const MEMBER_ROLES = ["Manager", "Support", "Finance"];
 
-function InviteForm({ onDone }: { onDone: () => void }) {
+function AddUserForm({ onDone }: { onDone: () => void }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("Manager");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [created, setCreated] = useState<{ email: string; password: string } | null>(null);
+
+  // The account already exists and can log in the moment this is shown —
+  // this password is generated once, returned once, and never stored or
+  // logged anywhere else, so this screen is the only place to copy it from.
+  if (created) {
+    return (
+      <div className="card card-pad mb-3" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div className="section-title" style={{ fontSize: 14 }}>Account created</div>
+        <div className="muted" style={{ fontSize: 12.5, lineHeight: 1.5 }}>
+          Share these with {created.email} however you like — this password won&apos;t be shown again. They can sign
+          in right away and change it from their own profile.
+        </div>
+        <div className="field" style={{ userSelect: "all", fontWeight: 700 }}>{created.email}</div>
+        <div className="field" style={{ userSelect: "all", fontWeight: 700, fontFamily: "monospace" }}>{created.password}</div>
+        <button className="btn btn-primary btn-block" onClick={onDone}>Done</button>
+      </div>
+    );
+  }
 
   return (
     <div className="card card-pad mb-3" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div className="section-title" style={{ fontSize: 14 }}>
-        Invite team member
+        Add team member
       </div>
       <div>
         <label className="field-label">Full Name</label>
@@ -51,15 +70,15 @@ function InviteForm({ onDone }: { onDone: () => void }) {
           setError(null);
           startTransition(async () => {
             try {
-              await inviteTeamMember({ name, email, role });
-              onDone();
+              const result = await addTeamMember({ name, email, role });
+              setCreated(result);
             } catch (e) {
-              setError(e instanceof Error ? e.message : "Could not send invite.");
+              setError(e instanceof Error ? e.message : "Could not add this user.");
             }
           });
         }}
       >
-        {pending ? "Sending…" : "Send invite"}
+        {pending ? "Creating…" : "Add user"}
       </button>
     </div>
   );
@@ -178,11 +197,11 @@ export function TeamClient({ members }: { members: TeamMember[] }) {
   return (
     <>
       <button className="btn btn-primary" style={{ height: 40, padding: "0 16px" }} onClick={() => setOpen((v) => !v)}>
-        <Icon name={open ? "x" : "plus"} size={15} stroke={2.4} /> {open ? "Close" : "Invite"}
+        <Icon name={open ? "x" : "plus"} size={15} stroke={2.4} /> {open ? "Close" : "Add user"}
       </button>
 
       {open && (
-        <InviteForm
+        <AddUserForm
           onDone={() => {
             setOpen(false);
             router.refresh();

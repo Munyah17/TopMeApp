@@ -18,8 +18,8 @@ export default async function StaffPage() {
       <h2 style={{ fontSize: 19 }}>Staff & Access</h2>
       <div className="muted mb-3" style={{ lineHeight: 1.5 }}>
         Admin accounts handle day-to-day operations. Assign only the rights each person needs, and keep Super
-        Admin access with the owner. Invites are sent as real Supabase auth invitations — activating an invite
-        is what actually grants them <code>/admin</code> access.
+        Admin access with the owner. Adding a user creates their account immediately — no invite email, no
+        waiting on them to accept anything.
       </div>
       <TeamClient members={members} />
     </div>
