@@ -1,3 +1,4 @@
+import { Icon } from "@/components/icons";
 import { fmt } from "@/lib/data/catalog-helpers";
 import { getAllServices, getCategories } from "@/lib/data/queries";
 import { getMyPermissions } from "@/lib/auth/permissions";
@@ -80,38 +81,46 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
       <div className="row gap-2" style={{ flexWrap: "wrap" }}>
         <div className="card card-pad" style={{ flex: "1 1 140px" }}>
-          <div className="muted">Gross volume</div>
+          <div className="ibadge round" style={{ width: 30, height: 30, background: "var(--green-50)", color: "var(--green-600)" }}><Icon name="wallet" size={15} stroke={2} /></div>
+          <div className="muted mt-2">Gross volume</div>
           <div style={{ fontWeight: 800, fontSize: 18, marginTop: 2 }}>{fmt(grossVolume)}</div>
         </div>
         <div className="card card-pad" style={{ flex: "1 1 140px" }}>
-          <div className="muted">Net revenue</div>
+          <div className="ibadge round" style={{ width: 30, height: 30, background: "var(--green-50)", color: "var(--green-600)" }}><Icon name="grid" size={15} stroke={2} /></div>
+          <div className="muted mt-2">Net revenue</div>
           <div style={{ fontWeight: 800, fontSize: 18, marginTop: 2, color: "var(--success)" }}>{fmt(netRevenue)}</div>
         </div>
         <div className="card card-pad" style={{ flex: "1 1 140px" }}>
-          <div className="muted">Fee revenue</div>
+          <div className="ibadge round" style={{ width: 30, height: 30, background: "var(--blue-50)", color: "var(--blue)" }}><Icon name="book" size={15} stroke={2} /></div>
+          <div className="muted mt-2">Fee revenue</div>
           <div style={{ fontWeight: 800, fontSize: 18, marginTop: 2 }}>{fmt(feeRevenue)}</div>
         </div>
         <div className="card card-pad" style={{ flex: "1 1 140px" }}>
-          <div className="muted">Transactions</div>
+          <div className="ibadge round" style={{ width: 30, height: 30, background: "#FEF6E7", color: "var(--warning)" }}><Icon name="zap" size={15} stroke={2} /></div>
+          <div className="muted mt-2">Transactions</div>
           <div style={{ fontWeight: 800, fontSize: 18, marginTop: 2 }}>{successTx.length}</div>
         </div>
       </div>
 
       <div className="row gap-2 mt-2" style={{ flexWrap: "wrap" }}>
         <div className="card card-pad" style={{ flex: "1 1 140px" }}>
-          <div className="muted">Refunds issued</div>
+          <div className="ibadge round" style={{ width: 30, height: 30, background: "#FDECEC", color: "var(--error)" }}><Icon name="refresh" size={15} stroke={2} /></div>
+          <div className="muted mt-2">Refunds issued</div>
           <div style={{ fontWeight: 800, fontSize: 18, marginTop: 2, color: "var(--error)" }}>{fmt(refundTotal)}</div>
         </div>
         <div className="card card-pad" style={{ flex: "1 1 140px" }}>
-          <div className="muted">Wallet adjustments</div>
+          <div className="ibadge round" style={{ width: 30, height: 30, background: "var(--blue-50)", color: "var(--blue)" }}><Icon name="arrowUpR" size={15} stroke={2} /></div>
+          <div className="muted mt-2">Wallet adjustments</div>
           <div style={{ fontWeight: 800, fontSize: 18, marginTop: 2 }}>{fmt(adjustmentTotal)}</div>
         </div>
         <div className="card card-pad" style={{ flex: "1 1 140px" }}>
-          <div className="muted">Disputes open</div>
+          <div className="ibadge round" style={{ width: 30, height: 30, background: "#FEF6E7", color: "var(--warning)" }}><Icon name="shield" size={15} stroke={2} /></div>
+          <div className="muted mt-2">Disputes open</div>
           <div style={{ fontWeight: 800, fontSize: 18, marginTop: 2, color: disputesOpen ? "var(--warning)" : undefined }}>{disputesOpen}</div>
         </div>
         <div className="card card-pad" style={{ flex: "1 1 140px" }}>
-          <div className="muted">Tickets open</div>
+          <div className="ibadge round" style={{ width: 30, height: 30, background: "#FEF6E7", color: "var(--warning)" }}><Icon name="headset" size={15} stroke={2} /></div>
+          <div className="muted mt-2">Tickets open</div>
           <div style={{ fontWeight: 800, fontSize: 18, marginTop: 2, color: ticketsOpen ? "var(--warning)" : undefined }}>{ticketsOpen}</div>
         </div>
       </div>

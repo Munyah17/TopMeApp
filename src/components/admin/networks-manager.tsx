@@ -3,7 +3,6 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icons";
-import { hexA } from "@/lib/data/catalog-helpers";
 import { setNetworkActive, setNetworkLogo, uploadNetworkLogo } from "@/lib/actions/admin";
 import type { Network } from "@/types/database";
 
@@ -142,7 +141,7 @@ export function NetworksManager({ networks }: { networks: Network[] }) {
   return (
     <div className="card mb-3" style={{ overflow: "hidden" }}>
       <div className="row gap-2" style={{ padding: 16, borderBottom: "1px solid var(--border)" }}>
-        <div className="ibadge" style={{ background: hexA("#00c853", 0.12), color: "#00c853" }}>
+        <div className="ibadge" style={{ background: "var(--green-50)", color: "var(--green-600)" }}>
           <Icon name="phone" size={20} stroke={1.8} />
         </div>
         <div style={{ flex: 1 }}>
