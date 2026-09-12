@@ -10,6 +10,7 @@ import { failGuestCheckout } from "@/lib/payments/guest-checkout";
 import { hasRealCoverage } from "@/lib/fulfillment";
 import { calculatePlatformFee, calculateTopupFee } from "@/lib/fees";
 import { resolveVerifiedAmount } from "@/lib/pricing";
+import { assertRateLimit, getClientIp } from "@/lib/rate-limit";
 import type { ApiModuleSafe } from "@/types/database";
 
 const FRIENDLY_ERRORS: Record<string, string> = {
@@ -50,6 +51,15 @@ export async function startGuestCheckout(input: StartGuestCheckoutInput) {
   if (input.gateway === "ecocash" && !input.guestPhone?.trim()) {
     throw new Error("Enter your EcoCash number.");
   }
+
+  // The one unauthenticated, money-moving entry point in the app — no
+  // login required to reach it, and every call triggers a real request to
+  // Paynow/EcoCash/Stripe, so hammering it costs real money in gateway
+  // calls even when every attempt fails. 8 attempts / 10 minutes is
+  // generous for a real customer retrying a declined card or a mistyped
+  // number, tight enough to stop scripted abuse.
+  const ip = await getClientIp();
+  await assertRateLimit("guest_checkout", ip, 8, 600);
 
   // Never take a real card/mobile-money payment for a service with no
   // working provider behind it.
