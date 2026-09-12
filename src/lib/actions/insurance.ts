@@ -122,7 +122,15 @@ export async function purchaseInsurancePolicy(params: {
       return { error: "Failed to create client record" };
     }
 
-    // 6. Charge wallet (using wallet_pay RPC)
+    // 6. Charge wallet (using wallet_pay RPC). owner_label/provider_cost are
+    // passed explicitly — TopMe is Motions Microinsurance's agent/dealer,
+    // not an insurer, selling under their licence, so the audit trail must
+    // say so the same way every other service records who it's "sold by
+    // TopMe, processed and paid to <owner_label>". provider_cost is the
+    // real base_premium from the live quote above, not a guessed
+    // percentage (there's no `services` row for insurance products at all
+    // — see 2026-09-13-wallet-pay-explicit-attribution.sql for why the
+    // normal cost_percentage lookup silently produced 0 here).
     const { data: transaction, error: paymentError } = await admin.rpc("wallet_pay", {
       p_service_id: `insurance-${params.productId}`,
       p_amount: totalPremium,
@@ -130,6 +138,8 @@ export async function purchaseInsurancePolicy(params: {
       p_network_id: null,
       p_extra_value: JSON.stringify({ product_id: params.productId, client_id: localClient.id }),
       p_fulfillment_provider: "insurance",
+      p_owner_label: "Motions Microinsurance",
+      p_provider_cost: quote.base_premium,
     });
 
     if (paymentError) {

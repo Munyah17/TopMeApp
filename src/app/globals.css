@@ -1616,12 +1616,36 @@ h4 {
   --adm-sidebar-ink: #dfeae4;
   --adm-sidebar-ink-soft: #8ea297;
   --adm-sidebar-active: #17301f;
-  --adm-green-tile: #e7f5ea;
+  --adm-green-tile: #e2faec;
   --adm-blue: #2f6fed;
   --adm-blue-tile: #eaf1ff;
   --adm-amber-tile: #fdf3e3;
   --adm-coral: #d8434b;
   --adm-coral-tile: #fcedee;
+
+  /* Sharpen the shared design tokens for the whole console — every
+     existing var(--green)/var(--bg)/var(--surface)/var(--border)
+     reference across EVERY /admin and /super-admin page repaints from
+     this one place, since .admin-shell wraps all of them (see
+     src/app/admin/layout.tsx, src/app/super-admin/layout.tsx). The old
+     values (#00c853 green on an #f8fafc hazy blue-grey canvas) read flat
+     next to the new dark sidebar — this is a punchier, more saturated
+     green and a genuinely white canvas + cards, separated by a crisp
+     border/shadow instead of a muddy grey fill difference. Scoped here
+     only — :root and .app-shell (customer pages) are untouched. */
+  --green: #10c85f;
+  --green-600: #0aa64c;
+  --green-50: #e1faeb;
+  --green-100: #c3f4d8;
+  --bg: #f6f9f7;
+  --surface: #ffffff;
+  --surface-elevated: #ffffff;
+  --muted: #eef3f0;
+  --border: #dfe7e2;
+  --border-subtle: #e9efec;
+  --shadow-xs: 0 1px 2px rgba(13, 23, 18, 0.05);
+  --shadow-sm: 0 2px 10px rgba(13, 23, 18, 0.07);
+  --shadow-green: 0 6px 16px rgba(16, 200, 95, 0.22);
 }
 .admin-mobile-bar {
   display: flex;
