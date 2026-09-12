@@ -112,6 +112,11 @@ export default function SignupPage() {
         <button className="btn btn-primary btn-block" type="submit" disabled={loading}>
           {loading ? "Creating account…" : "Create account"}
         </button>
+        <div className="muted mt-2" style={{ textAlign: "center", fontSize: 11.5 }}>
+          By creating an account, you agree to TopMe&apos;s{" "}
+          <Link href="/terms" style={{ color: "var(--text-soft)" }}>Terms of Service</Link> and{" "}
+          <Link href="/privacy" style={{ color: "var(--text-soft)" }}>Privacy Policy</Link>.
+        </div>
       </form>
 
       <div className="muted mt-3" style={{ textAlign: "center" }}>
