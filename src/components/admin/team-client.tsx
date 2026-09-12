@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { Icon } from "@/components/icons";
-import { activateTeamMember, addTeamMember, deactivateTeamMember, togglePermission } from "@/lib/actions/admin";
-import { PERMISSION_GROUPS, PERMISSION_LABEL } from "@/lib/auth/permission-keys";
+import { addTeamMember } from "@/lib/actions/admin";
 import type { TeamMember } from "@/types/database";
 
 const MEMBER_ROLES = ["Manager", "Support", "Finance"];
@@ -86,117 +86,45 @@ function AddUserForm({ onDone }: { onDone: () => void }) {
 
 const STATUS_COLOR: Record<string, string> = { invited: "var(--warning)", active: "var(--success)", disabled: "var(--text-faint)" };
 
-function MemberCard({ member }: { member: TeamMember }) {
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-
+// Compact by design — settings, status changes and permissions all moved
+// to this member's own full profile page (staff-member-detail.tsx). This
+// row is just enough to identify someone and get to that page; a
+// permissions table for every staff member expanded by default here was
+// real, unnecessary space, especially with more than a couple of staff.
+function MemberCard({ member, basePath }: { member: TeamMember; basePath: string }) {
   return (
-    <div className="card card-pad mb-2">
-      <div className="row gap-2">
-        <div
-          className="ibadge round"
-          style={{ width: 38, height: 38, background: "#F1F4F9", color: "var(--text-soft)", fontSize: 12, fontWeight: 700 }}
-        >
-          {(member.name || member.invited_email).slice(0, 2).toUpperCase()}
+    <Link
+      href={`${basePath}/staff/${member.id}`}
+      className="card card-pad mb-2 tap row gap-2"
+      style={{ textDecoration: "none", color: "inherit" }}
+    >
+      <div
+        className="ibadge round"
+        style={{ width: 38, height: 38, background: "#F1F4F9", color: "var(--text-soft)", fontSize: 12, fontWeight: 700, flexShrink: 0 }}
+      >
+        {(member.name || member.invited_email).slice(0, 2).toUpperCase()}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 700, fontSize: 13.5 }}>{member.name || member.invited_email}</div>
+        <div className="muted" style={{ fontSize: 11.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {member.invited_email} · {member.role}
         </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 700, fontSize: 13.5 }}>{member.name || member.invited_email}</div>
-          <div className="muted" style={{ fontSize: 11.5 }}>
-            {member.invited_email} · {member.role}
-          </div>
-        </div>
-        <span style={{ fontSize: 10.5, fontWeight: 800, color: STATUS_COLOR[member.status], textTransform: "uppercase" }}>{member.status}</span>
       </div>
-
-      {error && (
-        <div className="muted mt-2" style={{ color: "var(--error)" }}>
-          {error}
-        </div>
-      )}
-
-      <div className="row gap-2 mt-2">
-        {member.status !== "active" ? (
-          <button
-            className="btn btn-secondary"
-            style={{ height: 34, padding: "0 14px", fontSize: 12 }}
-            disabled={pending}
-            onClick={() =>
-              startTransition(async () => {
-                setError(null);
-                try {
-                  await activateTeamMember(member.id);
-                  router.refresh();
-                } catch (e) {
-                  setError(e instanceof Error ? e.message : "Could not activate.");
-                }
-              })
-            }
-          >
-            Activate
-          </button>
-        ) : (
-          <button
-            className="btn btn-secondary"
-            style={{ height: 34, padding: "0 14px", fontSize: 12, color: "var(--error)" }}
-            disabled={pending}
-            onClick={() =>
-              startTransition(async () => {
-                setError(null);
-                try {
-                  await deactivateTeamMember(member.id);
-                  router.refresh();
-                } catch (e) {
-                  setError(e instanceof Error ? e.message : "Could not deactivate.");
-                }
-              })
-            }
-          >
-            Deactivate
-          </button>
-        )}
-      </div>
-
-      <div className="muted mt-2 mb-1" style={{ fontSize: 11 }}>
-        Permissions
-      </div>
-      <div style={{ opacity: pending ? 0.6 : 1 }}>
-        {PERMISSION_GROUPS.map((group) => (
-          <div key={group.label} className="mt-2">
-            <div className="muted" style={{ fontSize: 10.5, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.04em" }}>
-              {group.label}
-            </div>
-            {group.keys.map((p) => {
-              const on = member.permissions.includes(p);
-              return (
-                <div key={p} className="row between" style={{ padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
-                  <span style={{ fontSize: 13 }}>{PERMISSION_LABEL[p]}</span>
-                  <button
-                    type="button"
-                    className={`toggle ${on ? "on" : ""}`}
-                    disabled={pending}
-                    aria-label={PERMISSION_LABEL[p]}
-                    onClick={() => startTransition(async () => { await togglePermission(member.id, p, member.permissions); router.refresh(); })}
-                  >
-                    <div className="knob" />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        ))}
-      </div>
-    </div>
+      <span style={{ fontSize: 10.5, fontWeight: 800, color: STATUS_COLOR[member.status], textTransform: "uppercase", flexShrink: 0 }}>{member.status}</span>
+      <Icon name="chevronR" size={16} stroke={2} />
+    </Link>
   );
 }
 
 export function TeamClient({ members }: { members: TeamMember[] }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
+  const basePath = pathname.startsWith("/super-admin") ? "/super-admin" : "/admin";
 
   return (
     <>
-      <button className="btn btn-primary" style={{ height: 40, padding: "0 16px" }} onClick={() => setOpen((v) => !v)}>
+      <button className="btn btn-primary mb-3" style={{ height: 40, padding: "0 16px" }} onClick={() => setOpen((v) => !v)}>
         <Icon name={open ? "x" : "plus"} size={15} stroke={2.4} /> {open ? "Close" : "Add user"}
       </button>
 
@@ -210,7 +138,7 @@ export function TeamClient({ members }: { members: TeamMember[] }) {
       )}
 
       {members.map((m) => (
-        <MemberCard key={m.id} member={m} />
+        <MemberCard key={m.id} member={m} basePath={basePath} />
       ))}
     </>
   );

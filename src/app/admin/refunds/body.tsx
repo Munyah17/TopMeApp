@@ -13,12 +13,6 @@ export async function RefundsBody({ basePath }: { basePath: string }) {
   return (
     <div>
       <h2 style={{ fontSize: 19 }}>Refunds</h2>
-      <div className="muted mb-3" style={{ lineHeight: 1.5 }}>
-        A refund is raised automatically whenever a payment succeeds but the order can&apos;t be
-        delivered. Wallet failures of $49 or less are refunded on the spot; anything larger, and
-        every guest checkout, waits here for your decision. Refunds always go to the customer&apos;s
-        TopMe wallet — never reversed to Paynow/EcoCash/card.
-      </div>
       <RefundsClient refunds={refunds} basePath={basePath} />
     </div>
   );

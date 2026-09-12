@@ -13,7 +13,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
 
   return (
     <div>
-      <h2 style={{ fontSize: 19 }}>Users</h2>
+      <h2 style={{ fontSize: 19 }}>User Management</h2>
       <div className="muted mb-3" style={{ lineHeight: 1.5 }}>
         Search any customer by name, phone, or email. Suspending an account blocks sign-in
         immediately and can be reversed anytime. Super Admin accounts can&apos;t be suspended here.

@@ -38,6 +38,15 @@ function CustomerRow({ customer }: { customer: Profile }) {
           Suspended
         </span>
       )}
+      <Link
+        href={`${basePath}/users/${customer.id}`}
+        className="tap"
+        title="Edit this account"
+        aria-label="Edit"
+        style={{ width: 32, height: 32, borderRadius: 9, border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-soft)", flexShrink: 0 }}
+      >
+        <Icon name="edit" size={14} stroke={2} />
+      </Link>
       {isSuperadmin ? (
         <span className="muted" style={{ fontSize: 11.5 }}>
           Protected
@@ -45,7 +54,7 @@ function CustomerRow({ customer }: { customer: Profile }) {
       ) : (
         <button
           className="btn btn-ghost"
-          style={{ height: 32, padding: "0 12px", fontSize: 12, color: customer.is_suspended ? "var(--success)" : "var(--error)" }}
+          style={{ height: 32, padding: "0 12px", fontSize: 12, color: customer.is_suspended ? "var(--success)" : "var(--error)", flexShrink: 0 }}
           disabled={pending}
           onClick={() => {
             if (!confirm(`${customer.is_suspended ? "Reactivate" : "Suspend"} this account?`)) return;

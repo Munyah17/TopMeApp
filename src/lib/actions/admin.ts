@@ -12,6 +12,19 @@ import { requirePermission } from "@/lib/auth/permissions";
 // no matter what a permissions array says — granting superadmin itself is
 // the obvious one. Everything else below delegates via requirePermission()
 // so toggling a key on a staff member's team_members row actually works.
+// Super Admin is the system owner — total control over every account,
+// staff included, not just customers. A regular admin (staff.manage /
+// users.suspend granted via permissions, not the role itself) stays
+// restricted to customer accounts only, since staff/role management has
+// its own dedicated page and blast radius. Throws the same friendly
+// message either way so a regular admin can't tell staff accounts even
+// exist via this path.
+async function assertProfileEditable(admin: ReturnType<typeof createAdminClient>, actingUserId: string, targetRole: string) {
+  if (targetRole === "customer") return;
+  const { data: actingProfile } = await admin.from("profiles").select("role").eq("id", actingUserId).single();
+  if (actingProfile?.role !== "superadmin") throw new Error("Only customer accounts can be edited here.");
+}
+
 async function requireSuperadmin() {
   const supabase = await createClient();
   const {
@@ -281,7 +294,7 @@ export async function updateCustomerProfile(
 
   const { data: target } = await admin.from("profiles").select("role, email").eq("id", userId).single();
   if (!target) throw new Error("That account couldn't be found.");
-  if (target.role !== "customer") throw new Error("Only customer accounts can be edited here.");
+  await assertProfileEditable(admin, actingUser.id, target.role);
 
   const patch: Record<string, string | null> = {};
   const changed: Record<string, unknown> = {};
@@ -367,7 +380,7 @@ export async function setCustomerPassword(userId: string, newPassword: string) {
 
   const { data: target } = await admin.from("profiles").select("role").eq("id", userId).single();
   if (!target) throw new Error("That account couldn't be found.");
-  if (target.role !== "customer") throw new Error("Only customer accounts can be edited here.");
+  await assertProfileEditable(admin, actingUser.id, target.role);
 
   const { error } = await admin.auth.admin.updateUserById(userId, { password: newPassword });
   if (error) throw new Error(error.message);
@@ -398,6 +411,8 @@ export async function uploadUserAvatar(formData: FormData) {
 export async function setUserAvatar(userId: string, avatarUrl: string | null) {
   const { user: actingUser } = await requirePermission("users.suspend");
   const admin = createAdminClient();
+  const { data: target } = await admin.from("profiles").select("role").eq("id", userId).single();
+  if (target) await assertProfileEditable(admin, actingUser.id, target.role);
   const { error } = await admin.from("profiles").update({ avatar_url: avatarUrl }).eq("id", userId);
   if (error) throw new Error(error.message);
   await logAdminAction(admin, { actorId: actingUser.id, action: "user.avatar_set", targetTable: "profiles", targetId: userId });
@@ -419,7 +434,8 @@ export async function deleteCustomerAccount(userId: string, confirmEmail: string
 
   const { data: target } = await admin.from("profiles").select("role, email").eq("id", userId).single();
   if (!target) throw new Error("That account couldn't be found.");
-  if (target.role !== "customer") throw new Error("Only customer accounts can be deleted here.");
+  if (target.role === "superadmin") throw new Error("A Super Admin account can't be deleted here.");
+  await assertProfileEditable(admin, actingUser.id, target.role);
   if ((target.email || "").trim().toLowerCase() !== confirmEmail.trim().toLowerCase()) {
     throw new Error("That email doesn't match — please retype it exactly to confirm.");
   }
@@ -435,6 +451,68 @@ export async function deleteCustomerAccount(userId: string, confirmEmail: string
   if (error) throw new Error(error.message);
 
   revalidateAdminPath("/users");
+}
+
+// Operations Center's "stuck" queues (getAttentionQueue) used to be pure
+// display — a list with nowhere to click. These give staff an actual way
+// to resolve a stuck top-up or guest checkout instead of only being able
+// to look at it and wait, or go dig through the gateway's own dashboard.
+export async function adminForceCheckTopup(reference: string) {
+  const { user: actingUser } = await requirePermission("transactions.rectify");
+  const admin = createAdminClient();
+  const { data: intent } = await admin.from("topup_intents").select("status, provider, meta").eq("reference", reference).single();
+  if (!intent) throw new Error("That top-up couldn't be found.");
+  if (intent.status !== "pending") return { checked: true, alreadyResolved: true };
+  if (intent.provider !== "paynow") throw new Error("Manual check is only available for Paynow top-ups — mark it failed instead if the gateway confirms nothing happened.");
+
+  const pollUrl = (intent.meta as { pollUrl?: string } | null)?.pollUrl;
+  if (!pollUrl) throw new Error("This top-up has no status handle to check yet.");
+
+  const { checkPaynowStatus } = await import("@/lib/payments/paynow");
+  const { applyPaynowResult } = await import("@/lib/payments/paynow-result");
+  const result = await checkPaynowStatus(pollUrl);
+  if (!result.ok || !result.status) throw new Error(result.error || "Paynow didn't respond — try again shortly.");
+
+  await applyPaynowResult(reference, result.status, result.fields);
+  await logAdminAction(admin, { actorId: actingUser.id, action: "operations.force_check_topup", targetTable: "topup_intents", targetId: reference });
+  revalidateAdminPath("/operations");
+  return { checked: true };
+}
+
+export async function adminForceCheckGuestCheckout(reference: string) {
+  const { user: actingUser } = await requirePermission("transactions.rectify");
+  const admin = createAdminClient();
+  const { data: intent } = await admin.from("guest_checkout_intents").select("status, provider, meta").eq("reference", reference).single();
+  if (!intent) throw new Error("That checkout couldn't be found.");
+  if (intent.status !== "pending") return { checked: true, alreadyResolved: true };
+  if (intent.provider !== "paynow") throw new Error("Manual check is only available for Paynow checkouts — mark it failed instead if the gateway confirms nothing happened.");
+
+  const pollUrl = (intent.meta as { pollUrl?: string } | null)?.pollUrl;
+  if (!pollUrl) throw new Error("This checkout has no status handle to check yet.");
+
+  const { checkPaynowStatus } = await import("@/lib/payments/paynow");
+  const { applyPaynowResult } = await import("@/lib/payments/paynow-result");
+  const result = await checkPaynowStatus(pollUrl);
+  if (!result.ok || !result.status) throw new Error(result.error || "Paynow didn't respond — try again shortly.");
+
+  await applyPaynowResult(reference, result.status, result.fields);
+  await logAdminAction(admin, { actorId: actingUser.id, action: "operations.force_check_guest_checkout", targetTable: "guest_checkout_intents", targetId: reference });
+  revalidateAdminPath("/operations");
+  return { checked: true };
+}
+
+// Manual last resort when a gateway will never answer (dead pollUrl, no
+// webhook ever arriving) — conditional on status still being 'pending' so
+// a webhook that lands a split-second later can't be silently overwritten.
+export async function adminMarkPendingFailed(kind: "topup" | "guest", reference: string) {
+  const { user: actingUser } = await requirePermission("transactions.rectify");
+  const admin = createAdminClient();
+  const table = kind === "topup" ? "topup_intents" : "guest_checkout_intents";
+  const { data: updated, error } = await admin.from(table).update({ status: "failed" }).eq("reference", reference).eq("status", "pending").select().maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!updated) throw new Error("This was already resolved — nothing to change.");
+  await logAdminAction(admin, { actorId: actingUser.id, action: `operations.mark_${kind}_failed`, targetTable: table, targetId: reference });
+  revalidateAdminPath("/operations");
 }
 
 function revalidateCatalog() {

@@ -12,11 +12,6 @@ export async function WithdrawalsBody() {
   return (
     <div>
       <h2 style={{ fontSize: 19 }}>Withdrawals</h2>
-      <div className="muted mb-3" style={{ lineHeight: 1.5 }}>
-        Customers cash TopMe balance out to a local rail (bank, ZIPIT, EcoCash, InnBucks, O&apos;mari) for a
-        1.3% fee. The amount already left their wallet when they requested it. Approve, then pay them on the
-        rail and mark it paid. Rejecting returns the full amount to their wallet.
-      </div>
       <WithdrawalsClient withdrawals={withdrawals} />
     </div>
   );

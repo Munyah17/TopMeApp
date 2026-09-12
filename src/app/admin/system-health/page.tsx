@@ -28,8 +28,7 @@ export default async function SystemHealthPage() {
     <div>
       <h2 style={{ fontSize: 19 }}>System Health</h2>
       <div className="muted mb-3">
-        Last-known-good state from the actual webhook/poll traffic for each integration — not a synthetic
-        heartbeat. A provider with no successes and repeated failures needs attention.
+        Last-known-good state from the actual webhook/poll traffic for each integration — not a synthetic heartbeat.
       </div>
 
       <div className="card" style={{ overflow: "hidden" }}>

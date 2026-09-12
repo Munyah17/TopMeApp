@@ -34,11 +34,6 @@ export default async function ApiManagementPage() {
   return (
     <div>
       <h2 style={{ fontSize: 19 }}>APIs Management</h2>
-      <div className="muted mb-3" style={{ lineHeight: 1.5 }}>
-        Every product on TopMe is powered by an API module. Add a key to bring a new biller online, or toggle one
-        off without removing it. A service with no active module behind it is declined upfront as
-        &quot;Temporarily Not Available&quot; — it never fakes a purchase.
-      </div>
       <div className="card card-pad mb-3">
         <div className="row between" style={{ alignItems: "center" }}>
           <div>

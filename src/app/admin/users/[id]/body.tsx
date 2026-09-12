@@ -94,7 +94,7 @@ export async function UserDetailBody({ id, basePath }: { id: string; basePath: s
         )}
       </div>
 
-      {permissions.includes("users.suspend") && target.role === "customer" && (
+      {permissions.includes("users.suspend") && (target.role === "customer" || viewer?.role === "superadmin") && viewer?.id !== id && (
         <div className="mb-3">
           <UserEditForm userId={id} fullName={target.full_name} phone={target.phone} email={target.email} avatarUrl={target.avatar_url} />
         </div>
@@ -112,7 +112,7 @@ export async function UserDetailBody({ id, basePath }: { id: string; basePath: s
         </div>
       )}
 
-      {permissions.includes("users.suspend") && target.role === "customer" && viewer?.id !== id && (
+      {permissions.includes("users.suspend") && target.role !== "superadmin" && (target.role === "customer" || viewer?.role === "superadmin") && viewer?.id !== id && (
         <div className="mb-3">
           <UserDeleteButton userId={id} email={target.email ?? ""} basePath={basePath} />
         </div>
