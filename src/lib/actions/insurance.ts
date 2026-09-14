@@ -2,7 +2,8 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/server";
-import { createOrGetClient, getQuote, createPolicy, recordPayment as recordTariqifyPayment } from "@/lib/insurance/tariqify";
+import { createOrGetClient, getQuote, createPolicy, recordPayment as recordTariqifyPayment, getProducts as getTariqifyProducts } from "@/lib/insurance/tariqify";
+import { enrichInsuranceProduct } from "@/lib/insurance/types";
 import { revalidatePath } from "next/cache";
 
 /**
@@ -232,7 +233,55 @@ export async function getInsuranceProducts() {
     return [];
   }
 
-  return data;
+  // Lazy sync: the cron route isn't always registered (and may never have
+  // run), so if the table is completely empty pull straight from Tariqify
+  // and populate it here — otherwise the storefront shows nothing until
+  // someone hits the admin sync button. The check is "zero rows at all",
+  // not "zero active rows", so it can never resurrect products an admin
+  // deliberately switched off.
+  if (data.length === 0) {
+    const { count } = await supabase
+      .from("insurance_products")
+      .select("id", { count: "exact", head: true });
+
+    if ((count ?? 0) === 0) {
+      try {
+        const tariqifyProducts = await getTariqifyProducts();
+        if (tariqifyProducts.length > 0) {
+          const admin = createAdminClient();
+          // Only upsert base columns — the premium/cover_amount/features etc.
+          // columns may not exist yet (migrations not applied). Everything
+          // is preserved in `raw` and enriched on read via enrichInsuranceProduct.
+          await admin.from("insurance_products").upsert(
+            tariqifyProducts.map((product) => ({
+              id: product.id,
+              name: product.name,
+              description: product.description,
+              category: product.category,
+              currency: product.currency,
+              image_url: product.image_url,
+              signup_fields: product.signup_fields,
+              is_active: product.is_active,
+              raw: product.raw,
+              synced_at: new Date().toISOString(),
+            })),
+            { onConflict: "id", ignoreDuplicates: false }
+          );
+
+          const { data: refreshed } = await supabase
+            .from("insurance_products")
+            .select("*")
+            .eq("is_active", true)
+            .order("sort_order");
+          return (refreshed ?? []).map((row) => enrichInsuranceProduct(row as Record<string, unknown>));
+        }
+      } catch (syncError) {
+        console.error("Lazy insurance product sync failed:", syncError);
+      }
+    }
+  }
+
+  return data.map((row) => enrichInsuranceProduct(row as Record<string, unknown>));
 }
 
 /**

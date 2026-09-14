@@ -76,3 +76,35 @@ export function displayImage(p: Pick<InsuranceProduct, "image_url" | "display_im
 export function displayPremium(p: Pick<InsuranceProduct, "premium" | "markup_percent">) {
   return p.premium * (1 + p.markup_percent / 100);
 }
+
+/**
+ * Enrich a DB row with fields from `raw` when the corresponding columns
+ * don't exist yet (migrations 2026-09-12 and 2026-09-12b may not have been
+ * applied). Falls back gracefully so the UI always has the full shape.
+ */
+export function enrichInsuranceProduct(row: Record<string, unknown>): InsuranceProduct {
+  const raw = (row.raw ?? {}) as Record<string, unknown>;
+  return {
+    id: String(row.id),
+    name: String(row.name ?? ""),
+    description: (row.description as string | null) ?? null,
+    display_name: (row.display_name as string | null) ?? null,
+    display_description: (row.display_description as string | null) ?? null,
+    category: (row.category as string | null) ?? null,
+    currency: String(row.currency ?? "USD"),
+    image_url: (row.image_url as string | null) ?? null,
+    display_image_url: (row.display_image_url as string | null) ?? null,
+    markup_percent: Number(row.markup_percent ?? 10),
+    provider: String(row.provider ?? "tariqify"),
+    is_purchasable: row.is_purchasable != null ? Boolean(row.is_purchasable) : true,
+    premium: Number(row.premium ?? raw.premium ?? 0),
+    cover_amount: row.cover_amount != null ? Number(row.cover_amount) : (raw.coverAmount != null ? Number(raw.coverAmount) : null),
+    waiting_period_days: row.waiting_period_days != null ? Number(row.waiting_period_days) : (raw.waitingPeriodDays != null ? Number(raw.waitingPeriodDays) : null),
+    min_age: row.min_age != null ? Number(row.min_age) : (raw.minAge != null ? Number(raw.minAge) : null),
+    max_age: row.max_age != null ? Number(row.max_age) : (raw.maxAge != null ? Number(raw.maxAge) : null),
+    features: Array.isArray(row.features) ? (row.features as string[]) : (Array.isArray(raw.features) ? (raw.features as string[]).map(String) : []),
+    signup_fields: Array.isArray(row.signup_fields) ? (row.signup_fields as InsuranceSignupField[]) : [],
+    is_active: row.is_active != null ? Boolean(row.is_active) : true,
+    sort_order: Number(row.sort_order ?? 0),
+  };
+}

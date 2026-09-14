@@ -5,6 +5,8 @@ import { GuestRecent } from "@/components/home/guest-recent";
 import { ProductCard } from "@/components/home/product-card";
 import { QuickSearch } from "@/components/home/quick-search";
 import { fmt } from "@/lib/data/catalog-helpers";
+import { getInsuranceProducts } from "@/lib/actions/insurance";
+import { displayName, displayDescription, displayImage, displayPremium } from "@/lib/insurance/types";
 import {
   getActivePromoBanner,
   getAllServices,
@@ -21,7 +23,7 @@ const CAT_ROW_DESKTOP_COLUMNS = 4;
 export default async function HomePage() {
   const profile = await getCurrentProfile();
 
-  const [categories, services, favoriteIds, recent, beneficiaries, promoBanner, gridWidgets] = await Promise.all([
+  const [categories, services, favoriteIds, recent, beneficiaries, promoBanner, gridWidgets, insuranceProducts] = await Promise.all([
     getCategories(),
     getAllServices(),
     profile ? getFavoriteServiceIds(profile.id) : Promise.resolve(new Set<string>()),
@@ -29,6 +31,7 @@ export default async function HomePage() {
     profile ? getBeneficiaries(profile.id) : Promise.resolve([]),
     getActivePromoBanner(),
     profile ? getGridWidgetBanners() : Promise.resolve([]),
+    getInsuranceProducts(),
   ]);
   // Cursor shared across all category rows below so, with more than one
   // active widget, they rotate rather than always showing the same one.
@@ -234,6 +237,125 @@ export default async function HomePage() {
                   </Link>
                 );
               })}
+            </div>
+          )}
+
+          {insuranceProducts.length > 0 && (
+            <div>
+              <div className="row between mt-3 mb-2" style={{ gap: 10 }}>
+                <div className="row gap-2" style={{ minWidth: 0, flex: 1 }}>
+                  <div
+                    className="ibadge round"
+                    style={{
+                      width: 30,
+                      height: 30,
+                      background: categories.find((c) => c.id === "insurance")?.bg ?? "#e0e7ff",
+                      color: categories.find((c) => c.id === "insurance")?.color ?? "#6366f1",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Icon name="shield" size={15} stroke={1.8} />
+                  </div>
+                  <span className="section-title">Insurance</span>
+                </div>
+                <Link href="/insurance" className="muted see-all-link" style={{ flexShrink: 0 }}>
+                  See all <Icon name="chevronR" size={13} stroke={2.4} />
+                </Link>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {insuranceProducts.slice(0, 3).map((product) => {
+                  const name = displayName(product);
+                  const description = displayDescription(product);
+                  const image = displayImage(product);
+                  const premium = displayPremium(product);
+
+                  return (
+                    <Link
+                      key={product.id}
+                      href={`/insurance/${product.id}`}
+                      style={{ textDecoration: "none", display: "block" }}
+                    >
+                      <div
+                        style={{
+                          background: "var(--card-bg)",
+                          borderRadius: 16,
+                          padding: 16,
+                          display: "flex",
+                          gap: 12,
+                          alignItems: "flex-start",
+                        }}
+                      >
+                        {image ? (
+                          // eslint-disable-next-line @next/next/no-img-element -- provider/admin-hosted product image
+                          <img
+                            src={image}
+                            alt={name}
+                            style={{ width: 60, height: 60, borderRadius: 12, objectFit: "cover", flexShrink: 0 }}
+                          />
+                        ) : (
+                          <div
+                            style={{
+                              width: 60,
+                              height: 60,
+                              borderRadius: 12,
+                              background: "var(--accent-bg)",
+                              color: "var(--accent)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              flexShrink: 0,
+                            }}
+                          >
+                            <Icon name="shield" size={28} stroke={1.5} />
+                          </div>
+                        )}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 4 }}>{name}</div>
+                          <div className="muted" style={{ fontSize: 12, lineHeight: 1.4 }}>
+                            {description}
+                          </div>
+                          <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                            {product.is_purchasable ? (
+                              <span style={{ fontSize: 13, fontWeight: 700 }}>
+                                ${premium.toFixed(2)}
+                                <span className="muted" style={{ fontWeight: 500, fontSize: 11 }}>/mo</span>
+                              </span>
+                            ) : (
+                              <span
+                                style={{
+                                  fontSize: 10.5,
+                                  fontWeight: 800,
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.04em",
+                                  color: "var(--warning)",
+                                  background: "#FEF6E7",
+                                  padding: "3px 8px",
+                                  borderRadius: 6,
+                                }}
+                              >
+                                Coming soon
+                              </span>
+                            )}
+                            {product.is_purchasable && product.cover_amount != null && (
+                              <span className="muted" style={{ fontSize: 11 }}>
+                                · ${product.cover_amount.toFixed(0)} cover
+                              </span>
+                            )}
+                            {product.category && (
+                              <span style={{ fontSize: 11, color: "var(--accent)", fontWeight: 500 }}>
+                                · {product.category}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div style={{ flexShrink: 0, paddingTop: 4, color: "var(--muted)" }}>
+                          <Icon name="chevronR" size={18} stroke={2} />
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
           )}
 
