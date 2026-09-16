@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Icon } from "@/components/icons";
@@ -15,6 +16,22 @@ const NAVTABS = [
   { id: "history", href: "/history", label: "History", icon: "clock" },
   { id: "account", href: "/account", label: "Account", icon: "user" },
 ];
+
+// Human title for the sticky topbar, derived from the current route.
+const PAGE_TITLES: Array<[string, string]> = [
+  ["/home", "Home"],
+  ["/services", "Services"],
+  ["/chat", "Chat & Pay"],
+  ["/history", "History"],
+  ["/account", "Account"],
+  ["/wallet", "Wallet"],
+  ["/insurance", "Insurance"],
+  ["/pay", "Pay"],
+];
+function pageTitle(pathname: string) {
+  const match = PAGE_TITLES.find(([href]) => pathname === href || pathname.startsWith(href + "/"));
+  return match?.[1] ?? "TopMe";
+}
 
 function initials(name: string | null) {
   if (!name) return "TM";
@@ -41,52 +58,106 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const showFab = pathname === "/home";
   const isAdminSection = pathname.startsWith("/admin");
   const navTabs = chatEnabled ? NAVTABS : NAVTABS.filter((t) => t.id !== "chat");
 
+  // Close the mobile drawer whenever the route changes.
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [pathname]);
+
+  const navLinks = (onNavigate?: () => void) =>
+    navTabs.map((t) => (
+      <Link
+        key={t.id}
+        href={t.href}
+        onClick={onNavigate}
+        className={`side-nav-item ${isActive(pathname, t.href) ? "active" : ""}`}
+      >
+        <Icon name={t.icon} size={18} stroke={2} />
+        <span>{t.label}</span>
+        {t.id === "chat" && unreadChatCount > 0 && <span className="side-nav-dot" />}
+      </Link>
+    ));
+
+  const userCard = profile ? (
+    <Link href="/account" className="side-user" style={{ textDecoration: "none" }}>
+      <span className="side-user-avatar">{initials(profile.full_name)}</span>
+      <span className="side-user-meta">
+        <span className="side-user-name">{profile.full_name || "Account"}</span>
+        <span className="side-user-sub">View profile</span>
+      </span>
+      <Icon name="chevronR" size={16} stroke={2} className="side-user-chevron" />
+    </Link>
+  ) : (
+    <div className="side-user" style={{ gap: 8 }}>
+      <Link
+        href="/login"
+        className="btn"
+        style={{ flex: 1, height: 38, textDecoration: "none", background: "rgba(236,253,245,0.1)", color: "#ecfdf5", border: "1px solid rgba(236,253,245,0.2)" }}
+      >
+        Log in
+      </Link>
+      <Link
+        href="/signup"
+        className="btn"
+        style={{ flex: 1, height: 38, textDecoration: "none", background: "#fff", color: "var(--green-900)", fontWeight: 700 }}
+      >
+        Sign Up
+      </Link>
+    </div>
+  );
+
   return (
     <div className="app-shell">
+      {/* Desktop sidebar — fixed left rail with brand, grouped nav, user card. */}
+      <aside className="app-sidebar">
+        <Link href="/home" className="side-brand" style={{ textDecoration: "none" }}>
+          <BrandMark size={30} />
+          <Wordmark size={16} />
+        </Link>
+        <nav className="side-nav">{navLinks()}</nav>
+        <div className="side-footer">{userCard}</div>
+      </aside>
+
+      {/* Mobile drawer — same nav, slides in over a scrim. */}
+      <div className={`drawer-scrim ${drawerOpen ? "open" : ""}`} onClick={() => setDrawerOpen(false)} aria-hidden="true" />
+      <aside className={`app-drawer ${drawerOpen ? "open" : ""}`} aria-hidden={!drawerOpen}>
+        <div className="drawer-head">
+          <Link href="/home" className="side-brand" style={{ textDecoration: "none" }} onClick={() => setDrawerOpen(false)}>
+            <BrandMark size={28} />
+            <Wordmark size={15} />
+          </Link>
+          <button type="button" className="header-icon-btn" onClick={() => setDrawerOpen(false)} aria-label="Close menu">
+            <Icon name="x" size={18} stroke={2} />
+          </button>
+        </div>
+        <nav className="side-nav">{navLinks(() => setDrawerOpen(false))}</nav>
+        <div className="side-footer">{userCard}</div>
+      </aside>
+
       <div className="app-main">
         <header className="app-header">
-          <div className="header-inner content-wrap">
+          <div className="header-inner">
+            <button
+              type="button"
+              className="header-icon-btn drawer-toggle"
+              onClick={() => setDrawerOpen(true)}
+              aria-label="Open menu"
+            >
+              <Icon name="menu" size={20} stroke={2} />
+            </button>
             <Link href="/home" className="header-logo tap" style={{ textDecoration: "none" }}>
-              <BrandMark size={30} />
-              <Wordmark size={16} />
+              <BrandMark size={28} />
             </Link>
-
-            <nav className="header-nav">
-              {navTabs.map((t) => (
-                <Link
-                  key={t.id}
-                  href={t.href}
-                  className={`header-nav-item ${t.id === "chat" ? "header-nav-item-chat" : ""} ${isActive(pathname, t.href) ? "active" : ""}`}
-                  style={{ position: "relative" }}
-                >
-                  <Icon name={t.icon} size={17} stroke={2} />
-                  <span>{t.label}</span>
-                  {t.id === "chat" && unreadChatCount > 0 && (
-                    <span
-                      style={{
-                        position: "absolute",
-                        top: 5,
-                        right: 6,
-                        width: 6,
-                        height: 6,
-                        background: "var(--error)",
-                        borderRadius: "50%",
-                        border: "1.5px solid var(--surface)",
-                      }}
-                    />
-                  )}
-                </Link>
-              ))}
-            </nav>
+            <div className="topbar-title">{pageTitle(pathname)}</div>
 
             <div className="header-right">
               {profile ? (
                 <>
-                  <Link href="/account" className="header-icon-btn tap" style={{ textDecoration: "none" }}>
+                  <Link href="/account" className="header-icon-btn tap" style={{ textDecoration: "none" }} aria-label="Notifications">
                     <Icon name="bell" size={18} stroke={2} />
                     <span
                       style={{
@@ -117,14 +188,14 @@ export function AppShell({
           </div>
         </header>
 
-        <div className="mobile-topbar" aria-hidden="true" />
-
         <div className="view-area">
-          <div className="screen-pad page-enter" key={pathname}>
+          <div className={`screen-pad page-enter${pathname.startsWith("/chat") ? " chat-route" : ""}`} key={pathname}>
             {!isAdminSection && announcements}
             {children}
           </div>
-          <Footer />
+          {/* No footer on /chat — the fixed-height shell fills the view-area,
+              so a footer would just add a scrollable gap below it. */}
+          {!pathname.startsWith("/chat") && <Footer />}
         </div>
 
         {showFab && (

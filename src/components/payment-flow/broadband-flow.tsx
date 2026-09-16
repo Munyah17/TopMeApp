@@ -239,7 +239,7 @@ export function BroadbandFlow({
                       style={{
                         padding: "12px 14px",
                         borderColor: packageIdx === i ? "var(--green)" : "var(--border)",
-                        boxShadow: packageIdx === i ? "0 0 0 3px rgba(0,200,83,0.14)" : "none",
+                        boxShadow: packageIdx === i ? "0 0 0 3px rgba(5,150,105,0.14)" : "none",
                       }}
                     >
                       <span style={{ fontWeight: 700, fontSize: 13.5 }}>{p.name}</span>

@@ -50,7 +50,7 @@ export default async function AccountPage() {
             width: 52,
             height: 52,
             borderRadius: 14,
-            background: "var(--navy)",
+            background: "var(--green-700)",
             color: "#fff",
             display: "flex",
             alignItems: "center",

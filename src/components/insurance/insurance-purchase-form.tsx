@@ -3,48 +3,26 @@
 import { useState } from "react";
 import { Icon } from "@/components/icons";
 import type { InsuranceProduct, InsuranceSignupField } from "@/lib/insurance/types";
-import { getInsuranceQuote, purchaseInsurancePolicy } from "@/lib/actions/insurance";
+import { purchaseInsurancePolicy } from "@/lib/actions/insurance";
+import { displayPremium } from "@/lib/insurance/types";
 
 interface InsurancePurchaseFormProps {
   product: InsuranceProduct;
 }
 
 export default function InsurancePurchaseForm({ product }: InsurancePurchaseFormProps) {
-  const [step, setStep] = useState<"details" | "quote" | "confirm">("details");
+  const [step, setStep] = useState<"details" | "confirm">("details");
   const [nationalId, setNationalId] = useState("");
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
-  const [quote, setQuote] = useState<{ base_premium: number; currency: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleGetQuote = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-
-    const result = await getInsuranceQuote({
-      productId: product.id,
-      nationalId,
-      fieldValues,
-    });
-
-    setLoading(false);
-
-    if (result.error) {
-      setError(result.error);
-      return;
-    }
-
-    if (result.success && result.quote) {
-      setQuote({
-        base_premium: result.quote.base_premium,
-        currency: result.quote.currency,
-      });
-      setStep("quote");
-    }
-  };
+  // Skip the separate quote step — the premium is already known from the
+  // synced product, and purchaseInsurancePolicy registers the client with
+  // TariqifyIMS, charges the wallet, and creates the policy in one call.
+  const total = displayPremium(product);
 
   const handlePurchase = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -224,7 +202,7 @@ export default function InsurancePurchaseForm({ product }: InsurancePurchaseForm
   }
 
   return (
-    <form onSubmit={step === "details" ? handleGetQuote : handlePurchase}>
+    <form onSubmit={handlePurchase}>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {/* Personal Information */}
         <div>
@@ -319,43 +297,43 @@ export default function InsurancePurchaseForm({ product }: InsurancePurchaseForm
           </div>
         )}
 
-        {/* Quote Display */}
-        {step === "quote" && quote && (
+        {/* Price summary — the synced product premium already includes the
+            markup, so there's no separate quote step. The wallet is charged
+            this amount on submit. */}
+        <div
+          style={{
+            padding: 16,
+            borderRadius: 12,
+            background: "var(--accent-bg)",
+            border: "1px solid var(--accent)",
+          }}
+        >
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Order Summary</div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14 }}>
+            <span>Premium:</span>
+            <span>{product.currency} {total.toFixed(2)}/mo</span>
+          </div>
+          {product.cover_amount != null && (
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginTop: 4 }}>
+              <span>Cover amount:</span>
+              <span>{product.currency} {product.cover_amount.toFixed(0)}</span>
+            </div>
+          )}
           <div
             style={{
-              padding: 16,
-              borderRadius: 12,
-              background: "var(--accent-bg)",
-              border: "1px solid var(--accent)",
+              display: "flex",
+              justifyContent: "space-between",
+              fontSize: 15,
+              fontWeight: 700,
+              marginTop: 8,
+              paddingTop: 8,
+              borderTop: "1px solid var(--accent)",
             }}
           >
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Quote Summary</div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14 }}>
-              <span>Base Premium:</span>
-              <span>{quote.currency} {quote.base_premium.toFixed(2)}</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginTop: 4 }}>
-              <span>Markup ({product.markup_percent}%):</span>
-              <span>{quote.currency} {(quote.base_premium * product.markup_percent / 100).toFixed(2)}</span>
-            </div>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                fontSize: 15,
-                fontWeight: 700,
-                marginTop: 8,
-                paddingTop: 8,
-                borderTop: "1px solid var(--accent)",
-              }}
-            >
-              <span>Total:</span>
-              <span>
-                {quote.currency} {(quote.base_premium * (1 + product.markup_percent / 100)).toFixed(2)}
-              </span>
-            </div>
+            <span>Charged today:</span>
+            <span>{product.currency} {total.toFixed(2)}</span>
           </div>
-        )}
+        </div>
 
         <button
           type="submit"
@@ -366,19 +344,8 @@ export default function InsurancePurchaseForm({ product }: InsurancePurchaseForm
             cursor: loading ? "not-allowed" : "pointer",
           }}
         >
-          {loading ? "Processing..." : step === "details" ? "Get Quote" : "Purchase Policy"}
+          {loading ? "Processing..." : `Buy for ${product.currency} ${total.toFixed(2)}`}
         </button>
-
-        {step === "quote" && (
-          <button
-            type="button"
-            onClick={() => setStep("details")}
-            className="btn btn-secondary btn-block"
-            style={{ marginTop: 8 }}
-          >
-            Back
-          </button>
-        )}
       </div>
     </form>
   );

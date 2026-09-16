@@ -82,6 +82,17 @@ export function displayPremium(p: Pick<InsuranceProduct, "premium" | "markup_per
  * don't exist yet (migrations 2026-09-12 and 2026-09-12b may not have been
  * applied). Falls back gracefully so the UI always has the full shape.
  */
+/** First positive number across the possible premium keys — the column can
+ *  exist but hold its 0 default when the base-only upsert ran, and Tariqify's
+ *  raw payload has used a few different key names across versions. */
+function pickPremium(row: Record<string, unknown>, raw: Record<string, unknown>): number {
+  for (const v of [row.premium, raw.premium, raw.base_premium, raw.price, raw.monthly_premium, raw.premium_amount, raw.amount]) {
+    const n = Number(v);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return 0;
+}
+
 export function enrichInsuranceProduct(row: Record<string, unknown>): InsuranceProduct {
   const raw = (row.raw ?? {}) as Record<string, unknown>;
   return {
@@ -97,7 +108,7 @@ export function enrichInsuranceProduct(row: Record<string, unknown>): InsuranceP
     markup_percent: Number(row.markup_percent ?? 10),
     provider: String(row.provider ?? "tariqify"),
     is_purchasable: row.is_purchasable != null ? Boolean(row.is_purchasable) : true,
-    premium: Number(row.premium ?? raw.premium ?? 0),
+    premium: pickPremium(row, raw),
     cover_amount: row.cover_amount != null ? Number(row.cover_amount) : (raw.coverAmount != null ? Number(raw.coverAmount) : null),
     waiting_period_days: row.waiting_period_days != null ? Number(row.waiting_period_days) : (raw.waitingPeriodDays != null ? Number(raw.waitingPeriodDays) : null),
     min_age: row.min_age != null ? Number(row.min_age) : (raw.minAge != null ? Number(raw.minAge) : null),

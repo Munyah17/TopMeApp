@@ -58,11 +58,15 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
 
       <div className="wallet-grid">
         <div className="col-main">
-          <div className="card card-pad" style={{ background: "var(--navy)", border: "none" }}>
-            <div className="muted" style={{ color: "rgba(255,255,255,0.55)" }}>
+          <div
+            className="card card-pad"
+            style={{ background: "linear-gradient(135deg, var(--green-800) 0%, var(--green-950) 100%)", border: "none", position: "relative", overflow: "hidden" }}
+          >
+            <div style={{ position: "absolute", right: -50, top: -50, width: 160, height: 160, borderRadius: "50%", background: "rgba(167,243,208,0.08)", pointerEvents: "none" }} />
+            <div className="muted" style={{ color: "rgba(236,253,245,0.6)", position: "relative" }}>
               Available balance
             </div>
-            <div style={{ color: "#fff", fontSize: 32, fontWeight: 800, marginTop: 4 }}>{fmt(wallet?.balance ?? 0)}</div>
+            <div style={{ color: "#fff", fontSize: 32, fontWeight: 800, marginTop: 4, position: "relative" }}>{fmt(wallet?.balance ?? 0)}</div>
             <div className="row gap-2 mt-3" style={{ flexWrap: "wrap" }}>
               <Link href="/pay/send" className="btn wallet-action-btn" style={{ background: "rgba(255,255,255,0.12)", color: "#fff", textDecoration: "none", display: "inline-flex" }}>
                 <Icon name="arrowUpR" size={15} stroke={2.4} /> <span>Send Money</span>

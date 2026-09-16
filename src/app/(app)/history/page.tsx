@@ -139,17 +139,17 @@ export default async function HistoryPage({
                           : t.status === "pending"
                             ? "Pending"
                             : "Failed";
-                      const color = refunded
-                        ? "var(--info)"
+                      const tone = refunded
+                        ? "info"
                         : t.status === "success"
-                          ? "var(--success)"
+                          ? "success"
                           : t.status === "pending"
-                            ? "var(--warning)"
-                            : "var(--error)";
+                            ? "warning"
+                            : "error";
                       return (
                         <div style={{ textAlign: "right" }}>
                           <div style={{ fontWeight: 700, fontSize: 14 }}>-{fmt(t.amount)}</div>
-                          <div style={{ fontSize: 11, fontWeight: 600, color }}>{label}</div>
+                          <span className={`status-badge ${tone}`} style={{ marginTop: 4 }}>{label}</span>
                         </div>
                       );
                     })()}

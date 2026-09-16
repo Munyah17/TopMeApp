@@ -54,16 +54,16 @@ export default async function HomePage() {
           <div className="quickpay-gift-row">
             <div
               style={{
-                background: "#0f172a",
+                background: "linear-gradient(135deg, var(--green-800) 0%, var(--green-950) 100%)",
                 borderRadius: 16,
                 padding: "24px",
                 position: "relative",
                 overflow: "hidden",
               }}
             >
-              <div style={{ position: "absolute", right: -40, top: -40, width: 120, height: 120, borderRadius: "50%", background: "rgba(0,200,83,0.08)" }} />
-              <div style={{ position: "absolute", right: 40, bottom: -30, width: 80, height: 80, borderRadius: "50%", background: "rgba(56,189,248,0.06)" }} />
-              <div className="eyebrow" style={{ color: "#7CF2AE", position: "relative" }}>
+              <div style={{ position: "absolute", right: -40, top: -40, width: 120, height: 120, borderRadius: "50%", background: "rgba(167,243,208,0.10)" }} />
+              <div style={{ position: "absolute", right: 40, bottom: -30, width: 80, height: 80, borderRadius: "50%", background: "rgba(167,243,208,0.07)" }} />
+              <div className="eyebrow" style={{ color: "var(--green-200)", position: "relative" }}>
                 New
               </div>
               <div style={{ color: "#fff", fontWeight: 700, fontSize: 20, marginTop: 4, position: "relative" }}>
@@ -230,9 +230,9 @@ export default async function HomePage() {
                     </div>
                     <div style={{ textAlign: "right" }}>
                       <div style={{ fontWeight: 800, fontSize: 14 }}>-{fmt(t.amount)}</div>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: t.status === "success" ? "var(--success)" : "var(--error)" }}>
+                      <span className={`status-badge ${t.status === "success" ? "success" : t.status === "pending" ? "warning" : "error"}`} style={{ marginTop: 4 }}>
                         {t.status === "success" ? "Success" : t.status === "pending" ? "Pending" : "Failed"}
-                      </div>
+                      </span>
                     </div>
                   </Link>
                 );

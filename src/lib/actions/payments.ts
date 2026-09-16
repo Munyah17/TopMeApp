@@ -307,17 +307,23 @@ export async function validateMeter(meterNumber: string): Promise<MeterCheckResu
   }
 }
 
+export type SendMoneyResult = { ok: true; transfer: P2pTransfer } | { ok: false; error: string };
+
 // Instant wallet-to-wallet transfer between two existing TopMe accounts
 // (unlike a gift voucher, this requires the receiver to already have an
 // account — resolved by phone number via the wallet_transfer RPC).
-export async function sendMoney(receiverPhone: string, amount: number, note?: string, kind: "transfer" | "red_packet" = "transfer") {
-  if (!(await isFeatureEnabled("p2p_transfers_enabled"))) throw new Error(FRIENDLY_ERRORS.feature_disabled);
+//
+// Returns a result object instead of throwing: errors thrown from Server
+// Actions are masked in production ("An error occurred in the Server
+// Components render"), so callers would never see the friendly message.
+export async function sendMoney(receiverPhone: string, amount: number, note?: string, kind: "transfer" | "red_packet" = "transfer"): Promise<SendMoneyResult> {
+  if (!(await isFeatureEnabled("p2p_transfers_enabled"))) return { ok: false, error: FRIENDLY_ERRORS.feature_disabled };
 
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error(FRIENDLY_ERRORS.not_authenticated);
+  if (!user) return { ok: false, error: FRIENDLY_ERRORS.not_authenticated };
 
   const { data, error } = await supabase.rpc("wallet_transfer", {
     p_receiver_phone: receiverPhone,
@@ -325,38 +331,46 @@ export async function sendMoney(receiverPhone: string, amount: number, note?: st
     p_note: note ?? null,
     p_kind: kind,
   });
-  if (error) throw new Error(friendlyError(error.message));
+  if (error) return { ok: false, error: friendlyError(error.message) };
 
   const transfer = data as P2pTransfer;
 
   revalidatePath("/wallet");
   revalidatePath("/home");
 
-  // Receiver's email isn't visible under normal RLS from the sender's session
-  // (profiles are owner-select-only) — the admin client bypasses that only
-  // to send a courtesy notification, never exposing it back to the client.
-  const admin = createAdminClient();
-  const [{ data: senderProfile }, { data: receiverProfile }] = await Promise.all([
-    supabase.from("profiles").select("full_name").eq("id", user.id).single(),
-    admin.from("profiles").select("email, full_name").eq("id", transfer.receiver_id).single(),
-  ]);
+  // Notifications are strictly best-effort: the money has already moved, so a
+  // failure here (missing service-role key, profile fetch, email/push) must
+  // never throw — a throw would be masked in production and report a failed
+  // send for a transfer that actually succeeded.
+  try {
+    // Receiver's email isn't visible under normal RLS from the sender's session
+    // (profiles are owner-select-only) — the admin client bypasses that only
+    // to send a courtesy notification, never exposing it back to the client.
+    const admin = createAdminClient();
+    const [{ data: senderProfile }, { data: receiverProfile }] = await Promise.all([
+      supabase.from("profiles").select("full_name").eq("id", user.id).single(),
+      admin.from("profiles").select("email, full_name").eq("id", transfer.receiver_id).single(),
+    ]);
 
-  if (user.email) {
-    const { subject, html } = moneySentEmail({ amount, receiverName: receiverProfile?.full_name || receiverPhone, kind });
-    void sendEmail({ sender: "noreply", to: user.email, subject, html });
+    if (user.email) {
+      const { subject, html } = moneySentEmail({ amount, receiverName: receiverProfile?.full_name || receiverPhone, kind });
+      void sendEmail({ sender: "noreply", to: user.email, subject, html });
+    }
+    if (receiverProfile?.email) {
+      const { subject, html } = moneyReceivedEmail({ amount, senderName: senderProfile?.full_name || "A TopMe user", kind });
+      void sendEmail({ sender: "noreply", to: receiverProfile.email, subject, html });
+    }
+    // Covers both this standalone Send Money/Red Packet flow and the
+    // chat-embedded one (sendMoneyMessage in chat.ts calls this same
+    // function) from one place, instead of notifying twice.
+    void sendPushToUser(admin, transfer.receiver_id, {
+      title: senderProfile?.full_name || "TopMe",
+      body: kind === "red_packet" ? "Sent you a red packet 🧧" : `Sent you $${amount.toFixed(2)}`,
+      url: "/wallet",
+    });
+  } catch {
+    /* notification failure must not fail a completed transfer */
   }
-  if (receiverProfile?.email) {
-    const { subject, html } = moneyReceivedEmail({ amount, senderName: senderProfile?.full_name || "A TopMe user", kind });
-    void sendEmail({ sender: "noreply", to: receiverProfile.email, subject, html });
-  }
-  // Covers both this standalone Send Money/Red Packet flow and the
-  // chat-embedded one (sendMoneyMessage in chat.ts calls this same
-  // function) from one place, instead of notifying twice.
-  void sendPushToUser(admin, transfer.receiver_id, {
-    title: senderProfile?.full_name || "TopMe",
-    body: kind === "red_packet" ? "Sent you a red packet 🧧" : `Sent you $${amount.toFixed(2)}`,
-    url: "/wallet",
-  });
 
-  return transfer;
+  return { ok: true, transfer };
 }

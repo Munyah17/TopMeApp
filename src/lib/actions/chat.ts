@@ -121,37 +121,54 @@ export async function sendImageMessage(conversationId: string, formData: FormDat
   return data as ChatMessage;
 }
 
-export async function sendMoneyMessage(conversationId: string, receiverPhone: string, amount: number, note: string | undefined, kind: "transfer" | "red_packet"): Promise<ChatMessage> {
-  const { supabase, user } = await requireUser();
+export type SendMoneyMessageResult = { ok: true; message: ChatMessage } | { ok: false; error: string };
+
+export async function sendMoneyMessage(conversationId: string, receiverPhone: string, amount: number, note: string | undefined, kind: "transfer" | "red_packet"): Promise<SendMoneyMessageResult> {
+  // Non-throwing auth check — requireUser() throws, which production masks as
+  // "An error occurred in the Server Components render" instead of a message.
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: FRIENDLY_ERRORS.not_authenticated };
 
   // Money movement itself is unchanged — reuses the exact same wallet_transfer
-  // RPC path as the standalone Send Money / Red Packet flow.
-  const transfer = await sendMoney(receiverPhone, amount, note, kind);
+  // RPC path as the standalone Send Money / Red Packet flow. sendMoney returns
+  // a result object (not a throw) so the friendly error survives production's
+  // Server Action error masking.
+  const result = await sendMoney(receiverPhone, amount, note, kind);
+  if (!result.ok) return result;
+  const transfer = result.transfer;
 
   const preview = kind === "red_packet" ? `🧧 Sent a red packet` : `Sent $${amount.toFixed(2)}`;
-  // select() joins p2p_transfer the same way getMessages() does for the
-  // initial page load — needed so the sender's own bubble can render the
-  // "$X sent" card immediately instead of a blank one. Postgres Realtime's
-  // postgres_changes payloads are always the bare row with no joins, which
-  // is a real, separate bug on the *recipient's* side: their card would
-  // render blank until they reloaded the page. See the join fetched
-  // client-side in chat-thread.tsx's realtime handler for that half of it.
+  // Insert WITHOUT the embedded `p2p_transfer:p2p_transfers(*)` join — when
+  // PostgREST can't resolve that relationship (stale schema cache / FK naming)
+  // the whole insert errors and the throw was masked in production, which is
+  // exactly why chat money sends failed while plain text worked. We already
+  // hold the transfer row from sendMoney(), so attach it to the returned
+  // message directly — no join needed, and the sender's "$X sent" card still
+  // renders immediately.
   const { data, error } = await supabase
     .from("messages")
     .insert({ conversation_id: conversationId, sender_id: user.id, kind: "p2p_transfer", p2p_transfer_id: transfer.id })
-    .select("*, p2p_transfer:p2p_transfers(*)")
+    .select()
     .single();
-  if (error) throw new Error(friendlyError(error.message));
+  if (error) return { ok: false, error: friendlyError(error.message) };
 
   // No separate push trigger here — sendMoney() above already sends one to
   // the receiver, covering this chat-embedded path and the standalone
-  // Send Money/Red Packet page identically from one place.
-  await touchConversation(conversationId, preview);
+  // Send Money/Red Packet page identically from one place. The preview update
+  // is best-effort: never let it fail a send that already moved money.
+  try {
+    await touchConversation(conversationId, preview);
+  } catch {
+    /* conversation preview is cosmetic — ignore */
+  }
   revalidatePath(`/chat/${conversationId}`);
   revalidatePath("/chat");
   revalidatePath("/wallet");
 
-  return data as ChatMessage;
+  return { ok: true, message: { ...(data as ChatMessage), p2p_transfer: transfer } as ChatMessage };
 }
 
 export async function markConversationRead(conversationId: string) {

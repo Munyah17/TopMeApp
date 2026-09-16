@@ -217,6 +217,15 @@ export async function purchaseInsurancePolicy(params: {
   }
 }
 
+// Agricultural / farming covers are excluded from the storefront — the
+// catalog should only show personal lines (medical, funeral, legal, travel,
+// vehicle). Matched on category or name so it works whether Tariqify tags
+// them by category or only in the product name (e.g. "Field To Floor").
+const EXCLUDED_PRODUCT_PATTERN = /agric|farm|field|crop|livestock/i;
+function isExcludedProduct(p: { name?: string | null; category?: string | null }) {
+  return EXCLUDED_PRODUCT_PATTERN.test(p.name ?? "") || EXCLUDED_PRODUCT_PATTERN.test(p.category ?? "");
+}
+
 /**
  * Get insurance products for display
  */
@@ -273,7 +282,7 @@ export async function getInsuranceProducts() {
             .select("*")
             .eq("is_active", true)
             .order("sort_order");
-          return (refreshed ?? []).map((row) => enrichInsuranceProduct(row as Record<string, unknown>));
+          return (refreshed ?? []).map((row) => enrichInsuranceProduct(row as Record<string, unknown>)).filter((p) => !isExcludedProduct(p));
         }
       } catch (syncError) {
         console.error("Lazy insurance product sync failed:", syncError);
@@ -281,7 +290,7 @@ export async function getInsuranceProducts() {
     }
   }
 
-  return data.map((row) => enrichInsuranceProduct(row as Record<string, unknown>));
+  return data.map((row) => enrichInsuranceProduct(row as Record<string, unknown>)).filter((p) => !isExcludedProduct(p));
 }
 
 /**

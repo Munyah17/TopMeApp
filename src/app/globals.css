@@ -5,36 +5,49 @@
    Premium Fintech Visual Language
    ============================================ */
 :root {
-  /* Brand Colors */
-  --green: #00c853;
-  --green-600: #00b24b;
-  --green-50: #e9fbf0;
-  --green-100: #d4f7e3;
-  
+  /* Brand Colors — deep emerald ramp (Linear/Stripe-style restraint).
+     One accent does all the work: 50/100 soft tints for badges & icon
+     chips, 600 for primary buttons, 700–950 for the sidebar gradient. */
+  --green: #059669;            /* brand-600 — primary buttons, links, active */
+  --green-600: #047857;        /* brand-700 — hover */
+  --green-700: #047857;
+  --green-800: #065f46;
+  --green-900: #064e3b;
+  --green-950: #022c22;
+  --green-50: #ecfdf5;         /* soft tint — badges, icon chips */
+  --green-100: #d1fae5;
+  --green-200: #a7f3d0;
+  --accent: var(--green);
+  --accent-bg: var(--green-50);
+  --accent-strong: var(--green-700);
+
   /* Neutral Colors - Light Mode */
-  --bg: #f8fafc;
+  --bg: #f6f7f8;
   --surface: #ffffff;
   --surface-elevated: #ffffff;
   --muted: #f1f5f9;
-  
+  --card-bg: var(--surface);
+  --input-bg: var(--surface);
+
   /* Text Colors */
   --text-primary: #0f172a;
   --text-secondary: #64748b;
   --text-tertiary: #94a3b8;
   --text-inverse: #ffffff;
-  
+
   /* Border Colors */
-  --border: #e2e8f0;
+  --border: #e6e9ee;
   --border-subtle: #f1f5f9;
-  
-  /* Semantic Colors */
-  --success: #16a34a;
-  --warning: #f59e0b;
-  --error: #ef4444;
-  --info: #3b82f6;
-  
+  --border-strong: #d3d9e0;
+
+  /* Semantic Colors — soft tinted backgrounds, never saturated fills */
+  --success: #059669;
+  --warning: #d97706;
+  --error: #dc2626;
+  --info: #2563eb;
+
   /* Semantic Backgrounds */
-  --success-bg: #dcfce7;
+  --success-bg: #d1fae5;
   --warning-bg: #fef3c7;
   --error-bg: #fee2e2;
   --info-bg: #dbeafe;
@@ -98,7 +111,7 @@
   --shadow-sm: 0 4px 10px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04);
   --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.06);
   --shadow-lg: 0 8px 24px rgba(15, 23, 42, 0.08);
-  --shadow-green: 0 4px 12px rgba(0, 200, 83, 0.15);
+  --shadow-green: 0 4px 12px rgba(5, 150, 105, 0.18);
   
   /* Typography Scale */
   --font-xs: 12px;
@@ -166,9 +179,11 @@
    has no background of its own and just inherits body's — which is
    exactly what the owner explicitly said not to touch. */
 html[data-theme="dark"] .app-shell {
-  /* Brand Colors (unchanged) */
-  --green-50: rgba(0, 200, 83, 0.16);
-  --green-100: rgba(0, 200, 83, 0.24);
+  /* Brand Colors (unchanged hue — emerald reads well on dark) */
+  --green-50: rgba(5, 150, 105, 0.16);
+  --green-100: rgba(5, 150, 105, 0.24);
+  --green-200: rgba(5, 150, 105, 0.35);
+  --accent-bg: var(--green-50);
   
   /* Neutral Colors - Dark Mode */
   --bg: #0f172a;
@@ -228,7 +243,7 @@ html[data-theme="dark"] .app-shell {
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6);
-  --shadow-green: 0 4px 12px rgba(0, 200, 83, 0.25);
+  --shadow-green: 0 4px 12px rgba(5, 150, 105, 0.3);
   
   /* Legacy Aliases */
   --navy: #1e293b;
@@ -464,8 +479,8 @@ h4 {
 
 /* ---------- Cards ---------- */
 .card {
-  background: var(--surface);
-  border-radius: var(--radius-xl);
+  background: var(--card-bg);
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border);
   box-shadow: var(--shadow-xs);
   transition: box-shadow var(--transition-normal), border-color var(--transition-normal), transform var(--transition-normal);
@@ -485,10 +500,10 @@ h4 {
 /* ---------- Inputs ---------- */
 .field {
   width: 100%;
-  background: var(--surface);
+  background: var(--input-bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  padding: var(--space-4) var(--space-4);
+  padding: 10px var(--space-4);
   font-size: var(--font-base);
   font-family: inherit;
   color: var(--text-primary);
@@ -502,7 +517,7 @@ h4 {
 .field:focus {
   outline: none;
   border-color: var(--green);
-  box-shadow: 0 0 0 3px rgba(0, 200, 83, 0.1);
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.14);
 }
 .field-label {
   font-size: var(--font-sm);
@@ -566,6 +581,88 @@ h4 {
 }
 .ibadge.round {
   border-radius: var(--radius-full);
+}
+
+/* ---------- Status badge (soft tinted pill, never a saturated fill) ---------- */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  font-size: var(--font-xs);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.status-badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.status-badge.success { background: var(--success-bg); color: var(--success); }
+.status-badge.warning { background: var(--warning-bg); color: var(--warning); }
+.status-badge.error   { background: var(--error-bg);   color: var(--error); }
+.status-badge.info    { background: var(--info-bg);    color: var(--info); }
+.status-badge.neutral { background: var(--muted);      color: var(--text-secondary); }
+
+/* ---------- Metric tile (label + value + optional delta) ---------- */
+.metric-tile {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-xs);
+}
+.metric-tile .metric-label {
+  font-size: var(--font-xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.metric-tile .metric-value {
+  font-size: var(--font-3xl);
+  font-weight: 700;
+  letter-spacing: var(--tracking-tight);
+  color: var(--text-primary);
+  margin-top: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.metric-tile .metric-delta {
+  font-size: var(--font-xs);
+  font-weight: 600;
+  margin-top: 4px;
+}
+.metric-tile .metric-delta.up { color: var(--success); }
+.metric-tile .metric-delta.down { color: var(--error); }
+
+/* ---------- Page header (title + subtitle + actions) ---------- */
+.page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-5);
+}
+.page-header .page-title {
+  font-size: var(--font-3xl);
+  font-weight: 700;
+  letter-spacing: var(--tracking-tight);
+  color: var(--text-primary);
+}
+.page-header .page-sub {
+  font-size: var(--font-sm);
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+.page-header .page-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 /* ---------- Misc utility ---------- */
@@ -645,22 +742,13 @@ h4 {
   display: flex;
   height: 100vh;
   height: 100dvh;
-  width: 100vw;
+  /* 100% (not 100vw): vw includes the vertical scrollbar's width, which made
+     the shell a few px wider than the visible viewport and let the whole page
+     be dragged sideways — the "freeplay" reported in Chat & Pay. */
+  width: 100%;
+  max-width: 100vw;
   background: var(--bg);
   overflow: hidden;
-}
-/* Mobile-only spacer so page content clears the status bar / notch instead
-   of butting straight up against it. Desktop uses .app-header instead. */
-.mobile-topbar {
-  display: block;
-  height: calc(env(safe-area-inset-top) + 14px);
-  flex-shrink: 0;
-  background: var(--bg);
-}
-@media (min-width: 820px) {
-  .mobile-topbar {
-    display: none;
-  }
 }
 .header-logo {
   display: flex;
@@ -674,45 +762,190 @@ h4 {
 }
 .header-nav {
   display: none;
-  align-items: center;
-  gap: 2px;
-  flex-shrink: 0;
-  margin-left: auto;
 }
-.header-nav-item {
+
+/* ---------- Sidebar (desktop) + drawer (mobile) ---------- */
+.app-sidebar {
+  display: none;
+  width: 248px;
+  flex-shrink: 0;
+  flex-direction: column;
+  height: 100dvh;
+  /* Deep emerald rail — the signature QuickRecon surface. Light text on
+     brand-800→950; the active item gets a soft light tint, not a fill. */
+  background: linear-gradient(180deg, var(--green-900) 0%, var(--green-950) 100%);
+  color: #ecfdf5;
+}
+.side-brand {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 9px 13px;
-  border-radius: 11px;
-  color: var(--text-soft);
+  gap: 10px;
+  padding: 18px 18px 16px;
+  color: #fff;
+  border-bottom: 1px solid rgba(236, 253, 245, 0.12);
+}
+.side-brand .wordmark .wm-top {
+  color: #fff;
+}
+.side-nav {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 12px;
+  overflow-y: auto;
+}
+.side-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  color: rgba(236, 253, 245, 0.72);
   font-weight: 600;
   font-size: 13.5px;
   text-decoration: none;
-  white-space: nowrap;
-  transition: background 0.16s, color 0.16s;
+  position: relative;
+  transition: background var(--transition-fast), color var(--transition-fast);
 }
-.header-nav-item:hover {
-  background: var(--bg);
+.side-nav-item:hover {
+  background: rgba(236, 253, 245, 0.08);
+  color: #fff;
 }
-.header-nav-item.active {
-  color: var(--green);
-  background: var(--green-50);
+.side-nav-item.active {
+  color: #fff;
+  background: rgba(236, 253, 245, 0.14);
 }
-.header-nav-item-chat {
-  color: #fff !important;
-  background: var(--green) !important;
+.side-nav-item.active::before {
+  content: "";
+  position: absolute;
+  left: -12px;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 3px;
+  background: #6ee7b7;
+}
+.side-nav-dot {
+  margin-left: auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #f87171;
+}
+.side-footer {
+  padding: 12px;
+  border-top: 1px solid rgba(236, 253, 245, 0.12);
+}
+.side-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 12px;
+  color: inherit;
+  transition: background var(--transition-fast);
+}
+a.side-user:hover {
+  background: rgba(236, 253, 245, 0.08);
+}
+.side-user-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(236, 253, 245, 0.16);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-weight: 700;
+  font-size: 12.5px;
+  flex-shrink: 0;
 }
-.header-nav-item-chat:hover {
-  background: #009e44 !important;
+.side-user-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.side-user-name {
+  font-weight: 600;
+  font-size: 13px;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.side-user-sub {
+  font-size: 11.5px;
+  color: rgba(236, 253, 245, 0.6);
+}
+.side-user-chevron {
+  color: rgba(236, 253, 245, 0.5);
+  flex-shrink: 0;
+}
+
+/* Mobile drawer + scrim */
+.app-drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: min(300px, 84vw);
+  /* Match the desktop emerald rail so the shared .side-nav-item styles
+     (light text) read correctly here too. */
+  background: linear-gradient(180deg, var(--green-900) 0%, var(--green-950) 100%);
+  color: #ecfdf5;
+  border-right: 1px solid rgba(236, 253, 245, 0.12);
+  display: flex;
+  flex-direction: column;
+  z-index: var(--z-modal);
+  transform: translateX(-100%);
+  transition: transform var(--transition-normal);
+  padding-top: env(safe-area-inset-top);
+}
+.app-drawer.open {
+  transform: translateX(0);
+}
+.drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-right: 12px;
+  border-bottom: 1px solid rgba(236, 253, 245, 0.12);
+}
+.drawer-head .side-brand {
+  border-bottom: none;
+}
+.drawer-head .header-icon-btn {
+  background: rgba(236, 253, 245, 0.1);
+  border-color: rgba(236, 253, 245, 0.16);
+  color: #ecfdf5;
+}
+.drawer-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-normal);
+  z-index: var(--z-modal);
+}
+.drawer-scrim.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+.drawer-toggle {
+  flex-shrink: 0;
 }
 
 .app-header {
-  display: none;
-  height: 72px;
+  display: flex;
+  height: calc(60px + env(safe-area-inset-top));
+  padding-top: env(safe-area-inset-top);
   flex-shrink: 0;
-  padding: 0 var(--space-8);
+  padding-left: var(--space-4);
+  padding-right: var(--space-4);
   border-bottom: 1px solid var(--border);
   /* Background + blur live on ::before, NOT on .app-header itself: a
      backdrop-filter element clips its descendants to its own box in
@@ -727,15 +960,28 @@ h4 {
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: rgba(248, 250, 252, 0.95);
+  background: var(--surface);
+  opacity: 0.92;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
 .header-inner {
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 12px;
   height: 100%;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+.topbar-title {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: var(--tracking-tight);
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .header-search {
   flex: 1;
@@ -759,7 +1005,7 @@ h4 {
 .header-search:focus-within {
   border-color: var(--green);
   background: var(--surface);
-  box-shadow: 0 0 0 3px rgba(0, 200, 83, 0.1);
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.14);
 }
 .quicksearch-dropdown {
   position: absolute;
@@ -897,12 +1143,22 @@ h4 {
   display: none;
 }
 
-@media (min-width: 820px) {
-  .app-header {
+/* Desktop layout: fixed left sidebar + sticky topbar. The bottom tab bar,
+   FAB, hamburger and in-topbar logo are mobile-only — they all drop away
+   once the sidebar takes over navigation. */
+@media (min-width: 1024px) {
+  .app-sidebar {
     display: flex;
   }
-  .header-nav {
-    display: flex;
+  .drawer-toggle {
+    display: none;
+  }
+  .header-logo {
+    display: none;
+  }
+  .app-drawer,
+  .drawer-scrim {
+    display: none !important;
   }
   .bottom-nav {
     display: none !important;
@@ -916,26 +1172,25 @@ h4 {
   .desktop-only {
     display: block;
   }
+  .app-header {
+    padding: 0 var(--space-8);
+  }
   .screen-pad {
-    padding-top: 20px;
-    padding-bottom: 56px !important;
-    padding-left: 32px;
-    padding-right: 32px;
+    padding-top: 24px;
+    padding-bottom: 64px !important;
+    padding-left: 40px;
+    padding-right: 40px;
   }
   .px {
     padding-left: 0;
     padding-right: 0;
   }
 }
-@media (min-width: 1180px) {
-  .header-logo .wordmark {
-    display: inline-flex;
-    font-size: 17px;
-  }
-}
 
 .screen-pad {
-  padding-bottom: calc(92px + env(safe-area-inset-bottom));
+  /* 68px nav bar + ~16px the raised chat badge sticks up above it +
+     breathing room, so page content never slides under the badge. */
+  padding-bottom: calc(104px + env(safe-area-inset-bottom));
 }
 .px {
   padding-left: 22px;
@@ -1037,7 +1292,9 @@ h4 {
 }
 .nav-chat-badge {
   position: absolute;
-  top: -22px;
+  /* Raised a touch higher so its bottom edge clears the "Chat & Pay"
+     label below — at -22px the 54px circle landed exactly on the label. */
+  top: -26px;
   left: 50%;
   transform: translateX(-50%);
   width: 54px;
@@ -1055,7 +1312,8 @@ h4 {
   box-shadow: 0 12px 26px -6px rgba(0, 200, 83, 0.65), 0 0 0 4px var(--bg);
 }
 .nav-item-chat .nav-label {
-  margin-top: 24px;
+  /* Push the label clear of the raised badge's bottom edge. */
+  margin-top: 30px;
   opacity: 1;
   transform: none;
   color: var(--green);
@@ -1527,6 +1785,11 @@ h4 {
   color: #fff !important;
 }
 .chat-wallpaper {
+  /* Grow to fill the thread column and scroll the messages internally — the
+     composer stays pinned below instead of the whole page scrolling. */
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   background-color: #e9f2ec;
   background-image:
     radial-gradient(rgba(15, 23, 42, 0.035) 1px, transparent 1px),
@@ -1598,18 +1861,31 @@ h4 {
    pathname check that adds .chat-shell-thread-open on mobile. */
 .chat-shell {
   display: flex;
-  min-height: 100dvh;
+  width: 100%;
+  overflow: hidden;
+  /* Fixed height = the view-area (100dvh minus the 60px topbar + top notch).
+     Each pane scrolls *inside* itself, so the shell never grows past the
+     viewport — that's what removes the horizontal freeplay/drag and the
+     cut-off composer the old min-height:100dvh caused. */
+  height: calc(100dvh - 60px - env(safe-area-inset-top));
 }
 .chat-list-pane {
   width: 100%;
   min-width: 0;
+  height: 100%;
   overflow-y: auto;
+  /* Room to scroll the last conversation clear of the mobile bottom nav. */
+  padding-bottom: calc(76px + env(safe-area-inset-bottom));
 }
 .chat-thread-pane {
   display: none;
   width: 100%;
   min-width: 0;
+  height: 100%;
   flex-direction: column;
+  overflow: hidden;
+  /* Lifts the composer above the mobile bottom nav. */
+  padding-bottom: calc(68px + env(safe-area-inset-bottom));
 }
 .chat-shell-thread-open .chat-list-pane {
   display: none;
@@ -1617,7 +1893,10 @@ h4 {
 .chat-shell-thread-open .chat-thread-pane {
   display: flex;
 }
-@media (min-width: 900px) {
+.chat-thread-empty {
+  display: none;
+}
+@media (min-width: 1024px) {
   .chat-shell {
     max-width: 1400px;
     margin: 0 auto;
@@ -1627,15 +1906,16 @@ h4 {
     flex: 0 0 34%;
     max-width: 400px;
     border-right: 1px solid var(--border);
-    height: 100dvh;
-    position: sticky;
-    top: 0;
+    padding-bottom: 0;
   }
   .chat-thread-pane {
     display: flex !important;
     flex: 1;
     min-width: 0;
+    padding-bottom: 0;
   }
+  /* Base .chat-thread-empty{display:none} sits BEFORE this media query so the
+     desktop rule actually wins (same specificity → later source order). */
   .chat-thread-empty {
     display: flex;
     flex-direction: column;
@@ -1646,8 +1926,11 @@ h4 {
     padding: 40px;
   }
 }
-.chat-thread-empty {
-  display: none;
+/* Chat fills the view-area edge-to-edge with its own internal scroll — the
+   screen-pad's bottom clearance (meant to float content above the bottom nav)
+   would otherwise add a scrollable gap under the fixed-height shell. */
+.screen-pad.chat-route {
+  padding: 0 !important;
 }
 .chat-pinned-row {
   background: var(--green-50);

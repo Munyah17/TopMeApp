@@ -14,7 +14,7 @@ const THEME: Record<Kind, { accent: string; accentSoft: string; gradient: string
   transfer: {
     accent: "var(--green)",
     accentSoft: "var(--green-50)",
-    gradient: "var(--navy)",
+    gradient: "linear-gradient(135deg, var(--green-800) 0%, var(--green-950) 100%)",
     title: "Send Money",
     icon: "arrowUpR",
     sentLabel: "sent",
@@ -51,27 +51,38 @@ export function SendMoneyFlow({
 
   const theme = THEME[kind];
   const amountNum = parseFloat(amount) || 0;
-  const insufficient = amountNum > walletBalance;
+  const balanceNum = Number(walletBalance) || 0;
+  const insufficient = amountNum > balanceNum;
 
   async function submitDetails() {
     setStep("looking-up");
     setErrorMsg(null);
-    const found = await lookupRecipient(phone);
-    if (!found) {
-      setErrorMsg("No TopMe account found with that phone number.");
+    try {
+      const found = await lookupRecipient(phone);
+      if (!found) {
+        setErrorMsg("No TopMe account found with that phone number.");
+        setStep("error");
+        return;
+      }
+      setRecipient(found);
+      setStep("amount");
+    } catch {
+      setErrorMsg("We couldn't check that number right now. Please try again.");
       setStep("error");
-      return;
     }
-    setRecipient(found);
-    setStep("amount");
   }
 
   async function submitTransfer() {
     setBusy(true);
     setErrorMsg(null);
     try {
-      const transfer = await sendMoney(phone, amountNum, note || undefined, kind);
-      setResult(transfer);
+      const res = await sendMoney(phone, amountNum, note || undefined, kind);
+      if (!res.ok) {
+        setErrorMsg(res.error);
+        setStep("error");
+        return;
+      }
+      setResult(res.transfer);
       setStep("success");
     } catch (e) {
       setErrorMsg(e instanceof Error ? e.message : "Transfer failed.");
@@ -236,7 +247,7 @@ export function SendMoneyFlow({
                 </div>
                 <div className="row between" style={{ padding: "12px 0" }}>
                   <span className="muted">Wallet balance</span>
-                  <span style={{ fontWeight: 700, fontSize: 13.5 }}>${walletBalance.toFixed(2)}</span>
+                  <span style={{ fontWeight: 700, fontSize: 13.5 }}>${balanceNum.toFixed(2)}</span>
                 </div>
               </div>
             </div>
@@ -290,7 +301,7 @@ export function SendMoneyFlow({
             </div>
             <h2 style={{ fontSize: 21, marginTop: 20 }}>{kind === "red_packet" ? "Red packet sent!" : "Money sent"}</h2>
             <div className="muted mt-1">
-              ${result.amount.toFixed(2)} {theme.sentLabel} to {recipient.full_name || recipient.phone}
+              ${Number(result.amount).toFixed(2)} {theme.sentLabel} to {recipient.full_name || recipient.phone}
             </div>
             <Link href="/wallet" className="btn btn-primary btn-block mt-4" style={{ textDecoration: "none" }}>
               Back to Wallet

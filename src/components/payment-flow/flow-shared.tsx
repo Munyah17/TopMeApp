@@ -98,7 +98,7 @@ export function DenomTile({ amount, selected, onClick }: { amount: number; selec
         cursor: "pointer",
         border: `1.5px solid ${selected ? "var(--green)" : "var(--border)"}`,
         background: selected ? "var(--green-50)" : "var(--surface)",
-        boxShadow: selected ? "0 0 0 3px rgba(0,200,83,0.14)" : "none",
+        boxShadow: selected ? "0 0 0 3px rgba(5,150,105,0.14)" : "none",
       }}
     >
       <div style={{ fontWeight: 800, fontSize: 16, color: selected ? "var(--green-600)" : "var(--text)" }}>${amount}</div>
@@ -132,7 +132,7 @@ export function NetworkTile({ network, selected, onClick }: { network: Network; 
         font: "inherit",
         border: `1px solid ${selected ? "var(--green)" : "var(--border)"}`,
         background: selected ? "var(--green-50)" : "var(--surface)",
-        boxShadow: selected ? "0 0 0 3px rgba(0, 200, 83, 0.12)" : "none",
+        boxShadow: selected ? "0 0 0 3px rgba(5, 150, 105, 0.12)" : "none",
         transition: "border-color 160ms ease, background 160ms ease, box-shadow 160ms ease",
       }}
     >

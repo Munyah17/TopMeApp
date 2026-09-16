@@ -16,7 +16,7 @@ export default async function InsurancePage() {
       </div>
       <div className="px content-wrap">
         <div className="muted mb-3" style={{ fontSize: 13, lineHeight: 1.5 }}>
-          Protect what matters most — medical, funeral, farming, legal, travel and vehicle cover, all from your wallet.
+          Protect what matters most — medical, funeral, legal, travel and vehicle cover, all from your wallet.
         </div>
 
         {products.length === 0 ? (

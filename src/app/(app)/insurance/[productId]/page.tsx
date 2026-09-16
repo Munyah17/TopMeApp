@@ -3,23 +3,27 @@ import Link from "next/link";
 import { Icon } from "@/components/icons";
 import { createClient } from "@/lib/supabase/server";
 import { getInsuranceQuote, purchaseInsurancePolicy } from "@/lib/actions/insurance";
-import { displayName, displayDescription, displayImage, displayPremium } from "@/lib/insurance/types";
+import { displayName, displayDescription, displayImage, displayPremium, enrichInsuranceProduct } from "@/lib/insurance/types";
 import InsurancePurchaseForm from "@/components/insurance/insurance-purchase-form";
 
 export default async function InsuranceProductPage({ params }: { params: Promise<{ productId: string }> }) {
   const { productId } = await params;
   const supabase = await createClient();
-  
-  const { data: product, error } = await supabase
+
+  const { data: row, error } = await supabase
     .from("insurance_products")
     .select("*")
     .eq("id", productId)
     .eq("is_active", true)
     .single();
 
-  if (error || !product) {
+  if (error || !row) {
     notFound();
   }
+
+  // Enrich from `raw` so premium/cover/features resolve even when the
+  // dedicated columns aren't populated yet.
+  const product = enrichInsuranceProduct(row as Record<string, unknown>);
 
   const name = displayName(product);
   const description = displayDescription(product);

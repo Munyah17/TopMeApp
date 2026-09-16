@@ -140,7 +140,12 @@ export function ChatThread({
     setMoneyBusy(true);
     setMoneyError(null);
     try {
-      addMessage(await sendMoneyMessage(conversationId, counterpart.phone, amt, note.trim() || undefined, moneySheet));
+      const res = await sendMoneyMessage(conversationId, counterpart.phone, amt, note.trim() || undefined, moneySheet);
+      if (!res.ok) {
+        setMoneyError(res.error);
+        return;
+      }
+      addMessage(res.message);
       setMoneySheet(null);
       setAmount("");
       setNote("");
@@ -152,7 +157,7 @@ export function ChatThread({
   }
 
   return (
-    <div>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
       <div className="chat-header">
         <Link href="/chat" className="backbtn tap chat-header-back" style={{ textDecoration: "none" }}>
           <Icon name="chevronL" size={18} stroke={2.2} />
@@ -163,7 +168,7 @@ export function ChatThread({
         <div style={{ flex: 1, fontWeight: 700, fontSize: 15, color: "#fff" }}>{counterpart?.full_name || counterpart?.phone || "TopMe user"}</div>
       </div>
 
-      <div className="chat-wallpaper px content-narrow" style={{ paddingTop: 10, paddingBottom: 90, minHeight: "calc(100vh - 160px)" }}>
+      <div className="chat-wallpaper px content-narrow" style={{ paddingTop: 10, paddingBottom: 16 }}>
         {messages.length === 0 && (
           <div className="muted" style={{ textAlign: "center", padding: "30px 0" }}>
             Say hello 👋
@@ -254,7 +259,7 @@ export function ChatThread({
         <div ref={bottomRef} />
       </div>
 
-      <div className="content-narrow" style={{ position: "sticky", bottom: 0, background: "var(--bg)", paddingTop: 8, paddingBottom: 8 }}>
+      <div className="content-narrow" style={{ flexShrink: 0, width: "100%", background: "var(--bg)", paddingTop: 8, paddingBottom: 8 }}>
         <div className="px">
           <div className="row gap-2" style={{ alignItems: "flex-end" }}>
             <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => e.target.files?.[0] && submitImage(e.target.files[0])} />

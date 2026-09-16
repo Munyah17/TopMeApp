@@ -542,7 +542,7 @@ function AmountStep({
                 style={{
                   padding: 14,
                   borderColor: bundleId === b.id ? "var(--green)" : "var(--border)",
-                  boxShadow: bundleId === b.id ? "0 0 0 3px rgba(0,200,83,0.14)" : "none",
+                  boxShadow: bundleId === b.id ? "0 0 0 3px rgba(5,150,105,0.14)" : "none",
                 }}
               >
                 <div style={{ flex: 1 }}>
@@ -570,7 +570,7 @@ function AmountStep({
                 style={{
                   padding: 14,
                   borderColor: pkgId === p.id ? "var(--green)" : "var(--border)",
-                  boxShadow: pkgId === p.id ? "0 0 0 3px rgba(0,200,83,0.14)" : "none",
+                  boxShadow: pkgId === p.id ? "0 0 0 3px rgba(5,150,105,0.14)" : "none",
                 }}
               >
                 <div style={{ flex: 1 }}>
@@ -585,8 +585,8 @@ function AmountStep({
       )}
 
       {service.amount_mode === "outstanding" && (
-        <div className="card card-pad" style={{ background: "var(--navy)", border: "none" }}>
-          <div className="muted" style={{ color: "rgba(255,255,255,0.55)" }}>
+        <div className="card card-pad" style={{ background: "linear-gradient(135deg, var(--green-800) 0%, var(--green-950) 100%)", border: "none" }}>
+          <div className="muted" style={{ color: "rgba(236,253,245,0.6)" }}>
             Outstanding balance
           </div>
           <div style={{ color: "#fff", fontSize: 30, fontWeight: 800, marginTop: 4 }}>${(service.outstanding ?? 0).toFixed(2)}</div>
