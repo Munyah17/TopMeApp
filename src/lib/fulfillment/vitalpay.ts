@@ -311,6 +311,104 @@ export async function validateElectricityMeter(meterNumber: string): Promise<Ele
   return { valid: false, reason: "unavailable", message: "Meter check is temporarily unavailable." };
 }
 
+/**
+ * Biller account validation — GET /bills/validate?biller_code=..&account_number=..&country=ZW.
+ * Same idea as the ZESA meter check above: VitalPay proxies the biller's own
+ * lookup (ZOL, DStv, TelOne, Bulawayo City Council — the BILLERS map), so a
+ * good account returns the registered customer name for the buyer to confirm
+ * before paying, and an unknown account comes back as a 422 field error.
+ *
+ * The endpoint's exact success-envelope shape isn't in any doc we have, so
+ * `pick()` tries every plausible key (and one level of nesting) — worst case
+ * the name is null and checkout still works. If the route itself doesn't
+ * exist for a biller, the non-OK status lands in "unavailable" and the
+ * caller treats the check as skipped rather than blocking the payment.
+ */
+export type BillAccountCheck =
+  | {
+      valid: true;
+      accountNumber: string;
+      customerName: string | null;
+      raw: Record<string, unknown>;
+    }
+  | { valid: false; reason: "invalid_account" | "unavailable"; message: string };
+
+export async function validateBillAccount(serviceId: string, accountNumber: string): Promise<BillAccountCheck> {
+  const biller = BILLERS[serviceId];
+  if (!biller) {
+    return { valid: false, reason: "unavailable", message: "No biller mapping for this service." };
+  }
+  const { baseUrl, secretKey } = config();
+  const account = accountNumber.trim();
+
+  let res: Response;
+  try {
+    res = await fetch(
+      `${baseUrl}/bills/validate?biller_code=${encodeURIComponent(biller.billerCode)}&account_number=${encodeURIComponent(account)}&country=ZW`,
+      { headers: { Accept: "application/json", Authorization: `Bearer ${secretKey}` } }
+    );
+  } catch {
+    return { valid: false, reason: "unavailable", message: "Account check is temporarily unavailable." };
+  }
+
+  const text = await res.text();
+  let parsed:
+    | (VitalPayEnvelope<Record<string, unknown>> & { errors?: Record<string, string[]> })
+    | null = null;
+  try {
+    parsed = text ? JSON.parse(text) : null;
+  } catch {
+    return { valid: false, reason: "unavailable", message: "Account check is temporarily unavailable." };
+  }
+
+  if (res.ok && parsed?.success && parsed.data && typeof parsed.data === "object") {
+    const flat: Record<string, unknown> = { ...parsed.data };
+    for (const nestKey of ["customer", "account", "details", "data", "biller"]) {
+      const nested = (parsed.data as Record<string, unknown>)[nestKey];
+      if (nested && typeof nested === "object") Object.assign(flat, nested);
+    }
+    const pick = (...keys: string[]) => {
+      for (const k of keys) {
+        const v = flat[k];
+        if (typeof v === "string" && v.trim()) return v.trim();
+      }
+      return null;
+    };
+    return {
+      valid: true,
+      accountNumber: pick("account_number", "accountNumber", "account") ?? account,
+      customerName: pick(
+        "customer_name",
+        "customerName",
+        "name",
+        "account_name",
+        "accountName",
+        "account_holder",
+        "accountHolder",
+        "customer",
+        "holder",
+        "owner",
+        "full_name",
+        "subscriber",
+        "subscriber_name"
+      ),
+      raw: parsed.data as Record<string, unknown>,
+    };
+  }
+
+  const fieldError =
+    parsed?.errors?.account_number?.[0] ?? parsed?.errors?.accountNumber?.[0] ?? null;
+  if ((res.status === 422 || res.status === 404) && (fieldError || res.status === 422)) {
+    return {
+      valid: false,
+      reason: "invalid_account",
+      message: "We couldn't find that account number. Please double-check it and try again.",
+    };
+  }
+
+  return { valid: false, reason: "unavailable", message: "Account check is temporarily unavailable." };
+}
+
 export class VitalPayProvider implements FulfillmentProvider {
   readonly name = "vitalpay";
   // Airtime (Econet/NetOne), the 4 confirmed billers, and ZESA electricity.

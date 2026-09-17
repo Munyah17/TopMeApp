@@ -7,7 +7,7 @@ import QRCode from "qrcode";
 import { Icon } from "@/components/icons";
 import { hexA } from "@/lib/data/catalog-helpers";
 import { calculatePlatformFee, calculateGatewaySurcharge } from "@/lib/fees";
-import { payService } from "@/lib/actions/payments";
+import { payService, validateBillAccount } from "@/lib/actions/payments";
 import { startGuestCheckout, type GuestGateway } from "@/lib/actions/guest-payments";
 import { addGuestActivity } from "@/lib/guest-activity";
 import { EditableRow, PaymentMethodSection, ReviewRow, type PaymentBanners, type PaymentMethod } from "./flow-shared";
@@ -44,6 +44,15 @@ export function BroadbandFlow({
 
   const [step, setStep] = useState<Step>("account");
   const [account, setAccount] = useState("");
+  // Registered account holder for `account`, fetched from the biller via
+  // VitalPay before payment so the buyer can confirm the account is right.
+  // `holder` null with a matching `checkedAccount` means the check ran but
+  // returned no name (service down / not wired / name field absent) — we
+  // don't re-nag or block in that case.
+  const [holder, setHolder] = useState<{ name: string | null } | null>(null);
+  const [checkedAccount, setCheckedAccount] = useState<string | null>(null);
+  const [accountChecking, setAccountChecking] = useState(false);
+  const [accountError, setAccountError] = useState<string | null>(null);
   const [packageIdx, setPackageIdx] = useState<number | null>(null);
   const [payFullBalance, setPayFullBalance] = useState(true);
   const [customAmount, setCustomAmount] = useState("");
@@ -62,6 +71,41 @@ export function BroadbandFlow({
     : payFullBalance
       ? fullBalance
       : parseFloat(customAmount) || 0;
+
+  const holderName = checkedAccount === account.trim() ? holder?.name ?? null : null;
+
+  // Returns true if checkout may proceed (valid account, or the check
+  // couldn't run), false if it's a known-bad account — in which case
+  // `accountError` is set and the caller keeps the customer on this step.
+  async function runAccountCheck(): Promise<boolean> {
+    const target = account.trim();
+    if (checkedAccount === target) return true; // already checked this exact number
+    setAccountChecking(true);
+    setAccountError(null);
+    try {
+      const res = await validateBillAccount(service.id, target);
+      if (res.state === "invalid") {
+        setAccountError(res.message);
+        setHolder(null);
+        setCheckedAccount(null);
+        return false;
+      }
+      setHolder(res.state === "ok" ? { name: res.customerName } : null);
+      setCheckedAccount(target);
+      return true;
+    } catch {
+      // Network/unexpected — don't block the payment on our own check failing.
+      setHolder(null);
+      setCheckedAccount(target);
+      return true;
+    } finally {
+      setAccountChecking(false);
+    }
+  }
+
+  async function continueFromAccount() {
+    if (await runAccountCheck()) setStep("amount");
+  }
 
   useEffect(() => {
     if (step === "receipt" && result && qrRef.current) {
@@ -189,12 +233,35 @@ export function BroadbandFlow({
             <h2 style={{ fontSize: 20, marginTop: 14 }}>{service.name}</h2>
             <div className="muted mb-3">Enter your account number to make a payment</div>
             <label className="field-label">{service.id_label}</label>
-            <input className="field" placeholder={service.id_placeholder ?? ""} value={account} onChange={(e) => setAccount(e.target.value)} />
-            <div className="mt-2 muted" style={{ lineHeight: 1.5 }}>
-              Double-check your account number — nothing is charged until you confirm.
-            </div>
-            <button className="btn btn-primary btn-block mt-4" disabled={account.trim().length < 3} onClick={() => setStep("amount")}>
-              Continue
+            <input
+              className="field"
+              placeholder={service.id_placeholder ?? ""}
+              value={account}
+              onChange={(e) => {
+                setAccount(e.target.value);
+                setAccountError(null);
+              }}
+            />
+            {accountError ? (
+              <div className="mt-2" style={{ color: "var(--error)", fontSize: 13, lineHeight: 1.5 }}>
+                {accountError}
+              </div>
+            ) : holderName ? (
+              <div className="row gap-2 mt-2" style={{ alignItems: "center", color: "var(--success)", fontSize: 13, fontWeight: 600 }}>
+                <Icon name="check" size={15} stroke={2.4} />
+                <span>{holderName}</span>
+              </div>
+            ) : (
+              <div className="mt-2 muted" style={{ lineHeight: 1.5 }}>
+                Double-check your account number — nothing is charged until you confirm.
+              </div>
+            )}
+            <button
+              className="btn btn-primary btn-block mt-4"
+              disabled={account.trim().length < 3 || accountChecking}
+              onClick={continueFromAccount}
+            >
+              {accountChecking ? "Checking account…" : "Continue"}
             </button>
           </>
         )}
@@ -219,6 +286,12 @@ export function BroadbandFlow({
                 <span className="muted">{service.id_label}</span>
                 <span style={{ fontWeight: 700, fontSize: 13.5 }}>{account}</span>
               </div>
+              {holderName && (
+                <div className="row between mt-1">
+                  <span className="muted">Account holder</span>
+                  <span style={{ fontWeight: 700, fontSize: 13.5 }}>{holderName}</span>
+                </div>
+              )}
               {!usesPackages && (
                 <div className="row between mt-1">
                   <span className="muted">Balance owed</span>
@@ -300,7 +373,19 @@ export function BroadbandFlow({
                 )}
               </div>
               <div style={{ padding: "6px 18px" }}>
-                <EditableRow label={service.id_label} value={account} onSave={setAccount} placeholder={service.id_placeholder ?? ""} />
+                <EditableRow
+                  label={service.id_label}
+                  value={account}
+                  onSave={(next) => {
+                    setAccount(next);
+                    if (next.trim() !== checkedAccount) {
+                      setHolder(null);
+                      setCheckedAccount(null);
+                    }
+                  }}
+                  placeholder={service.id_placeholder ?? ""}
+                />
+                {holderName && <ReviewRow label="Account holder" value={holderName} />}
                 <ReviewRow label="Amount" value={`$${amount.toFixed(2)}`} />
                 <ReviewRow label="Processing fee" value={`$${fee.toFixed(2)}`} />
                 {method === "wallet" && <ReviewRow label="Wallet balance" value={`$${walletBalance.toFixed(2)}`} />}
@@ -338,10 +423,18 @@ export function BroadbandFlow({
 
             <button
               className="btn btn-primary btn-block mt-4"
-              disabled={busy || insufficient || guestMissingInfo || noMethodChosen}
-              onClick={() => { if (method === "wallet") setStep("processing"); submit(); }}
+              disabled={busy || accountChecking || insufficient || guestMissingInfo || noMethodChosen}
+              onClick={async () => {
+                // Account may have been edited on this screen — re-confirm before charging.
+                if (!(await runAccountCheck())) {
+                  setStep("account");
+                  return;
+                }
+                if (method === "wallet") setStep("processing");
+                submit();
+              }}
             >
-              {busy ? "Processing…" : method ? `Pay With ${PAY_VIA_LABEL[method]} ($${total.toFixed(2)})` : `Pay $${total.toFixed(2)}`}
+              {busy ? "Processing…" : accountChecking ? "Checking account…" : method ? `Pay With ${PAY_VIA_LABEL[method]} ($${total.toFixed(2)})` : `Pay $${total.toFixed(2)}`}
             </button>
           </>
         )}

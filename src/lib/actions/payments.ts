@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { getFulfillmentProvider, hasRealCoverage } from "@/lib/fulfillment";
-import { validateElectricityMeter } from "@/lib/fulfillment/vitalpay";
+import { validateBillAccount as vitalpayValidateBillAccount, validateElectricityMeter } from "@/lib/fulfillment/vitalpay";
 import { isFeatureEnabled } from "@/lib/data/flags";
 import { findProfileByPhone } from "@/lib/data/queries";
 import { sendEmail } from "@/lib/email/client";
@@ -88,13 +88,19 @@ export async function payService(input: PayServiceInput) {
     if (!check.ok) throw new Error(check.message);
   }
 
+  // Resolve fulfillment up front: the first active aggregator that covers
+  // this service (already confirmed to exist by the coverage check above).
+  // The transaction record must carry the real provider name — hardcoding
+  // "simulated" made live VitalPay attempts indistinguishable from demo runs.
+  const provider = getFulfillmentProvider(input.serviceId, (activeModules as ApiModuleSafe[]) ?? []);
+
   const { data: txData, error } = await supabase.rpc("wallet_pay", {
     p_service_id: input.serviceId,
     p_amount: verifiedAmount,
     p_recipient: input.recipient,
     p_network_id: input.networkId ?? null,
     p_extra_value: input.extraValue ?? null,
-    p_fulfillment_provider: "simulated",
+    p_fulfillment_provider: provider.name,
   });
 
   if (error) {
@@ -109,9 +115,6 @@ export async function payService(input: PayServiceInput) {
     message: `Paid from wallet balance — $${verifiedAmount.toFixed(2)}.`,
   });
 
-  // Resolve fulfillment: first active aggregator that covers this service
-  // (already confirmed to exist by the coverage check above).
-  const provider = getFulfillmentProvider(input.serviceId, (activeModules as ApiModuleSafe[]) ?? []);
   const fulfillmentInput = {
     transactionId: tx.id,
     serviceId: input.serviceId,
@@ -162,12 +165,23 @@ export async function payService(input: PayServiceInput) {
   // staff approval queue otherwise (see 2026-09-10-fulfilment-auto-refund).
   if (fulfillmentResult.status === "failed") {
     const { recordFailedFulfilmentRefund } = await import("@/lib/payments/refunds");
-    await recordFailedFulfilmentRefund(admin, {
+    const refund = await recordFailedFulfilmentRefund(admin, {
       transactionId: tx.id,
       reference: tx.reference,
       serviceName: input.serviceName,
       reason: fulfillmentResult.message || `${provider.name} could not fulfil this order.`,
     });
+    revalidatePath("/home");
+    revalidatePath("/history");
+    revalidatePath("/wallet");
+    // The debit was already reversed (or queued for staff) — surface the real
+    // outcome. Returning the tx here let every flow render "successful" for a
+    // payment that had just failed and refunded (the 2026-09-17 airtime bug).
+    throw new Error(
+      refund?.status === "paid"
+        ? `${input.serviceName} delivery failed — $${refund.amount.toFixed(2)} has been refunded to your wallet.`
+        : `${input.serviceName} delivery failed — your refund is being processed.`
+    );
   }
 
   if (input.saveBeneficiary) {
@@ -301,6 +315,40 @@ export async function validateMeter(meterNumber: string): Promise<MeterCheckResu
       return { state: "ok", customerName: check.customerName, address: check.address, meterNumber: check.meterNumber };
     }
     if (check.reason === "invalid_meter") return { state: "invalid", message: check.message };
+    return { state: "skipped" };
+  } catch {
+    return { state: "skipped" };
+  }
+}
+
+export type BillAccountCheckResult =
+  | { state: "ok"; customerName: string | null; accountNumber: string }
+  | { state: "invalid"; message: string }
+  // Validation service is down, not configured, or this biller isn't wired
+  // to a live provider — the UI treats this as "couldn't check" and lets
+  // checkout proceed rather than hard-blocking on our side.
+  | { state: "skipped" };
+
+// Confirms a biller account number (ZOL, DStv, TelOne, Bulawayo City
+// Council) against the biller's own records via VitalPay and returns the
+// registered account holder, so the buyer can eyeball "paying <name>'s
+// account" before money moves. Only runs when the service is actually wired
+// to a live VitalPay module — anything else reports "skipped".
+export async function validateBillAccount(serviceId: string, accountNumber: string): Promise<BillAccountCheckResult> {
+  const account = accountNumber.trim();
+  if (account.length < 3) return { state: "invalid", message: "Enter your full account number." };
+
+  const admin = createAdminClient();
+  const { data: modules } = await admin.from("api_modules_safe").select("*").eq("status", "active");
+  const provider = getFulfillmentProvider(serviceId, (modules ?? []) as ApiModuleSafe[]);
+  if (provider.name !== "vitalpay") return { state: "skipped" };
+
+  try {
+    const check = await vitalpayValidateBillAccount(serviceId, account);
+    if (check.valid) {
+      return { state: "ok", customerName: check.customerName, accountNumber: check.accountNumber };
+    }
+    if (check.reason === "invalid_account") return { state: "invalid", message: check.message };
     return { state: "skipped" };
   } catch {
     return { state: "skipped" };
