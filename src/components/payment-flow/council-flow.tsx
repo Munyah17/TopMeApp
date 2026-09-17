@@ -83,6 +83,14 @@ export function CouncilFlow({
           if (data.status === "completed") {
             clearInterval(poll);
             setResult(data.transaction);
+            if (data.transaction.fulfillment_status === "failed") {
+              // Gateway captured the money but delivery failed — the refund
+              // path already notified the customer. Never show "successful"
+              // for a transaction whose delivery leg failed.
+              setErrorMsg("Payment went through but delivery failed — a refund is being processed.");
+              setStep("error");
+              return;
+            }
             addGuestActivity({
               reference: data.transaction.reference,
               serviceName: service.name,

@@ -64,7 +64,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true }); // acknowledge, nothing to do
   }
 
-  const { data: tx } = await admin.from("transactions").select("id").eq("reference", reference).maybeSingle();
+  const { data: tx } = await admin
+    .from("transactions")
+    .select("id, service_id, fulfillment_status")
+    .eq("reference", reference)
+    .maybeSingle();
   if (!tx) return NextResponse.json({ ok: true });
 
   void logTransactionEvent(admin, {
@@ -75,18 +79,36 @@ export async function POST(request: NextRequest) {
     meta: { event: payload.event },
   });
 
+  const failed = payload.event === "service.failed";
   await admin.rpc("set_fulfillment_result", {
     p_transaction_id: tx.id,
-    p_status: payload.event === "service.completed" ? "fulfilled" : "failed",
+    p_status: failed ? "failed" : "fulfilled",
     p_receipt: { provider: "vitalpay", event: payload.event },
   });
   void logTransactionEvent(admin, {
     transactionId: tx.id,
     reference,
-    eventType: payload.event === "service.completed" ? "fulfillment_success" : "fulfillment_failed",
-    message: payload.event === "service.completed" ? "VitalPay confirmed delivery." : "VitalPay reported delivery failed.",
+    eventType: failed ? "fulfillment_failed" : "fulfillment_success",
+    message: failed ? "VitalPay reported delivery failed." : "VitalPay confirmed delivery.",
     meta: { event: payload.event },
   });
+
+  // A failed delivery must refund NOW — auto-credit the wallet for small
+  // amounts, queue for staff otherwise. Previously this only flipped the
+  // status and waited for the daily reconcile cron, leaving the customer's
+  // money in limbo for up to 24h. Idempotent: safe if a refund already
+  // exists (e.g. a duplicate webhook delivery).
+  if (failed && tx.fulfillment_status !== "failed") {
+    const { data: svc } = await admin.from("services").select("name").eq("id", tx.service_id).single();
+    const { recordFailedFulfilmentRefund } = await import("@/lib/payments/refunds");
+    await recordFailedFulfilmentRefund(admin, {
+      transactionId: tx.id,
+      reference,
+      serviceName: (svc as { name: string } | null)?.name ?? tx.service_id,
+      reason: "VitalPay reported delivery failed (service.failed webhook).",
+      origin: "auto",
+    });
+  }
 
   return NextResponse.json({ ok: true });
 }

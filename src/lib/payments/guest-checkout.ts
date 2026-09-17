@@ -14,9 +14,18 @@ import type { ApiModuleSafe, Transaction } from "@/types/database";
 export async function finalizeGuestCheckout(reference: string): Promise<Transaction> {
   const admin = createAdminClient();
 
+  // Resolve the fulfillment provider BEFORE recording the payment so the
+  // transaction carries the real provider name — hardcoding "simulated"
+  // made live VitalPay attempts indistinguishable from demo runs.
+  const [{ data: intent }, { data: apiModules }] = await Promise.all([
+    admin.from("guest_checkout_intents").select("service_id").eq("reference", reference).single(),
+    admin.from("api_modules_safe").select("*").eq("status", "active"),
+  ]);
+  const provider = getFulfillmentProvider(intent?.service_id ?? "", (apiModules as ApiModuleSafe[]) ?? []);
+
   const { data: txData, error } = await admin.rpc("finalize_guest_payment", {
     p_reference: reference,
-    p_fulfillment_provider: "simulated",
+    p_fulfillment_provider: provider.name,
   });
   if (error) throw new Error(error.message);
   const tx = txData as Transaction;
@@ -27,12 +36,7 @@ export async function finalizeGuestCheckout(reference: string): Promise<Transact
     message: `Payment confirmed via ${tx.fulfillment_provider ?? "gateway"} — $${tx.amount.toFixed(2)} captured.`,
   });
 
-  const [{ data: apiModules }, { data: service }] = await Promise.all([
-    admin.from("api_modules_safe").select("*").eq("status", "active"),
-    admin.from("services").select("name").eq("id", tx.service_id).single(),
-  ]);
-
-  const provider = getFulfillmentProvider(tx.service_id, (apiModules as ApiModuleSafe[]) ?? []);
+  const { data: service } = await admin.from("services").select("name").eq("id", tx.service_id).single();
   const fulfillmentInput = {
     transactionId: tx.id,
     serviceId: tx.service_id,
@@ -88,6 +92,10 @@ export async function finalizeGuestCheckout(reference: string): Promise<Transact
       serviceName: (service as { name: string } | null)?.name ?? tx.service_id,
       reason: fulfillmentResult.message || `${provider.name} could not fulfil this order.`,
     });
+    // Delivery failed — the refund path already emailed the customer. Sending
+    // a success receipt on top of that is exactly the contradictory pair of
+    // emails behind the 2026-09-17 airtime incident.
+    return (updatedTx as Transaction) ?? tx;
   }
 
   const finalTx = (updatedTx as Transaction) ?? tx;
