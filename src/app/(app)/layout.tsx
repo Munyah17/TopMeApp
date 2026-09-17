@@ -1,6 +1,5 @@
 import { AnnouncementStrip } from "@/components/app-shell/announcement-strip";
 import { AppShell } from "@/components/app-shell/shell";
-import { SidebarWidgets } from "@/components/app-shell/sidebar-widgets";
 import { getUnreadChatCount } from "@/lib/data/chat-queries";
 import { isFeatureEnabled } from "@/lib/data/flags";
 import { getCurrentProfile } from "@/lib/data/queries";
@@ -17,7 +16,6 @@ export default async function AppGroupLayout({ children }: { children: React.Rea
       unreadChatCount={unreadChatCount}
       chatEnabled={chatEnabled}
       announcements={<AnnouncementStrip audience="customers" />}
-      sidebarWidgets={profile ? <SidebarWidgets profile={profile} /> : null}
     >
       {children}
     </AppShell>

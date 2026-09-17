@@ -48,14 +48,12 @@ export function AppShell({
   unreadChatCount = 0,
   chatEnabled = true,
   announcements,
-  sidebarWidgets,
   children,
 }: {
   profile: Profile | null;
   unreadChatCount?: number;
   chatEnabled?: boolean;
   announcements?: React.ReactNode;
-  sidebarWidgets?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -129,7 +127,6 @@ export function AppShell({
         </Link>
         <nav className="side-nav">
           {navLinks()}
-          {sidebarWidgets}
         </nav>
         <div className="side-footer">{userCard}</div>
       </aside>

@@ -1,5 +1,6 @@
 ﻿import Link from "next/link";
 import { Icon } from "@/components/icons";
+import { FavoriteButton } from "@/components/home/favorite-button";
 import { GuestRecent } from "@/components/home/guest-recent";
 import { ProductCard } from "@/components/home/product-card";
 import { QuickSearch } from "@/components/home/quick-search";
@@ -9,6 +10,7 @@ import { InsuranceCard } from "@/components/insurance/insurance-card";
 import {
   getActivePromoBanner,
   getAllServices,
+  getBeneficiaries,
   getCategories,
   getCurrentProfile,
   getFavoriteServiceIds,
@@ -21,11 +23,12 @@ const CAT_ROW_DESKTOP_COLUMNS = 4;
 export default async function HomePage() {
   const profile = await getCurrentProfile();
 
-  const [categories, services, favoriteIds, recent, promoBanner, gridWidgets, insuranceProducts] = await Promise.all([
+  const [categories, services, favoriteIds, recent, beneficiaries, promoBanner, gridWidgets, insuranceProducts] = await Promise.all([
     getCategories(),
     getAllServices(),
     profile ? getFavoriteServiceIds(profile.id) : Promise.resolve(new Set<string>()),
     profile ? getRecentTransactions(profile.id, 3) : Promise.resolve([]),
+    profile ? getBeneficiaries(profile.id) : Promise.resolve([]),
     getActivePromoBanner(),
     profile ? getGridWidgetBanners() : Promise.resolve([]),
     getInsuranceProducts(),
@@ -42,8 +45,17 @@ export default async function HomePage() {
   }
   const favoriteServices = services.filter((s) => favoriteIds.has(s.id));
 
+  const monthSpend = recent.reduce((sum, t) => (t.status === "success" ? sum + t.amount : sum), 0);
+
   return (
     <div className="px content-wrap" style={{ paddingTop: 6 }}>
+      {/* Logged-in users get the two-column home layout: product catalog on
+          the left, account widgets (help / activity / beneficiaries) in a
+          sticky right rail. Guests see the catalog full-width — the widgets
+          are account data, so they're gated on the server-side profile, not
+          a client cookie. */}
+      <div className={profile ? "home-grid" : ""}>
+        <div className="col-main">
           <div className="quickpay-gift-row">
             <div
               style={{
@@ -351,18 +363,58 @@ export default async function HomePage() {
               ))}
             </div>
           </div>
+        </div>
+
         {profile && (
-          <Link href="/chat" className="card card-pad row gap-2 mt-3 mobile-only" style={{ alignItems: "center", textDecoration: "none" }}>
-            <div className="ibadge round" style={{ background: "var(--blue-50)", color: "var(--blue)" }}>
-              <Icon name="headset" size={20} stroke={1.8} />
+          <div className="col-side">
+            <Link href="/chat" className="card card-pad row gap-2 tap" style={{ alignItems: "center", textDecoration: "none" }}>
+              <div className="ibadge round" style={{ background: "var(--blue-50)", color: "var(--blue)" }}>
+                <Icon name="headset" size={20} stroke={1.8} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>Need a hand?</div>
+                <div className="muted">We usually reply within minutes</div>
+              </div>
+              <Icon name="chevronR" size={18} stroke={2} />
+            </Link>
+
+            <div className="card card-pad mt-2 desktop-only">
+              <div className="muted">Recent activity</div>
+              <div style={{ fontSize: 22, fontWeight: 700, marginTop: 4, letterSpacing: "-0.02em" }}>{fmt(monthSpend)}</div>
+              <div className="muted" style={{ marginTop: 2 }}>
+                Across your last {recent.length} payment{recent.length === 1 ? "" : "s"}
+              </div>
             </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 700, fontSize: 14 }}>Need a hand?</div>
-              <div className="muted">We usually reply within minutes</div>
+
+            <div className="card card-pad mt-2 desktop-only">
+              <div className="section-title" style={{ fontSize: 14 }}>
+                Saved beneficiaries
+              </div>
+              {beneficiaries.length === 0 ? (
+                <div className="row gap-2 mt-3" style={{ alignItems: "center" }}>
+                  <div className="empty-state-icon" style={{ width: 36, height: 36, marginBottom: 0 }}>
+                    <Icon name="user" size={17} stroke={1.8} />
+                  </div>
+                  <div className="muted" style={{ flex: 1 }}>Recipients you pay often are saved here for quick reuse.</div>
+                </div>
+              ) : (
+                beneficiaries.slice(0, 3).map((b) => (
+                  <div className="row gap-2 mt-2" key={b.id}>
+                    <div className="ibadge round" style={{ width: 34, height: 34, background: "var(--badge-neutral-bg)", color: "var(--text-soft)", fontSize: 12, fontWeight: 700 }}>
+                      {(b.label || b.identifier).slice(0, 2).toUpperCase()}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: 13 }}>{b.label || b.identifier}</div>
+                      <div className="muted">{b.service_id}</div>
+                    </div>
+                    <FavoriteButton serviceId={b.service_id || ""} isFavorite={favoriteIds.has(b.service_id || "")} />
+                  </div>
+                ))
+              )}
             </div>
-            <Icon name="chevronR" size={18} stroke={2} />
-          </Link>
+          </div>
         )}
+      </div>
     </div>
   );
 }
