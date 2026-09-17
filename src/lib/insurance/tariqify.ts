@@ -184,7 +184,14 @@ export async function createOrGetClient(params: {
   national_id: string;
   full_name: string;
   phone?: string;
+  email?: string;
+  date_of_birth?: string;
+  address?: string;
+  occupation?: string;
 }): Promise<TariqifyClient> {
+  // Forward the whole application — Tariqify persists the fields its schema
+  // knows (national_id/full_name/phone at minimum) and ignores the rest, so
+  // sending email/dob/address/occupation is safe even where unmapped.
   const data = await tariqifyRequest<Record<string, unknown>>("/clients", {
     method: "POST",
     body: params,

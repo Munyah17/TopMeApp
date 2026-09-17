@@ -12,7 +12,7 @@ const ITEMS = [
   { href: "/account#notifications", label: "Notifications", icon: "bell" },
 ] as const;
 
-export function AvatarMenu({ initials }: { initials: string }) {
+export function AvatarMenu({ initials, avatarUrl }: { initials: string; avatarUrl?: string | null }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -29,7 +29,12 @@ export function AvatarMenu({ initials }: { initials: string }) {
   return (
     <div ref={ref} style={{ position: "relative" }}>
       <button type="button" className="header-avatar tap" onClick={() => setOpen((v) => !v)} aria-label="Account menu">
-        {initials}
+        {avatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- user-uploaded avatar from our own storage, no stored dimensions
+          <img src={avatarUrl} alt="" />
+        ) : (
+          initials
+        )}
       </button>
       {open && (
         <div className="avatar-menu">

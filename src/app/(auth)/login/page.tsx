@@ -10,23 +10,42 @@ function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
     setError(null);
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
-    if (error) {
-      setError(error.message);
-      return;
+
+    // Per-field validation — flag exactly which input is wrong instead of
+    // failing silently or surfacing a generic Supabase error.
+    const errs: { email?: string; password?: string } = {};
+    if (!email.trim()) errs.email = "Enter your email address.";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) errs.email = "That doesn't look like a valid email address.";
+    if (!password) errs.password = "Enter your password.";
+    setFieldErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+
+    setLoading(true);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      if (error) {
+        // Credential failures belong on the form, not a field — but a
+        // "invalid login credentials" is really about the pair, so keep it
+        // as a form-level message.
+        setError(error.message);
+        return;
+      }
+      // A hard navigation (not router.push + router.refresh) so the proxy
+      // middleware sees the just-set auth cookie on the very next request —
+      // push+refresh back-to-back races and can drop the navigation entirely.
+      window.location.assign(searchParams.get("redirect") || "/home");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
     }
-    // A hard navigation (not router.push + router.refresh) so the proxy
-    // middleware sees the just-set auth cookie on the very next request —
-    // push+refresh back-to-back races and can drop the navigation entirely.
-    window.location.assign(searchParams.get("redirect") || "/home");
   }
 
   return (
@@ -42,9 +61,13 @@ function LoginForm() {
             type="email"
             required
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => { setEmail(e.target.value); if (fieldErrors.email) setFieldErrors((p) => ({ ...p, email: undefined })); }}
             placeholder="you@example.com"
+            style={fieldErrors.email ? { borderColor: "var(--error)" } : undefined}
           />
+          {fieldErrors.email && (
+            <div style={{ color: "var(--error)", fontSize: 12.5, marginTop: 4 }}>{fieldErrors.email}</div>
+          )}
         </div>
         <div>
           <div className="row between" style={{ alignItems: "baseline" }}>
@@ -62,9 +85,13 @@ function LoginForm() {
             type="password"
             required
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => { setPassword(e.target.value); if (fieldErrors.password) setFieldErrors((p) => ({ ...p, password: undefined })); }}
             placeholder="••••••••"
+            style={fieldErrors.password ? { borderColor: "var(--error)" } : undefined}
           />
+          {fieldErrors.password && (
+            <div style={{ color: "var(--error)", fontSize: 12.5, marginTop: 4 }}>{fieldErrors.password}</div>
+          )}
         </div>
         {error && (
           <div className="muted" style={{ color: "var(--error)" }}>

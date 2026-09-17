@@ -2,21 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AuthRequired } from "@/components/auth-required";
 import { Icon } from "@/components/icons";
+import { ProfileAvatarCard } from "@/components/account/profile-avatar-card";
+import { ProfileDetailsCard } from "@/components/account/profile-details-card";
 import { NotificationsToggle } from "@/components/wallet/notifications-toggle";
 import { ThemeToggle } from "@/components/wallet/theme-toggle";
 import { signOut } from "@/lib/actions/account";
 import { getBeneficiaries, getCurrentProfile } from "@/lib/data/queries";
-
-function initials(name: string | null) {
-  if (!name) return "TM";
-  return name
-    .trim()
-    .split(/\s+/)
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-}
 
 export default async function AccountPage() {
   const profile = await getCurrentProfile();
@@ -44,27 +35,10 @@ export default async function AccountPage() {
   return (
     <div className="px content-narrow" style={{ paddingTop: 6 }}>
       <h2 style={{ fontSize: 22, letterSpacing: "-0.02em" }}>Account</h2>
-      <div className="card card-pad row gap-2 mt-3">
-        <div
-          style={{
-            width: 52,
-            height: 52,
-            borderRadius: 14,
-            background: "var(--green-700)",
-            color: "#fff",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontWeight: 700,
-            fontSize: 16,
-          }}
-        >
-          {initials(profile.full_name)}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 600, fontSize: 16, letterSpacing: "-0.01em" }}>{profile.full_name || "Your name"}</div>
-          <div className="muted">{profile.phone || profile.email}</div>
-        </div>
+      <ProfileAvatarCard name={profile.full_name} phone={profile.phone} email={profile.email} avatarUrl={profile.avatar_url} />
+
+      <div className="mt-3">
+        <ProfileDetailsCard name={profile.full_name} phone={profile.phone} email={profile.email} />
       </div>
 
       <div className="eyebrow mt-3 mb-1" style={{ paddingLeft: 2 }}>

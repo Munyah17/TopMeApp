@@ -2,8 +2,8 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Icon } from "@/components/icons";
 import { createClient } from "@/lib/supabase/server";
-import { getInsuranceQuote, purchaseInsurancePolicy } from "@/lib/actions/insurance";
-import { displayName, displayDescription, displayImage, displayPremium, enrichInsuranceProduct } from "@/lib/insurance/types";
+import { getInsuranceProducts } from "@/lib/actions/insurance";
+import { displayName, displayDescription, displayImage, enrichInsuranceProduct } from "@/lib/insurance/types";
 import InsurancePurchaseForm from "@/components/insurance/insurance-purchase-form";
 
 export default async function InsuranceProductPage({ params }: { params: Promise<{ productId: string }> }) {
@@ -25,10 +25,15 @@ export default async function InsuranceProductPage({ params }: { params: Promise
   // dedicated columns aren't populated yet.
   const product = enrichInsuranceProduct(row as Record<string, unknown>);
 
+  // Every purchasable product, for the form's "add another cover" picker.
+  const allProducts = (await getInsuranceProducts()).filter((p) => p.is_purchasable);
+
   const name = displayName(product);
   const description = displayDescription(product);
   const image = displayImage(product);
-  const premium = displayPremium(product);
+  // Original TariqifyIMS premium — TopMe's markup is itemised as a
+  // "Processing fee" inside the purchase form, not baked into this sticker.
+  const premium = product.premium;
   const features = Array.isArray(product.features) ? (product.features as string[]) : [];
 
   return (
@@ -98,7 +103,7 @@ export default async function InsuranceProductPage({ params }: { params: Promise
         )}
 
         {product.is_purchasable ? (
-          <InsurancePurchaseForm product={product} />
+          <InsurancePurchaseForm product={product} allProducts={allProducts} />
         ) : (
           <div
             className="row gap-2"

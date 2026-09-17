@@ -48,12 +48,14 @@ export function AppShell({
   unreadChatCount = 0,
   chatEnabled = true,
   announcements,
+  sidebarWidgets,
   children,
 }: {
   profile: Profile | null;
   unreadChatCount?: number;
   chatEnabled?: boolean;
   announcements?: React.ReactNode;
+  sidebarWidgets?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -84,7 +86,14 @@ export function AppShell({
 
   const userCard = profile ? (
     <Link href="/account" className="side-user" style={{ textDecoration: "none" }}>
-      <span className="side-user-avatar">{initials(profile.full_name)}</span>
+      <span className="side-user-avatar">
+        {profile.avatar_url ? (
+          // eslint-disable-next-line @next/next/no-img-element -- user-uploaded avatar from our own storage, no stored dimensions
+          <img src={profile.avatar_url} alt="" />
+        ) : (
+          initials(profile.full_name)
+        )}
+      </span>
       <span className="side-user-meta">
         <span className="side-user-name">{profile.full_name || "Account"}</span>
         <span className="side-user-sub">View profile</span>
@@ -118,7 +127,10 @@ export function AppShell({
           <BrandMark size={30} />
           <Wordmark size={16} />
         </Link>
-        <nav className="side-nav">{navLinks()}</nav>
+        <nav className="side-nav">
+          {navLinks()}
+          {sidebarWidgets}
+        </nav>
         <div className="side-footer">{userCard}</div>
       </aside>
 
@@ -143,15 +155,12 @@ export function AppShell({
           <div className="header-inner">
             <button
               type="button"
-              className="header-icon-btn drawer-toggle"
+              className="drawer-toggle tap"
               onClick={() => setDrawerOpen(true)}
               aria-label="Open menu"
             >
-              <Icon name="menu" size={20} stroke={2} />
+              <Icon name="menu" size={24} stroke={2} />
             </button>
-            <Link href="/home" className="header-logo tap" style={{ textDecoration: "none" }}>
-              <BrandMark size={28} />
-            </Link>
             <div className="topbar-title">{pageTitle(pathname)}</div>
 
             <div className="header-right">
@@ -172,16 +181,24 @@ export function AppShell({
                       }}
                     />
                   </Link>
-                  <AvatarMenu initials={initials(profile.full_name)} />
+                  <AvatarMenu initials={initials(profile.full_name)} avatarUrl={profile.avatar_url} />
                 </>
               ) : (
                 <>
-                  <Link href="/login" className="btn btn-secondary tap" style={{ textDecoration: "none", padding: "0 16px", height: 36 }}>
-                    Log in
-                  </Link>
-                  <Link href="/signup" className="btn btn-primary tap" style={{ textDecoration: "none", padding: "0 16px", height: 36 }}>
-                    Sign Up
-                  </Link>
+                  {/* Mobile gets one clean CTA; desktop keeps the split pair. */}
+                  <div className="mobile-only">
+                    <Link href="/signup" className="btn btn-primary tap" style={{ textDecoration: "none", padding: "0 18px", height: 38 }}>
+                      Get Started
+                    </Link>
+                  </div>
+                  <div className="header-auth-desktop">
+                    <Link href="/login" className="btn btn-secondary tap" style={{ textDecoration: "none", padding: "0 16px", height: 36 }}>
+                      Log in
+                    </Link>
+                    <Link href="/signup" className="btn btn-primary tap" style={{ textDecoration: "none", padding: "0 16px", height: 36 }}>
+                      Sign Up
+                    </Link>
+                  </div>
                 </>
               )}
             </div>

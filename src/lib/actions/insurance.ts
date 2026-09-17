@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import { createOrGetClient, getQuote, createPolicy, recordPayment as recordTariqifyPayment, getProducts as getTariqifyProducts } from "@/lib/insurance/tariqify";
 import { enrichInsuranceProduct } from "@/lib/insurance/types";
+import { isExcludedProduct } from "@/lib/insurance/exclusions";
 import { revalidatePath } from "next/cache";
 
 /**
@@ -44,14 +45,23 @@ export async function getInsuranceQuote(params: {
 }
 
 /**
- * Purchase an insurance policy
- * Full flow: client registration → quote → wallet charge → policy creation → payment recording
+ * Purchase one or more insurance policies from a single Apply-for-Cover
+ * submission. The client is registered with TariqifyIMS once, then each
+ * selected product runs the full flow — quote → wallet charge → policy
+ * creation → payment recording — so every cover lands in TariqifyIMS as a
+ * valid policy (their platform applies its own activation rules, e.g. a
+ * funeral plan's waiting period vs. instant cover). Returns per-product
+ * results so a partial failure still reports which covers went through.
  */
 export async function purchaseInsurancePolicy(params: {
-  productId: string;
+  productIds: string[];
   nationalId: string;
   fullName: string;
   phone?: string;
+  email?: string;
+  dateOfBirth?: string;
+  address?: string;
+  occupation?: string;
   fieldValues?: Record<string, unknown>;
 }) {
   const supabase = await createClient();
@@ -61,46 +71,26 @@ export async function purchaseInsurancePolicy(params: {
     return { error: "Authentication required" };
   }
 
+  const productIds = [...new Set(params.productIds)].filter(Boolean);
+  if (productIds.length === 0) {
+    return { error: "Choose at least one cover to buy." };
+  }
+
   try {
-    // 1. Get product details
-    const { data: product, error: productError } = await admin
-      .from("insurance_products")
-      .select("*")
-      .eq("id", params.productId)
-      .eq("is_active", true)
-      .single();
-
-    if (productError || !product) {
-      return { error: "Product not found or inactive" };
-    }
-    if (!product.is_purchasable) {
-      return { error: "This product isn't available to buy yet." };
-    }
-
-    // 2. Get or create client in TariqifyIMS
+    // Register (or fetch) the client in TariqifyIMS once for the whole
+    // submission — every policy below is written against this client id.
     const tariqifyClient = await createOrGetClient({
       national_id: params.nationalId,
       full_name: params.fullName,
       phone: params.phone,
+      email: params.email,
+      date_of_birth: params.dateOfBirth,
+      address: params.address,
+      occupation: params.occupation,
     });
 
-    // 3. Get quote
-    const quote = await getQuote({
-      product_id: params.productId,
-      national_id: params.nationalId,
-      field_values: params.fieldValues,
-    });
-
-    if (!quote.eligible) {
-      return { error: quote.message || "Not eligible for this product" };
-    }
-
-    // 4. Calculate total with markup
-    const markupPercent = Number(product.markup_percent);
-    const markupAmount = quote.base_premium * (markupPercent / 100);
-    const totalPremium = quote.base_premium + markupAmount;
-
-    // 5. Create or update local client record
+    // Create/update the local client record once, carrying the extra
+    // application fields in `raw` alongside Tariqify's own response.
     const { data: localClient, error: clientError } = await admin
       .from("insurance_clients")
       .upsert(
@@ -110,7 +100,15 @@ export async function purchaseInsurancePolicy(params: {
           full_name: params.fullName,
           phone: params.phone,
           tariqify_client_id: tariqifyClient.id,
-          raw: tariqifyClient.raw,
+          raw: {
+            ...tariqifyClient.raw,
+            application: {
+              email: params.email ?? null,
+              date_of_birth: params.dateOfBirth ?? null,
+              address: params.address ?? null,
+              occupation: params.occupation ?? null,
+            },
+          },
         },
         {
           onConflict: "profile_id,national_id",
@@ -123,107 +121,153 @@ export async function purchaseInsurancePolicy(params: {
       return { error: "Failed to create client record" };
     }
 
-    // 6. Charge wallet (using wallet_pay RPC). owner_label/provider_cost are
-    // passed explicitly — TopMe is Motions Microinsurance's agent/dealer,
-    // not an insurer, selling under their licence, so the audit trail must
-    // say so the same way every other service records who it's "sold by
-    // TopMe, processed and paid to <owner_label>". provider_cost is the
-    // real base_premium from the live quote above, not a guessed
-    // percentage (there's no `services` row for insurance products at all
-    // — see 2026-09-13-wallet-pay-explicit-attribution.sql for why the
-    // normal cost_percentage lookup silently produced 0 here).
-    const { data: transaction, error: paymentError } = await admin.rpc("wallet_pay", {
-      p_service_id: `insurance-${params.productId}`,
-      p_amount: totalPremium,
-      p_recipient: params.nationalId,
-      p_network_id: null,
-      p_extra_value: JSON.stringify({ product_id: params.productId, client_id: localClient.id }),
-      p_fulfillment_provider: "insurance",
-      p_owner_label: "Motions Microinsurance",
-      p_provider_cost: quote.base_premium,
-    });
+    const policies: Record<string, unknown>[] = [];
+    const failures: { productId: string; error: string }[] = [];
 
-    if (paymentError) {
-      console.error("Wallet payment error:", paymentError);
-      return { error: paymentError.message || "Payment failed" };
-    }
+    for (const productId of productIds) {
+      try {
+        // 1. Get product details
+        const { data: product, error: productError } = await admin
+          .from("insurance_products")
+          .select("*")
+          .eq("id", productId)
+          .eq("is_active", true)
+          .single();
 
-    // 7. Create policy in TariqifyIMS
-    const tariqifyPolicy = await createPolicy({
-      product_id: params.productId,
-      client_id: tariqifyClient.id,
-      premium: quote.base_premium,
-      currency: quote.currency,
-    });
+        if (productError || !product) {
+          failures.push({ productId, error: "Product not found or inactive" });
+          continue;
+        }
+        if (!product.is_purchasable) {
+          failures.push({ productId, error: `${product.name} isn't available to buy yet.` });
+          continue;
+        }
 
-    // 8. Create local policy record
-    const { data: localPolicy, error: policyError } = await admin
-      .from("insurance_policies")
-      .insert({
-        policy_number: tariqifyPolicy.policy_number,
-        product_id: params.productId,
-        profile_id: user.id,
-        insurance_client_id: localClient.id,
-        base_premium: quote.base_premium,
-        markup_amount: markupAmount,
-        total_premium: totalPremium,
-        currency: quote.currency,
-        status: "active",
-        transaction_id: transaction.id,
-        raw: tariqifyPolicy.raw,
-      })
-      .select()
-      .single();
+        // 2. Get quote
+        const quote = await getQuote({
+          product_id: productId,
+          national_id: params.nationalId,
+          field_values: params.fieldValues,
+        });
 
-    if (policyError || !localPolicy) {
-      return { error: "Failed to create policy record" };
-    }
+        if (!quote.eligible) {
+          failures.push({ productId, error: quote.message || `Not eligible for ${product.name}` });
+          continue;
+        }
 
-    // 9. Record payment with TariqifyIMS
-    const tariqifyPayment = await recordTariqifyPayment({
-      policy_number: tariqifyPolicy.policy_number,
-      amount: quote.base_premium,
-      currency: quote.currency,
-    });
+        // 3. Calculate total with markup (shown to the customer as a
+        // "Processing fee" — the sticker price stays Tariqify's premium).
+        const markupPercent = Number(product.markup_percent);
+        const markupAmount = quote.base_premium * (markupPercent / 100);
+        const totalPremium = quote.base_premium + markupAmount;
 
-    // 10. Create local payment record
-    const { error: paymentRecordError } = await admin
-      .from("insurance_premium_payments")
-      .insert({
-        policy_id: localPolicy.id,
-        amount: quote.base_premium,
-        transaction_id: transaction.id,
-        tariqify_payment_id: tariqifyPayment.id,
-        status: "recorded_with_provider",
-        raw: tariqifyPayment.raw,
-      });
+        // 4. Charge wallet (using wallet_pay RPC). owner_label/provider_cost
+        // are passed explicitly — TopMe is Motions Microinsurance's
+        // agent/dealer, not an insurer, selling under their licence, so the
+        // audit trail must say so the same way every other service records
+        // who it's "sold by TopMe, processed and paid to <owner_label>".
+        // provider_cost is the real base_premium from the live quote above,
+        // not a guessed percentage (there's no `services` row for insurance
+        // products at all — see 2026-09-13-wallet-pay-explicit-attribution.sql
+        // for why the normal cost_percentage lookup silently produced 0 here).
+        const { data: transaction, error: paymentError } = await admin.rpc("wallet_pay", {
+          p_service_id: `insurance-${productId}`,
+          p_amount: totalPremium,
+          p_recipient: params.nationalId,
+          p_network_id: null,
+          p_extra_value: JSON.stringify({ product_id: productId, client_id: localClient.id }),
+          p_fulfillment_provider: "insurance",
+          p_owner_label: "Motions Microinsurance",
+          p_provider_cost: quote.base_premium,
+        });
 
-    if (paymentRecordError) {
-      console.error("Failed to record payment:", paymentRecordError);
-      // Non-fatal - policy is created, payment record can be reconciled later
+        if (paymentError) {
+          console.error("Wallet payment error:", paymentError);
+          failures.push({ productId, error: paymentError.message || "Payment failed" });
+          continue;
+        }
+
+        // 5. Create policy in TariqifyIMS
+        const tariqifyPolicy = await createPolicy({
+          product_id: productId,
+          client_id: tariqifyClient.id,
+          premium: quote.base_premium,
+          currency: quote.currency,
+        });
+
+        // 6. Create local policy record
+        const { data: localPolicy, error: policyError } = await admin
+          .from("insurance_policies")
+          .insert({
+            policy_number: tariqifyPolicy.policy_number,
+            product_id: productId,
+            profile_id: user.id,
+            insurance_client_id: localClient.id,
+            base_premium: quote.base_premium,
+            markup_amount: markupAmount,
+            total_premium: totalPremium,
+            currency: quote.currency,
+            status: "active",
+            transaction_id: transaction.id,
+            raw: tariqifyPolicy.raw,
+          })
+          .select()
+          .single();
+
+        if (policyError || !localPolicy) {
+          failures.push({ productId, error: "Failed to create policy record" });
+          continue;
+        }
+
+        // 7. Record payment with TariqifyIMS
+        const tariqifyPayment = await recordTariqifyPayment({
+          policy_number: tariqifyPolicy.policy_number,
+          amount: quote.base_premium,
+          currency: quote.currency,
+        });
+
+        // 8. Create local payment record
+        const { error: paymentRecordError } = await admin
+          .from("insurance_premium_payments")
+          .insert({
+            policy_id: localPolicy.id,
+            amount: quote.base_premium,
+            transaction_id: transaction.id,
+            tariqify_payment_id: tariqifyPayment.id,
+            status: "recorded_with_provider",
+            raw: tariqifyPayment.raw,
+          });
+
+        if (paymentRecordError) {
+          console.error("Failed to record payment:", paymentRecordError);
+          // Non-fatal - policy is created, payment record can be reconciled later
+        }
+
+        policies.push(localPolicy);
+      } catch (productError) {
+        console.error(`Insurance purchase failed for ${productId}:`, productError);
+        failures.push({ productId, error: productError instanceof Error ? productError.message : "Purchase failed" });
+      }
     }
 
     revalidatePath("/account");
     revalidatePath("/history");
 
+    if (policies.length === 0) {
+      return { error: failures[0]?.error || "Failed to purchase insurance" };
+    }
+
     return {
       success: true,
-      policy: localPolicy,
-      transaction,
+      policies,
+      // Surface partial failures so the UI can say which covers didn't go
+      // through even though others did.
+      failures: failures.length > 0 ? failures : undefined,
     };
   } catch (error) {
     console.error("Insurance purchase error:", error);
     return { error: error instanceof Error ? error.message : "Failed to purchase insurance" };
   }
-}
-
-// Agricultural / farming covers are excluded from the storefront — the
-// catalog should only show personal lines (medical, funeral, legal, travel,
-// vehicle). Matched on category or name so it works whether Tariqify tags
-// them by category or only in the product name (e.g. "Field To Floor").
-const EXCLUDED_PRODUCT_PATTERN = /agric|farm|field|crop|livestock/i;
-function isExcludedProduct(p: { name?: string | null; category?: string | null }) {
-  return EXCLUDED_PRODUCT_PATTERN.test(p.name ?? "") || EXCLUDED_PRODUCT_PATTERN.test(p.category ?? "");
 }
 
 /**

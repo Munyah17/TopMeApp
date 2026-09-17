@@ -545,6 +545,7 @@ export async function adminMarkPendingFailed(kind: "topup" | "guest", reference:
 export interface InsuranceProductPatch {
   displayName?: string | null;
   displayDescription?: string | null;
+  displayImageUrl?: string | null;
   markupPercent?: number;
   isActive?: boolean;
   isPurchasable?: boolean;
@@ -557,6 +558,7 @@ export async function updateInsuranceProduct(id: string, patch: InsuranceProduct
   const dbPatch: Record<string, unknown> = {};
   if (patch.displayName !== undefined) dbPatch.display_name = patch.displayName?.trim() || null;
   if (patch.displayDescription !== undefined) dbPatch.display_description = patch.displayDescription?.trim() || null;
+  if (patch.displayImageUrl !== undefined) dbPatch.display_image_url = patch.displayImageUrl?.trim() || null;
   if (patch.markupPercent !== undefined) {
     if (!(patch.markupPercent >= 0)) throw new Error("Markup can't be negative.");
     dbPatch.markup_percent = patch.markupPercent;

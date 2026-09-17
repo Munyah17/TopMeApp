@@ -10,12 +10,22 @@ const PROVIDER_LABEL: Record<string, string> = { tariqify: "Motions Microinsuran
 
 function InsuranceProductRow({ product }: { product: InsuranceProduct }) {
   const router = useRouter();
+  const [pending, startTransition] = useTransition();
   const [editing, setEditing] = useState(false);
   const [displayNameVal, setDisplayNameVal] = useState(product.display_name ?? "");
   const [displayDesc, setDisplayDesc] = useState(product.display_description ?? "");
+  const [displayImage, setDisplayImage] = useState(product.display_image_url ?? "");
   const [markup, setMarkup] = useState(String(product.markup_percent));
-  const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+
+  function startEdit() {
+    setDisplayNameVal(product.display_name ?? "");
+    setDisplayDesc(product.display_description ?? "");
+    setDisplayImage(product.display_image_url ?? "");
+    setMarkup(String(product.markup_percent));
+    setError(null);
+    setEditing(true);
+  }
 
   function save() {
     setError(null);
@@ -24,6 +34,7 @@ function InsuranceProductRow({ product }: { product: InsuranceProduct }) {
         await updateInsuranceProduct(product.id, {
           displayName: displayNameVal,
           displayDescription: displayDesc,
+          displayImageUrl: displayImage,
           markupPercent: parseFloat(markup) || 0,
         });
         setEditing(false);
@@ -50,7 +61,9 @@ function InsuranceProductRow({ product }: { product: InsuranceProduct }) {
     return (
       <div className="card card-pad mb-2" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <div className="section-title" style={{ fontSize: 13.5 }}>{displayName(product)}</div>
-        <div className="muted" style={{ fontSize: 11.5 }}>Underwriter&apos;s own name/description: &quot;{product.name}&quot;. Leave blank to just show that.</div>
+        <div className="muted" style={{ fontSize: 11.5 }}>
+          Underwriter&apos;s own name/description/image: &quot;{product.name}&quot;. Leave a field blank to just show theirs.
+        </div>
         <div>
           <label className="field-label">Display name override</label>
           <input className="field" value={displayNameVal} onChange={(e) => setDisplayNameVal(e.target.value)} placeholder={product.name} />
@@ -58,6 +71,13 @@ function InsuranceProductRow({ product }: { product: InsuranceProduct }) {
         <div>
           <label className="field-label">Display description override</label>
           <input className="field" value={displayDesc} onChange={(e) => setDisplayDesc(e.target.value)} placeholder={product.description ?? ""} />
+        </div>
+        <div>
+          <label className="field-label">Featured image URL override</label>
+          <input className="field" value={displayImage} onChange={(e) => setDisplayImage(e.target.value)} placeholder={product.image_url ?? "https://…"} />
+          <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
+            Shown on the product card. Leave blank to use the underwriter&apos;s own image.
+          </div>
         </div>
         <div>
           <label className="field-label">Markup % (added on top of the underwriter&apos;s premium)</label>
@@ -98,7 +118,7 @@ function InsuranceProductRow({ product }: { product: InsuranceProduct }) {
       >
         <div className="knob" />
       </div>
-      <button className="btn btn-ghost" style={{ height: 32, padding: "0 10px", fontSize: 12 }} disabled={pending} onClick={() => setEditing(true)}>
+      <button className="btn btn-ghost" style={{ height: 32, padding: "0 10px", fontSize: 12 }} disabled={pending} onClick={startEdit}>
         Edit
       </button>
     </div>

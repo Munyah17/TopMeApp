@@ -885,6 +885,105 @@ a.side-user:hover {
   flex-shrink: 0;
 }
 
+/* Uploaded avatar photos fill their (initials) containers. */
+.side-user-avatar,
+.header-avatar {
+  overflow: hidden;
+}
+.side-user-avatar img,
+.header-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Account widgets relocated from the old /home right column into the left
+   rail — tinted panels that sit on the deep-emerald sidebar. */
+.side-widgets {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(236, 253, 245, 0.12);
+}
+.side-widget {
+  background: rgba(236, 253, 245, 0.06);
+  border: 1px solid rgba(236, 253, 245, 0.1);
+  border-radius: 12px;
+  padding: 12px;
+  color: #ecfdf5;
+}
+.side-widget-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  transition: background var(--transition-fast);
+}
+.side-widget-link:hover {
+  background: rgba(236, 253, 245, 0.1);
+}
+.side-widget-ic {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: rgba(236, 253, 245, 0.14);
+  color: #a7f3d0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.side-widget-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(236, 253, 245, 0.55);
+}
+.side-widget-big {
+  font-size: 20px;
+  font-weight: 800;
+  color: #fff;
+  margin-top: 3px;
+  letter-spacing: -0.01em;
+}
+.side-widget-sub {
+  font-size: 11.5px;
+  color: rgba(236, 253, 245, 0.55);
+  line-height: 1.4;
+}
+.side-bene-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 9px;
+}
+.side-bene-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  background: rgba(236, 253, 245, 0.14);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+.side-bene-name {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #ecfdf5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Mobile drawer + scrim */
 .app-drawer {
   position: fixed;
@@ -935,8 +1034,22 @@ a.side-user:hover {
   opacity: 1;
   pointer-events: auto;
 }
+/* Hamburger: a clean, borderless icon pulled flush to the left screen edge
+   (the negative margin cancels the header's own left padding) — no boxed
+   outline, per the simplified mobile header. */
 .drawer-toggle {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin-left: -10px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
 }
 
 .app-header {
@@ -1041,6 +1154,12 @@ a.side-user:hover {
   align-items: center;
   gap: 14px;
   margin-left: auto;
+}
+/* Guest auth pair — desktop only; mobile shows a single "Get Started". */
+.header-auth-desktop {
+  display: none;
+  align-items: center;
+  gap: 10px;
 }
 .header-icon-btn {
   width: 42px;
@@ -1171,6 +1290,9 @@ a.side-user:hover {
   }
   .desktop-only {
     display: block;
+  }
+  .header-auth-desktop {
+    display: flex;
   }
   .app-header {
     padding: 0 var(--space-8);
