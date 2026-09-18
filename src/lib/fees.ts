@@ -1,8 +1,9 @@
 // Platform processing fee: charged on top of the service amount, absorbed by
-// the customer. Airtime Direct Recharge uses a competitive percentage-only
-// rate (2%, no flat component) — a flat $0.10 under-charged larger recharges
-// and the standard $0.50+1.5% formula would be disproportionate on a $1 top-up.
-// Everything else is $0.50 flat + 1.5% of the amount.
+// the customer. Flat 2% of the amount on every service — owner directive
+// 2026-09-17 ("we agreed long ago to charge a percentage, like 2% as platform
+// (TopMe) processing fee"), extended to all services 2026-09-19. A pure
+// percentage scales fairly from a $1 top-up to a $200 bill where a flat
+// component would be disproportionate on the small end.
 //
 // This is the display-side source of truth used by every payment flow to
 // show the customer what they'll actually be charged before they pay. The
@@ -11,8 +12,7 @@
 // client can never under-report the fee by calling the RPC directly.
 export function calculatePlatformFee(serviceId: string, amount: number): number {
   if (!(amount > 0)) return 0;
-  if (serviceId === "airtime") return Math.round(amount * 0.02 * 100) / 100;
-  return Math.round((0.5 + amount * 0.015) * 100) / 100;
+  return Math.round(amount * 0.02 * 100) / 100;
 }
 
 export type TopupGateway = "paynow" | "stripe" | "ecocash" | "vitalpay";
