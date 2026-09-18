@@ -140,6 +140,14 @@ const BILLERS: Record<string, { billerCode: string; billType: string }> = {
   bulawayo_city_council: { billerCode: "bulawayo_city_zw", billType: "municipal" },
 };
 
+// True when VitalPay carries a biller for this service — i.e. the
+// /bills/validate account-holder lookup can run. Flows gate their
+// owner-name check on this so phone-number services (bundles, gifts)
+// don't waste a round trip on a lookup that can't exist.
+export function supportsBillAccountValidation(serviceId: string): boolean {
+  return serviceId in BILLERS;
+}
+
 function toPendingOrFulfilled(status: string, reference: string): FulfillmentResult {
   if (status === "completed" || status === "successful") return { status: "fulfilled", providerRef: reference };
   if (status === "failed") return { status: "failed", providerRef: reference };

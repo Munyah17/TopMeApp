@@ -7,10 +7,11 @@ import QRCode from "qrcode";
 import { Icon } from "@/components/icons";
 import { hexA } from "@/lib/data/catalog-helpers";
 import { calculatePlatformFee, calculateGatewaySurcharge } from "@/lib/fees";
-import { payService, sendGiftVoucher } from "@/lib/actions/payments";
+import { payService, sendGiftVoucher, validateBillAccount } from "@/lib/actions/payments";
 import { startGuestCheckout, type GuestGateway } from "@/lib/actions/guest-payments";
 import { addGuestActivity } from "@/lib/guest-activity";
 import { watchFulfillment } from "@/lib/payments/fulfillment-watch";
+import { supportsBillAccountValidation } from "@/lib/fulfillment/vitalpay";
 import { PaymentMethodSection, type PaymentBanners, type PaymentMethod } from "./flow-shared";
 import type { DataBundle, Network, Service, Transaction, TvPackage } from "@/types/database";
 
@@ -68,6 +69,51 @@ export function PaymentFlow({
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const watchRef = useRef<(() => void) | null>(null);
   const [deliveryTimedOut, setDeliveryTimedOut] = useState(false);
+  // Registered account holder for `identifier`, fetched from the biller via
+  // VitalPay before payment so the buyer can confirm the account is right
+  // (DStv smartcard etc.). `holder` null with a matching `checkedIdentifier`
+  // means the check ran but returned no name — we don't re-nag or block.
+  const [holder, setHolder] = useState<{ name: string | null } | null>(null);
+  const [checkedIdentifier, setCheckedIdentifier] = useState<string | null>(null);
+  const [identifierChecking, setIdentifierChecking] = useState(false);
+  const [identifierError, setIdentifierError] = useState<string | null>(null);
+
+  const canCheckAccount = supportsBillAccountValidation(service.id);
+  const holderName = checkedIdentifier === identifier.trim() ? holder?.name ?? null : null;
+
+  // Returns true if checkout may proceed (valid account, or the check
+  // couldn't run), false if it's a known-bad account — in which case
+  // `identifierError` is set and the caller keeps the customer on this step.
+  async function runIdentifierCheck(): Promise<boolean> {
+    if (!canCheckAccount) return true;
+    const target = identifier.trim();
+    if (checkedIdentifier === target) return true; // already checked this exact number
+    setIdentifierChecking(true);
+    setIdentifierError(null);
+    try {
+      const res = await validateBillAccount(service.id, target);
+      if (res.state === "invalid") {
+        setIdentifierError(res.message);
+        setHolder(null);
+        setCheckedIdentifier(null);
+        return false;
+      }
+      setHolder(res.state === "ok" ? { name: res.customerName } : null);
+      setCheckedIdentifier(target);
+      return true;
+    } catch {
+      // Network/unexpected — don't block the payment on our own check failing.
+      setHolder(null);
+      setCheckedIdentifier(target);
+      return true;
+    } finally {
+      setIdentifierChecking(false);
+    }
+  }
+
+  async function continueFromDetails() {
+    if (await runIdentifierCheck()) setStep("amount");
+  }
 
   const currentAmount = (): number => {
     if (service.amount_mode === "chips") return amount ?? (parseFloat(customAmount) || 0);
@@ -276,7 +322,11 @@ export function PaymentFlow({
             setIdentifier={setIdentifier}
             extra={extra}
             setExtra={setExtra}
-            onContinue={() => setStep("amount")}
+            onContinue={continueFromDetails}
+            holderName={holderName}
+            checking={identifierChecking}
+            checkError={identifierError}
+            canCheckAccount={canCheckAccount}
           />
         )}
 
@@ -350,7 +400,15 @@ export function PaymentFlow({
             method={method}
             setMethod={setMethod}
             banners={banners}
-            onPay={() => {
+            holderName={holderName}
+            checking={identifierChecking}
+            onPay={async () => {
+              // Identifier may have been edited on the details screen —
+              // re-confirm the account before charging.
+              if (!(await runIdentifierCheck())) {
+                setStep("details");
+                return;
+              }
               if (method === "wallet") setStep("processing");
               submitPayment();
             }}
@@ -440,6 +498,10 @@ function DetailsStep({
   extra,
   setExtra,
   onContinue,
+  holderName,
+  checking,
+  checkError,
+  canCheckAccount,
 }: {
   service: Service;
   networks: Network[];
@@ -450,6 +512,10 @@ function DetailsStep({
   extra: string;
   setExtra: (v: string) => void;
   onContinue: () => void;
+  holderName: string | null;
+  checking: boolean;
+  checkError: string | null;
+  canCheckAccount: boolean;
 }) {
   const canContinue = identifier.trim().length > 0 && (!service.needs_network || networkId);
   return (
@@ -489,6 +555,16 @@ function DetailsStep({
         onChange={(e) => setIdentifier(e.target.value)}
       />
 
+      {canCheckAccount && holderName && (
+        <div className="card card-pad mt-2" style={{ background: "var(--green-50)", border: "1px solid var(--green-200)" }}>
+          <div className="muted" style={{ fontSize: 12 }}>Account holder</div>
+          <div style={{ fontWeight: 700 }}>{holderName}</div>
+        </div>
+      )}
+      {canCheckAccount && checkError && (
+        <div className="muted mt-2" style={{ color: "var(--error)" }}>{checkError}</div>
+      )}
+
       {service.extra_field_label && (
         <>
           <label className="field-label mt-2">{service.extra_field_label}</label>
@@ -505,8 +581,8 @@ function DetailsStep({
         We&apos;ll verify these details before you pay. Nothing is charged until you confirm the amount.
       </div>
 
-      <button className="btn btn-primary btn-block mt-4" disabled={!canContinue} onClick={onContinue}>
-        Continue
+      <button className="btn btn-primary btn-block mt-4" disabled={!canContinue || checking} onClick={onContinue}>
+        {checking ? "Checking account…" : "Continue"}
       </button>
     </>
   );
@@ -690,6 +766,8 @@ function ReviewStep({
   method,
   setMethod,
   banners,
+  holderName,
+  checking,
   onPay,
 }: {
   service: Service;
@@ -712,6 +790,8 @@ function ReviewStep({
   method: PaymentMethod | null;
   setMethod: (v: PaymentMethod) => void;
   banners?: PaymentBanners;
+  holderName: string | null;
+  checking: boolean;
   onPay: () => void;
 }) {
   let detailLabel = service.name;
@@ -740,6 +820,7 @@ function ReviewStep({
         <div style={{ padding: "6px 18px" }}>
           <ReviewRow label="Service" value={detailLabel} />
           <ReviewRow label={service.id_label} value={identifier || "—"} />
+          {holderName && <ReviewRow label="Account holder" value={holderName} />}
           {service.is_gift && extra && <ReviewRow label="Sender Number" value={extra} />}
           <ReviewRow label="Amount" value={`$${amount.toFixed(2)}`} />
           <ReviewRow label="Processing fee" value={`$${fee.toFixed(2)}`} />
@@ -791,8 +872,8 @@ function ReviewStep({
         </div>
       )}
 
-      <button className="btn btn-primary btn-block mt-4" disabled={busy || insufficient || guestMissingInfo || noMethodChosen} onClick={onPay}>
-        {busy ? "Processing…" : method ? `Pay With ${PAY_VIA_LABEL[method]} ($${total.toFixed(2)})` : `Pay $${total.toFixed(2)}`}
+      <button className="btn btn-primary btn-block mt-4" disabled={busy || checking || insufficient || guestMissingInfo || noMethodChosen} onClick={onPay}>
+        {busy ? "Processing…" : checking ? "Checking account…" : method ? `Pay With ${PAY_VIA_LABEL[method]} ($${total.toFixed(2)})` : `Pay $${total.toFixed(2)}`}
       </button>
     </>
   );

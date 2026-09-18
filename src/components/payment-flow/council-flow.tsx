@@ -7,8 +7,9 @@ import QRCode from "qrcode";
 import { Icon } from "@/components/icons";
 import { hexA } from "@/lib/data/catalog-helpers";
 import { calculatePlatformFee, calculateGatewaySurcharge } from "@/lib/fees";
-import { payService } from "@/lib/actions/payments";
+import { payService, validateBillAccount } from "@/lib/actions/payments";
 import { watchFulfillment } from "@/lib/payments/fulfillment-watch";
+import { supportsBillAccountValidation } from "@/lib/fulfillment/vitalpay";
 import { startGuestCheckout, type GuestGateway } from "@/lib/actions/guest-payments";
 import { addGuestActivity } from "@/lib/guest-activity";
 import { EditableRow, PaymentMethodSection, ReviewRow, type PaymentBanners, type PaymentMethod } from "./flow-shared";
@@ -51,8 +52,53 @@ export function CouncilFlow({
   const qrRef = useRef<HTMLCanvasElement>(null);
   const watchRef = useRef<(() => void) | null>(null);
   const [deliveryTimedOut, setDeliveryTimedOut] = useState(false);
+  // Registered account holder for `account`, fetched from the biller via
+  // VitalPay before payment so the buyer can confirm the account is right.
+  // `holder` null with a matching `checkedAccount` means the check ran but
+  // returned no name — we don't re-nag or block in that case.
+  const [holder, setHolder] = useState<{ name: string | null } | null>(null);
+  const [checkedAccount, setCheckedAccount] = useState<string | null>(null);
+  const [accountChecking, setAccountChecking] = useState(false);
+  const [accountError, setAccountError] = useState<string | null>(null);
 
   const amount = parseFloat(customAmount) || 0;
+
+  const canCheckAccount = supportsBillAccountValidation(service.id);
+  const holderName = checkedAccount === account.trim() ? holder?.name ?? null : null;
+
+  // Returns true if checkout may proceed (valid account, or the check
+  // couldn't run), false if it's a known-bad account — in which case
+  // `accountError` is set and the caller keeps the customer on this step.
+  async function runAccountCheck(): Promise<boolean> {
+    if (!canCheckAccount) return true;
+    const target = account.trim();
+    if (checkedAccount === target) return true; // already checked this exact number
+    setAccountChecking(true);
+    setAccountError(null);
+    try {
+      const res = await validateBillAccount(service.id, target);
+      if (res.state === "invalid") {
+        setAccountError(res.message);
+        setHolder(null);
+        setCheckedAccount(null);
+        return false;
+      }
+      setHolder(res.state === "ok" ? { name: res.customerName } : null);
+      setCheckedAccount(target);
+      return true;
+    } catch {
+      // Network/unexpected — don't block the payment on our own check failing.
+      setHolder(null);
+      setCheckedAccount(target);
+      return true;
+    } finally {
+      setAccountChecking(false);
+    }
+  }
+
+  async function continueFromAccount() {
+    if (await runAccountCheck()) setStep("amount");
+  }
 
   useEffect(() => {
     if (step === "receipt" && result && qrRef.current) {
@@ -217,11 +263,20 @@ export function CouncilFlow({
             <div className="muted mb-3">Enter your account number to make a payment</div>
             <label className="field-label">{service.id_label}</label>
             <input className="field" placeholder={service.id_placeholder ?? ""} value={account} onChange={(e) => setAccount(e.target.value)} />
+            {canCheckAccount && holderName && (
+              <div className="card card-pad mt-2" style={{ background: "var(--green-50)", border: "1px solid var(--green-200)" }}>
+                <div className="muted" style={{ fontSize: 12 }}>Account holder</div>
+                <div style={{ fontWeight: 700 }}>{holderName}</div>
+              </div>
+            )}
+            {canCheckAccount && accountError && (
+              <div className="muted mt-2" style={{ color: "var(--error)" }}>{accountError}</div>
+            )}
             <div className="mt-2 muted" style={{ lineHeight: 1.5 }}>
               Double-check your account number — nothing is charged until you confirm.
             </div>
-            <button className="btn btn-primary btn-block mt-4" disabled={account.trim().length < 3} onClick={() => setStep("amount")}>
-              Continue
+            <button className="btn btn-primary btn-block mt-4" disabled={account.trim().length < 3 || accountChecking} onClick={continueFromAccount}>
+              {accountChecking ? "Checking account…" : "Continue"}
             </button>
           </>
         )}
@@ -281,6 +336,7 @@ export function CouncilFlow({
               </div>
               <div style={{ padding: "6px 18px" }}>
                 <EditableRow label={service.id_label} value={account} onSave={setAccount} placeholder={service.id_placeholder ?? ""} />
+                {holderName && <ReviewRow label="Account holder" value={holderName} />}
                 <ReviewRow label="Amount" value={`$${amount.toFixed(2)}`} />
                 <ReviewRow label="Processing fee" value={`$${fee.toFixed(2)}`} />
                 {method === "wallet" && <ReviewRow label="Wallet balance" value={`$${walletBalance.toFixed(2)}`} />}
@@ -318,10 +374,19 @@ export function CouncilFlow({
 
             <button
               className="btn btn-primary btn-block mt-4"
-              disabled={busy || insufficient || guestMissingInfo || noMethodChosen}
-              onClick={() => { if (method === "wallet") setStep("processing"); submit(); }}
+              disabled={busy || accountChecking || insufficient || guestMissingInfo || noMethodChosen}
+              onClick={async () => {
+                // Account may have been edited on the review screen —
+                // re-confirm it before charging.
+                if (!(await runAccountCheck())) {
+                  setStep("account");
+                  return;
+                }
+                if (method === "wallet") setStep("processing");
+                submit();
+              }}
             >
-              {busy ? "Processing…" : method ? `Pay With ${PAY_VIA_LABEL[method]} ($${total.toFixed(2)})` : `Pay $${total.toFixed(2)}`}
+              {busy ? "Processing…" : accountChecking ? "Checking account…" : method ? `Pay With ${PAY_VIA_LABEL[method]} ($${total.toFixed(2)})` : `Pay $${total.toFixed(2)}`}
             </button>
           </>
         )}
