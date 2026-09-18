@@ -378,7 +378,7 @@ export default async function HomePage() {
               <Icon name="chevronR" size={18} stroke={2} />
             </Link>
 
-            <div className="card card-pad mt-2 desktop-only">
+            <div className="card card-pad mt-2">
               <div className="muted">Recent activity</div>
               <div style={{ fontSize: 22, fontWeight: 700, marginTop: 4, letterSpacing: "-0.02em" }}>{fmt(monthSpend)}</div>
               <div className="muted" style={{ marginTop: 2 }}>
@@ -386,7 +386,7 @@ export default async function HomePage() {
               </div>
             </div>
 
-            <div className="card card-pad mt-2 desktop-only">
+            <div className="card card-pad mt-2">
               <div className="section-title" style={{ fontSize: 14 }}>
                 Saved beneficiaries
               </div>
