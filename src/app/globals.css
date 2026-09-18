@@ -964,8 +964,12 @@ a.side-user:hover {
   padding: 0;
   background: transparent;
   border: none;
+  outline: none;
   color: var(--text-primary);
   cursor: pointer;
+}
+.drawer-toggle:focus-visible {
+  outline: none;
 }
 
 .app-header {

@@ -162,24 +162,7 @@ export function AppShell({
 
             <div className="header-right">
               {profile ? (
-                <>
-                  <Link href="/account" className="header-icon-btn tap" style={{ textDecoration: "none" }} aria-label="Notifications">
-                    <Icon name="bell" size={18} stroke={2} />
-                    <span
-                      style={{
-                        position: "absolute",
-                        top: 8,
-                        right: 9,
-                        width: 6,
-                        height: 6,
-                        background: "var(--error)",
-                        borderRadius: "50%",
-                        border: "1.5px solid var(--surface)",
-                      }}
-                    />
-                  </Link>
-                  <AvatarMenu initials={initials(profile.full_name)} avatarUrl={profile.avatar_url} />
-                </>
+                <AvatarMenu initials={initials(profile.full_name)} avatarUrl={profile.avatar_url} />
               ) : (
                 <>
                   {/* Mobile gets one clean CTA; desktop keeps the split pair. */}

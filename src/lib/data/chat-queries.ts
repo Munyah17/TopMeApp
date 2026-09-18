@@ -82,12 +82,27 @@ export async function getConversation(conversationId: string, userId: string): P
 // display.
 export async function getMessages(conversationId: string, limit = 50): Promise<ChatMessage[]> {
   const supabase = await createClient();
+  // Plain select — the p2p_transfer:p2p_transfers(*) embed intermittently
+  // fails when PostgREST can't resolve the relationship (stale schema
+  // cache), and the throw surfaced as the masked "Server Components render"
+  // error in the money sheet even though the transfer had already succeeded.
+  // Transfers are fetched in a second query and merged instead — same shape,
+  // no fragile join.
   const { data } = await supabase
     .from("messages")
-    .select("*, p2p_transfer:p2p_transfers(*)")
+    .select("*")
     .eq("conversation_id", conversationId)
     .order("created_at", { ascending: false })
     .limit(limit);
-  const rows = (data as (ChatMessage & { p2p_transfer: P2pTransfer | null })[]) ?? [];
+  const rows = (data as ChatMessage[]) ?? [];
+
+  const transferIds = rows.map((m) => m.p2p_transfer_id).filter((id): id is string => Boolean(id));
+  if (transferIds.length > 0) {
+    const { data: transfers } = await supabase.from("p2p_transfers").select("*").in("id", transferIds);
+    const byId = new Map(((transfers as P2pTransfer[]) ?? []).map((t) => [t.id, t]));
+    for (const m of rows) {
+      m.p2p_transfer = m.p2p_transfer_id ? byId.get(m.p2p_transfer_id) ?? null : null;
+    }
+  }
   return rows.reverse();
 }

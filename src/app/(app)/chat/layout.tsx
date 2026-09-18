@@ -47,13 +47,13 @@ export default async function ChatLayout({ children }: { children: React.ReactNo
 
   const listPanel = (
     <div className="px content-wrap" style={{ paddingTop: 6 }}>
-      <div className="row between">
-        <h2 style={{ fontSize: 20 }}>Chat & Pay</h2>
+      <h2 style={{ fontSize: 20 }}>Chat & Pay</h2>
+      <div className="muted">Talk and pay — send money or a red packet right in the conversation</div>
+      <div className="mt-3 mb-3">
         <Link href="/chat/new" className="btn btn-primary" style={{ height: 38, padding: "0 14px", fontSize: 13 }}>
           <Icon name="plus" size={15} stroke={2.4} /> New chat
         </Link>
       </div>
-      <div className="muted mb-3">Talk and pay — send money or a red packet right in the conversation</div>
 
       <PushSubscribeButton />
 

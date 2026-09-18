@@ -10,11 +10,12 @@ import { calculatePlatformFee, calculateGatewaySurcharge } from "@/lib/fees";
 import { payService, validateBillAccount } from "@/lib/actions/payments";
 import { startGuestCheckout, type GuestGateway } from "@/lib/actions/guest-payments";
 import { addGuestActivity } from "@/lib/guest-activity";
+import { watchFulfillment } from "@/lib/payments/fulfillment-watch";
 import { EditableRow, PaymentMethodSection, ReviewRow, type PaymentBanners, type PaymentMethod } from "./flow-shared";
 import { TELONE_PACKAGES } from "@/lib/telone-packages";
 import type { Service, Transaction } from "@/types/database";
 
-type Step = "account" | "amount" | "review" | "processing" | "guest-ecocash" | "success" | "receipt" | "error";
+type Step = "account" | "amount" | "review" | "processing" | "guest-ecocash" | "delivering" | "success" | "receipt" | "error";
 
 const PAY_VIA_LABEL: Record<PaymentMethod, string> = {
   wallet: "TopMe Wallet",
@@ -63,6 +64,8 @@ export function BroadbandFlow({
   const [guestPhone, setGuestPhone] = useState(initialGuestPhone);
   const [method, setMethod] = useState<PaymentMethod | null>(null);
   const qrRef = useRef<HTMLCanvasElement>(null);
+  const watchRef = useRef<(() => void) | null>(null);
+  const [deliveryTimedOut, setDeliveryTimedOut] = useState(false);
 
   const amount = usesPackages
     ? packageIdx !== null
@@ -113,6 +116,8 @@ export function BroadbandFlow({
     }
   }, [step, result]);
 
+  useEffect(() => () => { watchRef.current?.(); }, []);
+
   async function submitGateway() {
     setBusy(true);
     setErrorMsg(null);
@@ -130,6 +135,7 @@ export function BroadbandFlow({
       });
       if (res.gateway === "ecocash") {
         setStep("guest-ecocash");
+        const pollStarted = Date.now();
         const poll = setInterval(async () => {
           const r = await fetch("/api/guest/ecocash/poll", {
             method: "POST",
@@ -138,16 +144,27 @@ export function BroadbandFlow({
           });
           const data = await r.json();
           if (data.status === "completed") {
-            clearInterval(poll);
             setResult(data.transaction);
             if (data.transaction.fulfillment_status === "failed") {
               // Gateway captured the money but delivery failed — the refund
               // path already notified the customer. Never show "successful"
               // for a transaction whose delivery leg failed.
+              clearInterval(poll);
               setErrorMsg("Payment went through but delivery failed — a refund is being processed.");
               setStep("error");
               return;
             }
+            if (data.transaction.fulfillment_status === "pending") {
+              // Delivery is still async — keep polling the same endpoint;
+              // it returns the updated transaction once the webhook lands.
+              setStep("delivering");
+              if (Date.now() - pollStarted > 90_000) {
+                clearInterval(poll);
+                setDeliveryTimedOut(true);
+              }
+              return;
+            }
+            clearInterval(poll);
             addGuestActivity({
               reference: data.transaction.reference,
               serviceName: service.name,
@@ -189,7 +206,23 @@ export function BroadbandFlow({
         beneficiaryLabel: account,
       });
       setResult(tx);
-      setStep("success");
+      if (tx.fulfillment_status === "pending") {
+        // Async provider delivery — wait for the webhook verdict instead of
+        // declaring success for a purchase that can still be refunded.
+        setStep("delivering");
+        watchRef.current = watchFulfillment(tx.reference, (outcome) => {
+          if (outcome === "fulfilled") {
+            setStep("success");
+          } else if (outcome === "failed") {
+            setErrorMsg("Payment went through but delivery failed — a refund is being processed.");
+            setStep("error");
+          } else {
+            setDeliveryTimedOut(true);
+          }
+        });
+      } else {
+        setStep("success");
+      }
     } catch (e) {
       setErrorMsg(e instanceof Error ? e.message : "Payment failed.");
       setStep("error");
@@ -199,7 +232,7 @@ export function BroadbandFlow({
   }
 
   const stepIndex = ["account", "amount", "review"].indexOf(step);
-  const showTop = !["processing", "guest-ecocash", "success"].includes(step);
+  const showTop = !["processing", "guest-ecocash", "delivering", "success"].includes(step);
   const fee = calculatePlatformFee(service.id, amount) + calculateGatewaySurcharge(method, amount);
   const total = amount + fee;
   const insufficient = method === "wallet" && total > walletBalance;
@@ -462,6 +495,23 @@ export function BroadbandFlow({
             <div className="muted mt-1" style={{ maxWidth: 280 }}>
               We sent a USSD prompt to {guestPhone}. Enter your EcoCash PIN to approve the ${total.toFixed(2)} payment.
             </div>
+          </div>
+        )}
+
+        {step === "delivering" && (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: 520, textAlign: "center" }}>
+            <div className="spinner-ring" />
+            <div style={{ fontWeight: 700, marginTop: 24, fontSize: 15.5 }}>
+              {deliveryTimedOut ? "Still processing" : "Delivering your payment…"}
+            </div>
+            <div className="muted mt-1" style={{ maxWidth: 300 }}>
+              {deliveryTimedOut
+                ? "It's taking longer than usual — we'll notify you when it completes. Failed deliveries are refunded automatically."
+                : "Payment received — the provider is confirming delivery. This usually takes a few seconds."}
+            </div>
+            {deliveryTimedOut && result && (
+              <button className="btn btn-primary btn-block mt-4" onClick={() => setStep("receipt")}>View receipt</button>
+            )}
           </div>
         )}
 

@@ -245,44 +245,36 @@ export default async function HomePage() {
             </div>
           )}
 
-          {insuranceProducts.length > 0 && (
-            <div>
-              <div className="row between mt-3 mb-2" style={{ gap: 10 }}>
-                <div className="row gap-2" style={{ minWidth: 0, flex: 1 }}>
-                  <div
-                    className="ibadge round"
-                    style={{
-                      width: 30,
-                      height: 30,
-                      background: categories.find((c) => c.id === "insurance")?.bg ?? "#e0e7ff",
-                      color: categories.find((c) => c.id === "insurance")?.color ?? "#6366f1",
-                      flexShrink: 0,
-                    }}
-                  >
-                    <Icon name="shield" size={15} stroke={1.8} />
-                  </div>
-                  <span className="section-title">Insurance</span>
-                </div>
-                <Link href="/insurance" className="muted see-all-link" style={{ flexShrink: 0 }}>
-                  See all <Icon name="chevronR" size={13} stroke={2.4} />
-                </Link>
-              </div>
-              <div className="cat-section-row">
-                {insuranceProducts.slice(0, CAT_ROW_DESKTOP_COLUMNS).map((product) => (
-                  <InsuranceCard
-                    key={product.id}
-                    product={product}
-                    categoryColor={categories.find((c) => c.id === "insurance")?.color}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
           {categories.map((c) => {
-            // Insurance has its own dedicated flow - skip in services listing
-            if (c.id === "insurance") return null;
-            
+            // Insurance has its own dedicated flow and product cards, but it
+            // renders as a normal category row in its own sorted slot — same
+            // section header, same card grid as every other category.
+            if (c.id === "insurance") {
+              if (insuranceProducts.length === 0) return null;
+              return (
+                <div key={c.id}>
+                  <div className="row between mt-3 mb-2" style={{ gap: 10 }}>
+                    <div className="row gap-2" style={{ minWidth: 0, flex: 1 }}>
+                      <div className="ibadge round" style={{ width: 30, height: 30, background: c.bg, color: c.color, flexShrink: 0 }}>
+                        <Icon name={c.icon} size={15} stroke={1.8} />
+                      </div>
+                      <span className="section-title" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {c.name}
+                      </span>
+                    </div>
+                    <Link href="/insurance" className="muted see-all-link" style={{ flexShrink: 0 }}>
+                      See all <Icon name="chevronR" size={13} stroke={2.4} />
+                    </Link>
+                  </div>
+                  <div className="cat-section-row">
+                    {insuranceProducts.slice(0, CAT_ROW_DESKTOP_COLUMNS).map((product) => (
+                      <InsuranceCard key={product.id} product={product} categoryColor={c.color} />
+                    ))}
+                  </div>
+                </div>
+              );
+            }
+
             const items = (servicesByCategory.get(c.id) ?? []).slice(0, 4);
             const total = servicesByCategory.get(c.id)?.length ?? 0;
             if (items.length === 0) return null;

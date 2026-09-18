@@ -2,7 +2,6 @@ import { notFound, redirect } from "next/navigation";
 import { ChatThread } from "@/components/chat/chat-thread";
 import { getConversation, getMessages } from "@/lib/data/chat-queries";
 import { getCurrentProfile } from "@/lib/data/queries";
-import { markConversationRead } from "@/lib/actions/chat";
 
 export default async function ChatThreadPage({ params }: { params: Promise<{ conversationId: string }> }) {
   const { conversationId } = await params;
@@ -13,7 +12,9 @@ export default async function ChatThreadPage({ params }: { params: Promise<{ con
   if (!conversation) notFound();
 
   const messages = await getMessages(conversationId);
-  void markConversationRead(conversationId);
+  // Read-receipt is marked client-side by ChatThread's useEffect — calling
+  // the server action here ran revalidatePath mid-render, which threw during
+  // the post-send revalidation and surfaced as the masked production error.
 
   return (
     <ChatThread

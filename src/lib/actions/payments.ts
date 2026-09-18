@@ -11,7 +11,7 @@ import { giftRedeemedEmail, giftSentEmail, moneyReceivedEmail, moneySentEmail, p
 import { logTransactionEvent } from "@/lib/transaction-events";
 import { resolveVerifiedAmount } from "@/lib/pricing";
 import { sendPushToUser } from "@/lib/push/send";
-import type { ApiModuleSafe, P2pTransfer, Transaction } from "@/types/database";
+import type { ApiModuleSafe, FulfillmentStatus, P2pTransfer, Transaction } from "@/types/database";
 
 const FRIENDLY_ERRORS: Record<string, string> = {
   insufficient_funds: "Your wallet balance is too low for this payment. Top up and try again.",
@@ -421,4 +421,26 @@ export async function sendMoney(receiverPhone: string, amount: number, note?: st
   }
 
   return { ok: true, transfer };
+}
+
+// Polled by the payment flows while a provider delivery is still async.
+// VitalPay airtime/bills fulfil via webhook — payService returns the
+// transaction with fulfillment_status "pending", and the UI must NOT call
+// that a success: the service.failed webhook can still arrive and trigger
+// the auto-refund. This returns the live status for the caller's own
+// transaction only (scoped by user_id), never throws — a null just means
+// "keep polling".
+export async function getTransactionFulfillment(reference: string): Promise<FulfillmentStatus | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data } = await supabase
+    .from("transactions")
+    .select("fulfillment_status")
+    .eq("reference", reference)
+    .eq("user_id", user.id)
+    .single();
+  return (data?.fulfillment_status as FulfillmentStatus | undefined) ?? null;
 }

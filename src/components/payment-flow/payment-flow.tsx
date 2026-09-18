@@ -10,10 +10,11 @@ import { calculatePlatformFee, calculateGatewaySurcharge } from "@/lib/fees";
 import { payService, sendGiftVoucher } from "@/lib/actions/payments";
 import { startGuestCheckout, type GuestGateway } from "@/lib/actions/guest-payments";
 import { addGuestActivity } from "@/lib/guest-activity";
+import { watchFulfillment } from "@/lib/payments/fulfillment-watch";
 import { PaymentMethodSection, type PaymentBanners, type PaymentMethod } from "./flow-shared";
 import type { DataBundle, Network, Service, Transaction, TvPackage } from "@/types/database";
 
-type Step = "details" | "amount" | "review" | "processing" | "guest-ecocash" | "success" | "receipt" | "error";
+type Step = "details" | "amount" | "review" | "processing" | "guest-ecocash" | "delivering" | "success" | "receipt" | "error";
 
 const PAY_VIA_LABEL: Record<PaymentMethod, string> = {
   wallet: "TopMe Wallet",
@@ -65,6 +66,8 @@ export function PaymentFlow({
   const [method, setMethod] = useState<PaymentMethod | null>(service.is_gift ? "wallet" : null);
   const qrRef = useRef<HTMLCanvasElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const watchRef = useRef<(() => void) | null>(null);
+  const [deliveryTimedOut, setDeliveryTimedOut] = useState(false);
 
   const currentAmount = (): number => {
     if (service.amount_mode === "chips") return amount ?? (parseFloat(customAmount) || 0);
@@ -83,6 +86,7 @@ export function PaymentFlow({
   useEffect(() => {
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
+      watchRef.current?.();
     };
   }, []);
 
@@ -106,6 +110,7 @@ export function PaymentFlow({
 
       if (res.gateway === "ecocash") {
         setStep("guest-ecocash");
+        const pollStarted = Date.now();
         pollRef.current = setInterval(async () => {
           const r = await fetch("/api/guest/ecocash/poll", {
             method: "POST",
@@ -114,16 +119,27 @@ export function PaymentFlow({
           });
           const data = await r.json();
           if (data.status === "completed") {
-            if (pollRef.current) clearInterval(pollRef.current);
             setResult(data.transaction);
             if (data.transaction.fulfillment_status === "failed") {
               // Gateway captured the money but delivery failed — the refund
               // path already notified the customer. Never show "successful"
               // for a transaction whose delivery leg failed.
+              if (pollRef.current) clearInterval(pollRef.current);
               setErrorMsg("Payment went through but delivery failed — a refund is being processed.");
               setStep("error");
               return;
             }
+            if (data.transaction.fulfillment_status === "pending") {
+              // Delivery is still async — keep polling the same endpoint;
+              // it returns the updated transaction once the webhook lands.
+              setStep("delivering");
+              if (Date.now() - pollStarted > 90_000) {
+                if (pollRef.current) clearInterval(pollRef.current);
+                setDeliveryTimedOut(true);
+              }
+              return;
+            }
+            if (pollRef.current) clearInterval(pollRef.current);
             addGuestActivity({
               reference: data.transaction.reference,
               serviceName: service.name,
@@ -192,6 +208,22 @@ export function PaymentFlow({
           beneficiaryLabel: extra || identifier,
         });
         setResult(tx);
+        if (tx.fulfillment_status === "pending") {
+          // Async provider delivery — wait for the webhook verdict instead
+          // of declaring success for a purchase that can still be refunded.
+          setStep("delivering");
+          watchRef.current = watchFulfillment(tx.reference, (outcome) => {
+            if (outcome === "fulfilled") {
+              setStep("success");
+            } else if (outcome === "failed") {
+              setErrorMsg("Payment went through but delivery failed — a refund is being processed.");
+              setStep("error");
+            } else {
+              setDeliveryTimedOut(true);
+            }
+          });
+          return;
+        }
       }
       setStep("success");
     } catch (e) {
@@ -202,7 +234,7 @@ export function PaymentFlow({
     }
   }
 
-  const showTop = step !== "processing" && step !== "guest-ecocash" && step !== "success";
+  const showTop = step !== "processing" && step !== "guest-ecocash" && step !== "delivering" && step !== "success";
   const stepIndex = ["details", "amount", "review"].indexOf(step);
 
   return (
@@ -340,6 +372,23 @@ export function PaymentFlow({
             <div className="muted mt-1" style={{ maxWidth: 280 }}>
               We sent a USSD prompt to {guestPhone}. Enter your EcoCash PIN to approve the ${currentAmount().toFixed(2)} payment.
             </div>
+          </div>
+        )}
+
+        {step === "delivering" && (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: 520, textAlign: "center" }}>
+            <div className="spinner-ring" />
+            <div style={{ fontWeight: 700, marginTop: 24, fontSize: 15.5 }}>
+              {deliveryTimedOut ? "Still processing" : "Delivering your order…"}
+            </div>
+            <div className="muted mt-1" style={{ maxWidth: 300 }}>
+              {deliveryTimedOut
+                ? "It's taking longer than usual — we'll notify you when it completes. Failed deliveries are refunded automatically."
+                : "Payment received — the provider is confirming delivery. This usually takes a few seconds."}
+            </div>
+            {deliveryTimedOut && result && (
+              <button className="btn btn-primary btn-block mt-4" onClick={() => setStep("receipt")}>View receipt</button>
+            )}
           </div>
         )}
 
