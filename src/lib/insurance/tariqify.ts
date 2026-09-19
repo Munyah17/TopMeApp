@@ -236,6 +236,9 @@ export async function createPolicy(params: {
   client_id: string;
   premium: number;
   currency: string;
+  /** Dependant rows from the application — Tariqify persists fields its
+   *  schema knows and ignores the rest, so sending these is safe. */
+  dependants?: { name: string; relationship?: string; dob?: string; national_id?: string }[];
 }): Promise<TariqifyPolicy> {
   const data = await tariqifyRequest<Record<string, unknown>>("/policies", {
     method: "POST",

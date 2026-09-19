@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/server";
-import { createOrGetClient, getQuote, createPolicy, recordPayment as recordTariqifyPayment, getProducts as getTariqifyProducts } from "@/lib/insurance/tariqify";
+import { createOrGetClient, getQuote, createPolicy, getPolicy, recordPayment as recordTariqifyPayment, createTicket as createTariqifyTicket, getProducts as getTariqifyProducts } from "@/lib/insurance/tariqify";
 import { enrichInsuranceProduct } from "@/lib/insurance/types";
 import { isExcludedProduct } from "@/lib/insurance/exclusions";
 import { revalidatePath } from "next/cache";
@@ -44,17 +44,41 @@ export async function getInsuranceQuote(params: {
   }
 }
 
+/** One dependant on a cover — same shape the Motions /apply form collects. */
+export interface InsuranceDependant {
+  name: string;
+  relationship?: string;
+  dob?: string;
+  nationalId?: string;
+}
+
+/** One cover line in an application — a product plus its dependants. */
+export interface CoverSelectionInput {
+  productId: string;
+  dependants?: InsuranceDependant[];
+}
+
+/** Tariqify payment statuses that count as "confirmed" on their side. */
+const CONFIRMED_PAYMENT_STATUSES = new Set(["recorded", "confirmed", "completed", "success", "paid", "successful"]);
+
 /**
  * Purchase one or more insurance policies from a single Apply-for-Cover
- * submission. The client is registered with TariqifyIMS once, then each
- * selected product runs the full flow — quote → wallet charge → policy
- * creation → payment recording — so every cover lands in TariqifyIMS as a
- * valid policy (their platform applies its own activation rules, e.g. a
- * funeral plan's waiting period vs. instant cover). Returns per-product
- * results so a partial failure still reports which covers went through.
+ * submission — the same application shape motions.co.zw/apply sends: each
+ * cover carries its own dependants, and non-agriculture covers are priced
+ * per member (policyholder + each named dependant) while agriculture is a
+ * flat annual premium.
+ *
+ * The client is registered with TariqifyIMS once, then each selected
+ * product runs the full flow — quote → wallet charge → policy creation →
+ * payment recording → dual confirmation (the payment record AND the
+ * policy are re-fetched from Tariqify so both sides must agree the money
+ * landed). A mismatch marks the policy pending_verification, the payment
+ * pending_review, files a ticket with Tariqify, and raises an urgent
+ * admin task for manual verification — the customer is never told a
+ * payment failed when it may have succeeded.
  */
 export async function purchaseInsurancePolicy(params: {
-  productIds: string[];
+  selections: CoverSelectionInput[];
   nationalId: string;
   fullName: string;
   phone?: string;
@@ -71,8 +95,12 @@ export async function purchaseInsurancePolicy(params: {
     return { error: "Authentication required" };
   }
 
-  const productIds = [...new Set(params.productIds)].filter(Boolean);
-  if (productIds.length === 0) {
+  // De-dupe by product — Motions treats picking the same product twice as
+  // an error (dependants belong on one row), so merge is never ambiguous.
+  const selections = params.selections.filter((s) => s.productId);
+  const seen = new Set<string>();
+  const deduped = selections.filter((s) => (seen.has(s.productId) ? false : (seen.add(s.productId), true)));
+  if (deduped.length === 0) {
     return { error: "Choose at least one cover to buy." };
   }
 
@@ -123,8 +151,13 @@ export async function purchaseInsurancePolicy(params: {
 
     const policies: Record<string, unknown>[] = [];
     const failures: { productId: string; error: string }[] = [];
+    let pendingVerification = false;
 
-    for (const productId of productIds) {
+    for (const selection of deduped) {
+      const productId = selection.productId;
+      // Named dependants only — blank rows the customer added but never
+      // filled in don't count toward the per-head price.
+      const dependants = (selection.dependants ?? []).filter((d) => d.name.trim());
       try {
         // 1. Get product details
         const { data: product, error: productError } = await admin
@@ -143,11 +176,20 @@ export async function purchaseInsurancePolicy(params: {
           continue;
         }
 
-        // 2. Get quote
+        // 2. Get quote — dependants ride along in field_values so the
+        // underwriter sees the full application, not just the principal.
         const quote = await getQuote({
           product_id: productId,
           national_id: params.nationalId,
-          field_values: params.fieldValues,
+          field_values: {
+            ...params.fieldValues,
+            dependants: dependants.map((d) => ({
+              name: d.name.trim(),
+              relationship: d.relationship?.trim() || undefined,
+              dob: d.dob || undefined,
+              national_id: d.nationalId?.trim() || undefined,
+            })),
+          },
         });
 
         if (!quote.eligible) {
@@ -155,11 +197,15 @@ export async function purchaseInsurancePolicy(params: {
           continue;
         }
 
-        // 3. Calculate total with markup (shown to the customer as a
-        // "Processing fee" — the sticker price stays Tariqify's premium).
+        // 3. Per-head pricing, same as Motions: non-agriculture covers are
+        // priced per member (policyholder + each named dependant);
+        // agriculture is a flat annual premium. Markup applies per head.
+        const perHead = product.category !== "agriculture";
+        const headCount = perHead ? 1 + dependants.length : 1;
+        const basePremium = quote.base_premium * headCount;
         const markupPercent = Number(product.markup_percent);
-        const markupAmount = quote.base_premium * (markupPercent / 100);
-        const totalPremium = quote.base_premium + markupAmount;
+        const markupAmount = basePremium * (markupPercent / 100);
+        const totalPremium = basePremium + markupAmount;
 
         // 4. Charge wallet (using wallet_pay RPC). owner_label/provider_cost
         // are passed explicitly — TopMe is Motions Microinsurance's
@@ -175,10 +221,10 @@ export async function purchaseInsurancePolicy(params: {
           p_amount: totalPremium,
           p_recipient: params.nationalId,
           p_network_id: null,
-          p_extra_value: JSON.stringify({ product_id: productId, client_id: localClient.id }),
+          p_extra_value: JSON.stringify({ product_id: productId, client_id: localClient.id, members: headCount }),
           p_fulfillment_provider: "insurance",
           p_owner_label: "Motions Microinsurance",
-          p_provider_cost: quote.base_premium,
+          p_provider_cost: basePremium,
         });
 
         if (paymentError) {
@@ -187,12 +233,20 @@ export async function purchaseInsurancePolicy(params: {
           continue;
         }
 
-        // 5. Create policy in TariqifyIMS
+        // 5. Create policy in TariqifyIMS — premium is the per-period total
+        // for all members, dependants forwarded so the underwriter's record
+        // matches the application exactly.
         const tariqifyPolicy = await createPolicy({
           product_id: productId,
           client_id: tariqifyClient.id,
-          premium: quote.base_premium,
+          premium: basePremium,
           currency: quote.currency,
+          dependants: dependants.map((d) => ({
+            name: d.name.trim(),
+            relationship: d.relationship?.trim() || undefined,
+            dob: d.dob || undefined,
+            national_id: d.nationalId?.trim() || undefined,
+          })),
         });
 
         // 6. Create local policy record
@@ -203,13 +257,13 @@ export async function purchaseInsurancePolicy(params: {
             product_id: productId,
             profile_id: user.id,
             insurance_client_id: localClient.id,
-            base_premium: quote.base_premium,
+            base_premium: basePremium,
             markup_amount: markupAmount,
             total_premium: totalPremium,
             currency: quote.currency,
             status: "active",
             transaction_id: transaction.id,
-            raw: tariqifyPolicy.raw,
+            raw: { ...tariqifyPolicy.raw, dependants, members: headCount },
           })
           .select()
           .single();
@@ -222,25 +276,82 @@ export async function purchaseInsurancePolicy(params: {
         // 7. Record payment with TariqifyIMS
         const tariqifyPayment = await recordTariqifyPayment({
           policy_number: tariqifyPolicy.policy_number,
-          amount: quote.base_premium,
+          amount: basePremium,
           currency: quote.currency,
         });
 
-        // 8. Create local payment record
+        // 8. Dual confirmation — TopMe's wallet already debited, so the
+        // payment must also be confirmed on Tariqify's side: the payment
+        // record's own status AND the policy it was recorded against must
+        // both check out. Anything else is a mismatch → pending review.
+        let paymentConfirmed = CONFIRMED_PAYMENT_STATUSES.has(tariqifyPayment.status.toLowerCase());
+        let policyStatus = tariqifyPolicy.status;
+        try {
+          const check = await getPolicy(tariqifyPolicy.policy_number);
+          policyStatus = check.status;
+        } catch (checkError) {
+          console.error("Policy re-check failed:", checkError);
+          paymentConfirmed = false;
+        }
+        const verified = paymentConfirmed && Boolean(policyStatus);
+
+        // 9. Create local payment record — flagged for manual review when
+        // the dual confirmation didn't come back clean.
         const { error: paymentRecordError } = await admin
           .from("insurance_premium_payments")
           .insert({
             policy_id: localPolicy.id,
-            amount: quote.base_premium,
+            amount: basePremium,
             transaction_id: transaction.id,
             tariqify_payment_id: tariqifyPayment.id,
-            status: "recorded_with_provider",
-            raw: tariqifyPayment.raw,
+            status: verified ? "recorded_with_provider" : "pending_review",
+            raw: { ...tariqifyPayment.raw, verification: { payment_status: tariqifyPayment.status, policy_status: policyStatus } },
           });
 
         if (paymentRecordError) {
           console.error("Failed to record payment:", paymentRecordError);
           // Non-fatal - policy is created, payment record can be reconciled later
+        }
+
+        if (!verified) {
+          pendingVerification = true;
+          await admin
+            .from("insurance_policies")
+            .update({ status: "pending_verification" })
+            .eq("id", localPolicy.id);
+
+          // Notify Tariqify — a ticket on their side so their team can
+          // trace the payment from their end.
+          try {
+            await createTariqifyTicket({
+              policy_number: tariqifyPolicy.policy_number,
+              client_id: tariqifyClient.id,
+              subject: `Payment verification needed — ${tariqifyPolicy.policy_number}`,
+              message:
+                `TopMe recorded a premium payment of ${quote.currency} ${basePremium.toFixed(2)} for policy ` +
+                `${tariqifyPolicy.policy_number} (product ${productId}, client ${params.fullName}, ` +
+                `national ID ${params.nationalId}), but the payment status came back as ` +
+                `"${tariqifyPayment.status}" and the policy status as "${policyStatus}". ` +
+                `Please confirm receipt on your side.`,
+            });
+          } catch (ticketError) {
+            console.error("Failed to file Tariqify ticket:", ticketError);
+          }
+
+          // Notify TopMe superadmins — an urgent task in the admin console
+          // so a human verifies before the customer is told they're covered.
+          await admin.from("admin_tasks").insert({
+            title: `Verify insurance payment — ${tariqifyPolicy.policy_number}`,
+            description:
+              `Wallet charged ${quote.currency} ${totalPremium.toFixed(2)} for ${product.name} ` +
+              `(${params.fullName}, ${params.nationalId}), but Tariqify returned payment status ` +
+              `"${tariqifyPayment.status}" / policy status "${policyStatus}". ` +
+              `A ticket was filed with Motions. Confirm the payment landed, then set the policy ` +
+              `back to active and the premium payment to recorded_with_provider.`,
+            priority: "urgent",
+            related_table: "insurance_policies",
+            related_id: localPolicy.id,
+          });
         }
 
         policies.push(localPolicy);
@@ -263,6 +374,9 @@ export async function purchaseInsurancePolicy(params: {
       // Surface partial failures so the UI can say which covers didn't go
       // through even though others did.
       failures: failures.length > 0 ? failures : undefined,
+      // True when at least one policy's payment couldn't be dual-confirmed —
+      // the UI shows "pending verification" instead of a hard success.
+      pendingVerification: pendingVerification || undefined,
     };
   } catch (error) {
     console.error("Insurance purchase error:", error);
