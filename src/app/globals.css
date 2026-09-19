@@ -767,9 +767,12 @@ h4 {
 /* ---------- Sidebar (desktop) + drawer (mobile) ---------- */
 .app-sidebar {
   display: none;
-  /* 174px ≈ 30% narrower than the original 248px rail — the reclaimed width
-     goes to the center content panel. Nav labels still fit comfortably. */
-  width: 174px;
+  /* 240px rail — widened back toward the original 248px after the 174px
+     version read too thin on desktop. The ~66px the main panel loses is
+     handed back to the product cards as extra body height (see the
+     .prod-body rule in the ≥1024px block) so cards keep their presence
+     instead of looking squished. */
+  width: 240px;
   flex-shrink: 0;
   flex-direction: column;
   height: 100dvh;
@@ -1213,6 +1216,12 @@ a.side-user:hover {
   }
   .header-auth-desktop {
     display: flex;
+  }
+  /* Sidebar widened to 240px, so each grid column is ~66px narrower and the
+     square .prod-media shrinks by the same amount. Give that height back to
+     the card body so the card's overall footprint stays where it was. */
+  .prod-body {
+    min-height: 126px;
   }
   .app-header {
     padding: 0 var(--space-8);
