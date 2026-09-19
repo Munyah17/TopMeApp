@@ -37,10 +37,24 @@ function LoginForm() {
         setError(error.message);
         return;
       }
+      // Route by role: staff land on their console, customers on the app.
+      // An explicit ?redirect= always wins (e.g. middleware bounced them off
+      // a protected page they asked for).
+      let dest = searchParams.get("redirect") || "/home";
+      if (!searchParams.get("redirect")) {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (user) {
+          const { data: prof } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+          if (prof?.role === "superadmin") dest = "/super-admin";
+          else if (prof?.role === "admin") dest = "/admin";
+        }
+      }
       // A hard navigation (not router.push + router.refresh) so the proxy
       // middleware sees the just-set auth cookie on the very next request —
       // push+refresh back-to-back races and can drop the navigation entirely.
-      window.location.assign(searchParams.get("redirect") || "/home");
+      window.location.assign(dest);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
     } finally {
