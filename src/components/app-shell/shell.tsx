@@ -158,7 +158,9 @@ export function AppShell({
             >
               <Icon name="menu" size={24} stroke={2} />
             </button>
-            <div className="topbar-title">{pageTitle(pathname)}</div>
+            {/* Page title is desktop-only — the mobile header carries just the
+                hamburger and the right-side action (Get Started / avatar). */}
+            <div className="topbar-title desktop-only">{pageTitle(pathname)}</div>
 
             <div className="header-right">
               {profile ? (
