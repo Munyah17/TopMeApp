@@ -3,15 +3,16 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icons";
-import { updateInsuranceProduct } from "@/lib/actions/admin";
+import { updateInsuranceProduct, deleteInsuranceProduct } from "@/lib/actions/admin";
 import { displayName, displayPremium, type InsuranceProduct } from "@/lib/insurance/types";
 
 const PROVIDER_LABEL: Record<string, string> = { tariqify: "Motions Microinsurance", enpassent: "EnpassentIMS" };
 
-function InsuranceProductRow({ product }: { product: InsuranceProduct }) {
+function InsuranceProductRow({ product, isSuperAdmin }: { product: InsuranceProduct; isSuperAdmin: boolean }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [editing, setEditing] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [displayNameVal, setDisplayNameVal] = useState(product.display_name ?? "");
   const [displayDesc, setDisplayDesc] = useState(product.display_description ?? "");
   const [displayImage, setDisplayImage] = useState(product.display_image_url ?? "");
@@ -53,6 +54,19 @@ function InsuranceProductRow({ product }: { product: InsuranceProduct }) {
         router.refresh();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Couldn't update this.");
+      }
+    });
+  }
+
+  function remove() {
+    setError(null);
+    startTransition(async () => {
+      try {
+        await deleteInsuranceProduct(product.id);
+        setConfirmingDelete(false);
+        router.refresh();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Couldn't delete this.");
       }
     });
   }
@@ -121,11 +135,33 @@ function InsuranceProductRow({ product }: { product: InsuranceProduct }) {
       <button className="btn btn-ghost" style={{ height: 32, padding: "0 10px", fontSize: 12 }} disabled={pending} onClick={startEdit}>
         Edit
       </button>
+      {isSuperAdmin &&
+        (confirmingDelete ? (
+          <button
+            className="btn btn-ghost"
+            style={{ height: 32, padding: "0 10px", fontSize: 12, color: "var(--error)", borderColor: "var(--error)" }}
+            disabled={pending}
+            onClick={remove}
+            title="Click again to permanently delete"
+          >
+            {pending ? "Deleting…" : "Confirm?"}
+          </button>
+        ) : (
+          <button
+            className="btn btn-ghost"
+            style={{ height: 32, padding: "0 10px", fontSize: 12, color: "var(--error)" }}
+            disabled={pending}
+            onClick={() => setConfirmingDelete(true)}
+            title="Permanently delete (super admin only)"
+          >
+            Delete
+          </button>
+        ))}
     </div>
   );
 }
 
-export function InsuranceProductsManager({ products }: { products: InsuranceProduct[] }) {
+export function InsuranceProductsManager({ products, isSuperAdmin = false }: { products: InsuranceProduct[]; isSuperAdmin?: boolean }) {
   if (products.length === 0) return null;
   return (
     <>
@@ -136,7 +172,7 @@ export function InsuranceProductsManager({ products }: { products: InsuranceProd
       </div>
       <div className="card mb-3" style={{ overflow: "hidden" }}>
         {products.map((p) => (
-          <InsuranceProductRow key={p.id} product={p} />
+          <InsuranceProductRow key={p.id} product={p} isSuperAdmin={isSuperAdmin} />
         ))}
       </div>
     </>

@@ -576,6 +576,36 @@ export async function updateInsuranceProduct(id: string, patch: InsuranceProduct
   revalidatePath("/insurance/[productId]", "page");
 }
 
+/**
+ * Permanently remove an insurance product from the catalog. Superadmin-only —
+ * a synced product that disappears from Tariqify is normally just switched
+ * off (is_active=false) so policy history keeps resolving; a hard delete is
+ * for rows that should never have existed (test data, wrong provider).
+ * Refuses to delete a product that has policies attached — those must stay
+ * for the lifetime of the cover.
+ */
+export async function deleteInsuranceProduct(id: string) {
+  const { supabase, user: actingUser } = await requirePermission("catalog.manage");
+  const { data: profile } = await supabase.from("profiles").select("role").eq("id", actingUser.id).single();
+  if (profile?.role !== "superadmin") throw new Error("Only a super admin can delete insurance products.");
+
+  const admin = createAdminClient();
+  const { count } = await admin
+    .from("insurance_policies")
+    .select("id", { count: "exact", head: true })
+    .eq("product_id", id);
+  if ((count ?? 0) > 0) {
+    throw new Error("This product has policies attached — deactivate it instead so cover records keep resolving.");
+  }
+
+  const { error } = await admin.from("insurance_products").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+
+  await logAdminAction(admin, { actorId: actingUser.id, action: "insurance_product.delete", targetTable: "insurance_products", targetId: id });
+  revalidateAdminPath("/products");
+  revalidatePath("/insurance");
+}
+
 function revalidateCatalog() {
   // getCategories/getAllServices/getNetworks are unstable_cache-wrapped
   // (see src/lib/data/queries.ts) precisely so customer pages don't

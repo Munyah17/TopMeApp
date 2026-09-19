@@ -44,7 +44,7 @@ export default async function ProductsPage() {
         deactivate anything that&apos;s ever been sold instead.
       </div>
       <NetworksManager networks={networks} />
-      <InsuranceProductsManager products={insuranceProducts} />
+      <InsuranceProductsManager products={insuranceProducts} isSuperAdmin={isSuperAdmin} />
       <ProductsClient categories={categories} services={services} />
     </div>
   );
