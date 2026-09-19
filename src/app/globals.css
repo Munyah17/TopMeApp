@@ -1217,12 +1217,6 @@ a.side-user:hover {
   .header-auth-desktop {
     display: flex;
   }
-  /* Sidebar widened to 240px, so each grid column is ~66px narrower and the
-     square .prod-media shrinks by the same amount. Give that height back to
-     the card body so the card's overall footprint stays where it was. */
-  .prod-body {
-    min-height: 126px;
-  }
   .app-header {
     padding: 0 var(--space-8);
   }

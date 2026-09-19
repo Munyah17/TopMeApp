@@ -24,7 +24,7 @@ export function InsuranceCard({ product, categoryColor }: { product: InsurancePr
           <img src={image} alt={name} loading="lazy" decoding="async" />
         ) : (
           <span className="prod-icon-tile" style={{ color }}>
-            <Icon name="shield" size={34} stroke={1.6} />
+            <Icon name="shield" size={56} stroke={1.4} />
           </span>
         )}
       </div>
