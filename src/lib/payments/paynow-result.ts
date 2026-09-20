@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { notifyTopupResult } from "@/lib/email/notify";
 import { finalizeGuestCheckout, failGuestCheckout } from "@/lib/payments/guest-checkout";
+import { finalizeInsuranceCheckout } from "@/lib/actions/insurance";
 import { recordIntegrationHealth } from "@/lib/integrations/health";
 import { logTransactionEvent } from "@/lib/transaction-events";
 import type { TopupIntent } from "@/types/database";
@@ -91,6 +92,30 @@ export async function applyPaynowResult(reference: string, status: string, meta?
       await failGuestCheckout(reference);
     }
     return { kind: "guest" as const, success, failed };
+  }
+
+  // Insurance checkouts use their own intent table (the application payload
+  // doesn't fit guest_checkout_intents' services-FK shape) — same routing
+  // rule: success finalizes, failure marks the intent failed.
+  const { data: insuranceIntent } = await admin
+    .from("insurance_checkout_intents")
+    .select("reference")
+    .eq("reference", reference)
+    .eq("status", "pending")
+    .maybeSingle();
+
+  if (insuranceIntent) {
+    if (success) {
+      const result = await finalizeInsuranceCheckout(reference);
+      if (result.error) {
+        console.error(`[paynow] finalizeInsuranceCheckout failed for ${reference}:`, result.error);
+        void logTransactionEvent(admin, { reference, eventType: "fulfillment_failed", message: `Paynow: finalizeInsuranceCheckout failed — ${result.error}` });
+      }
+    } else if (failed) {
+      await admin.rpc("fail_insurance_checkout", { p_reference: reference });
+      void logTransactionEvent(admin, { reference, eventType: "payment_failed", message: `Insurance checkout via Paynow failed (status: ${status}).` });
+    }
+    return { kind: "insurance" as const, success, failed };
   }
 
   return { kind: "none" as const, success, failed };

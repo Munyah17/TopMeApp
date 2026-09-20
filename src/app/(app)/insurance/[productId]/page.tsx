@@ -4,7 +4,14 @@ import { Icon } from "@/components/icons";
 import { createClient } from "@/lib/supabase/server";
 import { getInsuranceProducts } from "@/lib/actions/insurance";
 import { displayName, displayDescription, displayImage, enrichInsuranceProduct } from "@/lib/insurance/types";
+import { getCurrentProfile, getMyWallet } from "@/lib/data/queries";
+import { getPublicSetting } from "@/lib/data/flags";
 import InsurancePurchaseForm from "@/components/insurance/insurance-purchase-form";
+
+// Checkout shows the wallet balance and takes payment — always a fresh
+// read, never statically rendered or fetch-cached.
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 export default async function InsuranceProductPage({ params }: { params: Promise<{ productId: string }> }) {
   const { productId } = await params;
@@ -25,8 +32,15 @@ export default async function InsuranceProductPage({ params }: { params: Promise
   // dedicated columns aren't populated yet.
   const product = enrichInsuranceProduct(row as Record<string, unknown>);
 
-  // Every purchasable product, for the form's "add another cover" picker.
-  const allProducts = (await getInsuranceProducts()).filter((p) => p.is_purchasable);
+  // Every purchasable product, for the form's "add another cover" picker —
+  // plus the wallet balance and gateway banners the payment picker needs.
+  const [allProductsRaw, profile, paymentBanners] = await Promise.all([
+    getInsuranceProducts(),
+    getCurrentProfile(),
+    getPublicSetting<Record<string, string>>("payment_method_banners"),
+  ]);
+  const allProducts = allProductsRaw.filter((p) => p.is_purchasable);
+  const wallet = profile ? await getMyWallet(profile.id) : null;
 
   const name = displayName(product);
   const description = displayDescription(product);
@@ -103,7 +117,7 @@ export default async function InsuranceProductPage({ params }: { params: Promise
         )}
 
         {product.is_purchasable ? (
-          <InsurancePurchaseForm product={product} allProducts={allProducts} />
+          <InsurancePurchaseForm product={product} allProducts={allProducts} walletBalance={wallet?.balance ?? 0} banners={paymentBanners ?? {}} />
         ) : (
           <div
             className="row gap-2"

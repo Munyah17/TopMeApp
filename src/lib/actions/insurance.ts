@@ -1,11 +1,20 @@
 "use server";
 
+import { randomUUID } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import { createOrGetClient, getQuote, createPolicy, getPolicy, recordPayment as recordTariqifyPayment, createTicket as createTariqifyTicket, getProducts as getTariqifyProducts } from "@/lib/insurance/tariqify";
 import { enrichInsuranceProduct } from "@/lib/insurance/types";
 import { isExcludedProduct } from "@/lib/insurance/exclusions";
+import { calculateTopupFee } from "@/lib/fees";
+import { initiatePaynowPayment, checkPaynowStatus } from "@/lib/payments/paynow";
+import { applyPaynowResult } from "@/lib/payments/paynow-result";
+import { createGuestCheckoutSession } from "@/lib/payments/stripe";
+import { initiateEcocashPush, getEcocashStatus } from "@/lib/payments/ecocash";
+import { logTransactionEvent } from "@/lib/transaction-events";
 import { revalidatePath } from "next/cache";
+
+type Admin = ReturnType<typeof createAdminClient>;
 
 /**
  * Get a quote for an insurance product
@@ -60,6 +69,158 @@ export interface CoverSelectionInput {
 
 /** Tariqify payment statuses that count as "confirmed" on their side. */
 const CONFIRMED_PAYMENT_STATUSES = new Set(["recorded", "confirmed", "completed", "success", "paid", "successful"]);
+
+interface DependantsPayload {
+  name: string;
+  relationship?: string;
+  dob?: string;
+  national_id?: string;
+}
+
+/**
+ * Everything that happens AFTER money has moved, identical for the wallet
+ * path (wallet_pay already debited) and the gateway path (Paynow/Stripe/
+ * EcoCash already captured): create the Tariqify policy, write the local
+ * policy + premium-payment rows, then dual-confirm the payment landed on
+ * the underwriter's side. A mismatch marks the policy pending_verification,
+ * files a Tariqify ticket, and raises an urgent admin task — the customer
+ * is never told a payment failed when it may have succeeded.
+ */
+async function issuePolicyAfterPayment(opts: {
+  admin: Admin;
+  userId: string;
+  localClientId: string;
+  tariqifyClientId: string;
+  nationalId: string;
+  fullName: string;
+  product: Record<string, unknown>;
+  productId: string;
+  dependants: DependantsPayload[];
+  headCount: number;
+  basePremium: number;
+  markupAmount: number;
+  totalPremium: number;
+  currency: string;
+  transactionId: string;
+}): Promise<{ policy?: Record<string, unknown>; error?: string; pendingVerification?: boolean }> {
+  const { admin, product, productId, dependants, headCount, basePremium, markupAmount, totalPremium, currency } = opts;
+  const productName = String(product.name ?? productId);
+
+  // Create policy in TariqifyIMS — premium is the per-period total for all
+  // members, dependants forwarded so the underwriter's record matches the
+  // application exactly.
+  const tariqifyPolicy = await createPolicy({
+    product_id: productId,
+    client_id: opts.tariqifyClientId,
+    premium: basePremium,
+    currency,
+    dependants,
+  });
+
+  // Local policy record
+  const { data: localPolicy, error: policyError } = await admin
+    .from("insurance_policies")
+    .insert({
+      policy_number: tariqifyPolicy.policy_number,
+      product_id: productId,
+      profile_id: opts.userId,
+      insurance_client_id: opts.localClientId,
+      base_premium: basePremium,
+      markup_amount: markupAmount,
+      total_premium: totalPremium,
+      currency,
+      status: "active",
+      transaction_id: opts.transactionId,
+      raw: { ...tariqifyPolicy.raw, dependants, members: headCount },
+    })
+    .select()
+    .single();
+
+  if (policyError || !localPolicy) {
+    return { error: "Failed to create policy record" };
+  }
+
+  // Record payment with TariqifyIMS
+  const tariqifyPayment = await recordTariqifyPayment({
+    policy_number: tariqifyPolicy.policy_number,
+    amount: basePremium,
+    currency,
+  });
+
+  // Dual confirmation — the money already moved on TopMe's side, so the
+  // payment must also be confirmed on Tariqify's: the payment record's own
+  // status AND the policy it was recorded against must both check out.
+  let paymentConfirmed = CONFIRMED_PAYMENT_STATUSES.has(tariqifyPayment.status.toLowerCase());
+  let policyStatus = tariqifyPolicy.status;
+  try {
+    const check = await getPolicy(tariqifyPolicy.policy_number);
+    policyStatus = check.status;
+  } catch (checkError) {
+    console.error("Policy re-check failed:", checkError);
+    paymentConfirmed = false;
+  }
+  const verified = paymentConfirmed && Boolean(policyStatus);
+
+  // Local payment record — flagged for manual review when the dual
+  // confirmation didn't come back clean.
+  const { error: paymentRecordError } = await admin
+    .from("insurance_premium_payments")
+    .insert({
+      policy_id: localPolicy.id,
+      amount: basePremium,
+      transaction_id: opts.transactionId,
+      tariqify_payment_id: tariqifyPayment.id,
+      status: verified ? "recorded_with_provider" : "pending_review",
+      raw: { ...tariqifyPayment.raw, verification: { payment_status: tariqifyPayment.status, policy_status: policyStatus } },
+    });
+
+  if (paymentRecordError) {
+    console.error("Failed to record payment:", paymentRecordError);
+    // Non-fatal - policy is created, payment record can be reconciled later
+  }
+
+  if (!verified) {
+    await admin
+      .from("insurance_policies")
+      .update({ status: "pending_verification" })
+      .eq("id", localPolicy.id);
+
+    // Notify Tariqify — a ticket on their side so their team can trace the
+    // payment from their end.
+    try {
+      await createTariqifyTicket({
+        policy_number: tariqifyPolicy.policy_number,
+        client_id: opts.tariqifyClientId,
+        subject: `Payment verification needed — ${tariqifyPolicy.policy_number}`,
+        message:
+          `TopMe recorded a premium payment of ${currency} ${basePremium.toFixed(2)} for policy ` +
+          `${tariqifyPolicy.policy_number} (product ${productId}, client ${opts.fullName}, ` +
+          `national ID ${opts.nationalId}), but the payment status came back as ` +
+          `"${tariqifyPayment.status}" and the policy status as "${policyStatus}". ` +
+          `Please confirm receipt on your side.`,
+      });
+    } catch (ticketError) {
+      console.error("Failed to file Tariqify ticket:", ticketError);
+    }
+
+    // Notify TopMe superadmins — an urgent task in the admin console so a
+    // human verifies before the customer is told they're covered.
+    await admin.from("admin_tasks").insert({
+      title: `Verify insurance payment — ${tariqifyPolicy.policy_number}`,
+      description:
+        `Charged ${currency} ${totalPremium.toFixed(2)} for ${productName} ` +
+        `(${opts.fullName}, ${opts.nationalId}), but Tariqify returned payment status ` +
+        `"${tariqifyPayment.status}" / policy status "${policyStatus}". ` +
+        `A ticket was filed with Motions. Confirm the payment landed, then set the policy ` +
+        `back to active and the premium payment to recorded_with_provider.`,
+      priority: "urgent",
+      related_table: "insurance_policies",
+      related_id: localPolicy.id,
+    });
+  }
+
+  return { policy: localPolicy, pendingVerification: !verified || undefined };
+}
 
 /**
  * Purchase one or more insurance policies from a single Apply-for-Cover
@@ -207,24 +368,30 @@ export async function purchaseInsurancePolicy(params: {
         const markupAmount = basePremium * (markupPercent / 100);
         const totalPremium = basePremium + markupAmount;
 
-        // 4. Charge wallet (using wallet_pay RPC). owner_label/provider_cost
-        // are passed explicitly — TopMe is Motions Microinsurance's
-        // agent/dealer, not an insurer, selling under their licence, so the
-        // audit trail must say so the same way every other service records
-        // who it's "sold by TopMe, processed and paid to <owner_label>".
-        // provider_cost is the real base_premium from the live quote above,
-        // not a guessed percentage (there's no `services` row for insurance
-        // products at all — see 2026-09-13-wallet-pay-explicit-attribution.sql
-        // for why the normal cost_percentage lookup silently produced 0 here).
+        // 4. Charge wallet (using wallet_pay RPC). p_amount is the base
+        // premium and p_fee the markup — together exactly the "Charged
+        // today" total the form showed. (Before p_fee existed, wallet_pay
+        // added its own 2% platform fee on top of p_amount=totalPremium,
+        // silently debiting MORE than the displayed total.) owner_label/
+        // provider_cost are passed explicitly — TopMe is Motions
+        // Microinsurance's agent/dealer, not an insurer, selling under
+        // their licence, so the audit trail must say so the same way every
+        // other service records who it's "sold by TopMe, processed and
+        // paid to <owner_label>". provider_cost is the real base_premium
+        // from the live quote above, not a guessed percentage (there's no
+        // `services` row for insurance products at all — see
+        // 2026-09-13-wallet-pay-explicit-attribution.sql for why the normal
+        // cost_percentage lookup silently produced 0 here).
         const { data: transaction, error: paymentError } = await admin.rpc("wallet_pay", {
           p_service_id: `insurance-${productId}`,
-          p_amount: totalPremium,
+          p_amount: basePremium,
           p_recipient: params.nationalId,
           p_network_id: null,
           p_extra_value: JSON.stringify({ product_id: productId, client_id: localClient.id, members: headCount }),
           p_fulfillment_provider: "insurance",
           p_owner_label: "Motions Microinsurance",
           p_provider_cost: basePremium,
+          p_fee: markupAmount,
         });
 
         if (paymentError) {
@@ -233,128 +400,37 @@ export async function purchaseInsurancePolicy(params: {
           continue;
         }
 
-        // 5. Create policy in TariqifyIMS — premium is the per-period total
-        // for all members, dependants forwarded so the underwriter's record
-        // matches the application exactly.
-        const tariqifyPolicy = await createPolicy({
-          product_id: productId,
-          client_id: tariqifyClient.id,
-          premium: basePremium,
-          currency: quote.currency,
+        // 5-9. Policy creation → payment recording → dual confirmation —
+        // shared with the gateway path (see issuePolicyAfterPayment).
+        const issued = await issuePolicyAfterPayment({
+          admin,
+          userId: user.id,
+          localClientId: localClient.id,
+          tariqifyClientId: tariqifyClient.id,
+          nationalId: params.nationalId,
+          fullName: params.fullName,
+          product,
+          productId,
           dependants: dependants.map((d) => ({
             name: d.name.trim(),
             relationship: d.relationship?.trim() || undefined,
             dob: d.dob || undefined,
             national_id: d.nationalId?.trim() || undefined,
           })),
+          headCount,
+          basePremium,
+          markupAmount,
+          totalPremium,
+          currency: quote.currency,
+          transactionId: transaction.id,
         });
 
-        // 6. Create local policy record
-        const { data: localPolicy, error: policyError } = await admin
-          .from("insurance_policies")
-          .insert({
-            policy_number: tariqifyPolicy.policy_number,
-            product_id: productId,
-            profile_id: user.id,
-            insurance_client_id: localClient.id,
-            base_premium: basePremium,
-            markup_amount: markupAmount,
-            total_premium: totalPremium,
-            currency: quote.currency,
-            status: "active",
-            transaction_id: transaction.id,
-            raw: { ...tariqifyPolicy.raw, dependants, members: headCount },
-          })
-          .select()
-          .single();
-
-        if (policyError || !localPolicy) {
-          failures.push({ productId, error: "Failed to create policy record" });
+        if (issued.error) {
+          failures.push({ productId, error: issued.error });
           continue;
         }
-
-        // 7. Record payment with TariqifyIMS
-        const tariqifyPayment = await recordTariqifyPayment({
-          policy_number: tariqifyPolicy.policy_number,
-          amount: basePremium,
-          currency: quote.currency,
-        });
-
-        // 8. Dual confirmation — TopMe's wallet already debited, so the
-        // payment must also be confirmed on Tariqify's side: the payment
-        // record's own status AND the policy it was recorded against must
-        // both check out. Anything else is a mismatch → pending review.
-        let paymentConfirmed = CONFIRMED_PAYMENT_STATUSES.has(tariqifyPayment.status.toLowerCase());
-        let policyStatus = tariqifyPolicy.status;
-        try {
-          const check = await getPolicy(tariqifyPolicy.policy_number);
-          policyStatus = check.status;
-        } catch (checkError) {
-          console.error("Policy re-check failed:", checkError);
-          paymentConfirmed = false;
-        }
-        const verified = paymentConfirmed && Boolean(policyStatus);
-
-        // 9. Create local payment record — flagged for manual review when
-        // the dual confirmation didn't come back clean.
-        const { error: paymentRecordError } = await admin
-          .from("insurance_premium_payments")
-          .insert({
-            policy_id: localPolicy.id,
-            amount: basePremium,
-            transaction_id: transaction.id,
-            tariqify_payment_id: tariqifyPayment.id,
-            status: verified ? "recorded_with_provider" : "pending_review",
-            raw: { ...tariqifyPayment.raw, verification: { payment_status: tariqifyPayment.status, policy_status: policyStatus } },
-          });
-
-        if (paymentRecordError) {
-          console.error("Failed to record payment:", paymentRecordError);
-          // Non-fatal - policy is created, payment record can be reconciled later
-        }
-
-        if (!verified) {
-          pendingVerification = true;
-          await admin
-            .from("insurance_policies")
-            .update({ status: "pending_verification" })
-            .eq("id", localPolicy.id);
-
-          // Notify Tariqify — a ticket on their side so their team can
-          // trace the payment from their end.
-          try {
-            await createTariqifyTicket({
-              policy_number: tariqifyPolicy.policy_number,
-              client_id: tariqifyClient.id,
-              subject: `Payment verification needed — ${tariqifyPolicy.policy_number}`,
-              message:
-                `TopMe recorded a premium payment of ${quote.currency} ${basePremium.toFixed(2)} for policy ` +
-                `${tariqifyPolicy.policy_number} (product ${productId}, client ${params.fullName}, ` +
-                `national ID ${params.nationalId}), but the payment status came back as ` +
-                `"${tariqifyPayment.status}" and the policy status as "${policyStatus}". ` +
-                `Please confirm receipt on your side.`,
-            });
-          } catch (ticketError) {
-            console.error("Failed to file Tariqify ticket:", ticketError);
-          }
-
-          // Notify TopMe superadmins — an urgent task in the admin console
-          // so a human verifies before the customer is told they're covered.
-          await admin.from("admin_tasks").insert({
-            title: `Verify insurance payment — ${tariqifyPolicy.policy_number}`,
-            description:
-              `Wallet charged ${quote.currency} ${totalPremium.toFixed(2)} for ${product.name} ` +
-              `(${params.fullName}, ${params.nationalId}), but Tariqify returned payment status ` +
-              `"${tariqifyPayment.status}" / policy status "${policyStatus}". ` +
-              `A ticket was filed with Motions. Confirm the payment landed, then set the policy ` +
-              `back to active and the premium payment to recorded_with_provider.`,
-            priority: "urgent",
-            related_table: "insurance_policies",
-            related_id: localPolicy.id,
-          });
-        }
-
-        policies.push(localPolicy);
+        if (issued.pendingVerification) pendingVerification = true;
+        policies.push(issued.policy!);
       } catch (productError) {
         console.error(`Insurance purchase failed for ${productId}:`, productError);
         failures.push({ productId, error: productError instanceof Error ? productError.message : "Purchase failed" });
@@ -382,6 +458,391 @@ export async function purchaseInsurancePolicy(params: {
     console.error("Insurance purchase error:", error);
     return { error: error instanceof Error ? error.message : "Failed to purchase insurance" };
   }
+}
+
+/** Gateways insurance checkout can start — same rails as guest checkout. */
+export type InsuranceGateway = "paynow" | "stripe" | "ecocash";
+
+/** One priced cover line stored on the intent — recomputed server-side. */
+interface PricedLine {
+  productId: string;
+  dependants: DependantsPayload[];
+  headCount: number;
+  basePremium: number;
+  markupAmount: number;
+  totalPremium: number;
+  currency: string;
+}
+
+/**
+ * Start an insurance checkout on a real payment rail (Paynow hosted page,
+ * Stripe checkout, or EcoCash push). Mirrors startGuestCheckout: the whole
+ * order is re-priced server-side from live Tariqify quotes — the client's
+ * displayed total is never trusted — then the full application payload is
+ * stored on an intent so the webhook/redirect can finish the policy flow
+ * with nothing but the reference.
+ *
+ * The customer pays base premiums + markup + the gateway's own surcharge
+ * (calculateTopupFee — the rail's cut isn't recoverable from a wallet
+ * funding step here, same gap fixed for guest checkout 2026-09-12).
+ */
+export async function startInsuranceCheckout(params: {
+  gateway: InsuranceGateway;
+  selections: CoverSelectionInput[];
+  nationalId: string;
+  fullName: string;
+  phone?: string;
+  email?: string;
+  dateOfBirth?: string;
+  address?: string;
+  occupation?: string;
+  fieldValues?: Record<string, unknown>;
+}) {
+  const supabase = await createClient();
+  const admin = createAdminClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "Authentication required" };
+  }
+  if (!["paynow", "stripe", "ecocash"].includes(params.gateway)) {
+    return { error: "Unsupported payment method." };
+  }
+  if (params.gateway === "ecocash" && !params.phone) {
+    return { error: "EcoCash needs the mobile number to push the approval to." };
+  }
+
+  const seen = new Set<string>();
+  const deduped = params.selections.filter((s) => s.productId && (seen.has(s.productId) ? false : (seen.add(s.productId), true)));
+  if (deduped.length === 0) {
+    return { error: "Choose at least one cover to buy." };
+  }
+
+  try {
+    // Price every line server-side from a live quote — same math as the
+    // wallet path, so the gateway charge can never disagree with what the
+    // underwriter will be paid.
+    const lines: PricedLine[] = [];
+    for (const selection of deduped) {
+      const dependants = (selection.dependants ?? []).filter((d) => d.name.trim());
+      const { data: product } = await admin
+        .from("insurance_products")
+        .select("*")
+        .eq("id", selection.productId)
+        .eq("is_active", true)
+        .single();
+      if (!product) return { error: "One of the selected covers is no longer available." };
+      if (!product.is_purchasable) return { error: `${product.name} isn't available to buy yet.` };
+
+      const quote = await getQuote({
+        product_id: selection.productId,
+        national_id: params.nationalId,
+        field_values: {
+          ...params.fieldValues,
+          dependants: dependants.map((d) => ({
+            name: d.name.trim(),
+            relationship: d.relationship?.trim() || undefined,
+            dob: d.dob || undefined,
+            national_id: d.nationalId?.trim() || undefined,
+          })),
+        },
+      });
+      if (!quote.eligible) {
+        return { error: quote.message || `Not eligible for ${product.name}` };
+      }
+
+      const perHead = product.category !== "agriculture";
+      const headCount = perHead ? 1 + dependants.length : 1;
+      const basePremium = quote.base_premium * headCount;
+      const markupAmount = basePremium * (Number(product.markup_percent) / 100);
+      lines.push({
+        productId: selection.productId,
+        dependants: dependants.map((d) => ({
+          name: d.name.trim(),
+          relationship: d.relationship?.trim() || undefined,
+          dob: d.dob || undefined,
+          national_id: d.nationalId?.trim() || undefined,
+        })),
+        headCount,
+        basePremium,
+        markupAmount,
+        totalPremium: basePremium + markupAmount,
+        currency: quote.currency,
+      });
+    }
+
+    const baseTotal = lines.reduce((s, l) => s + l.basePremium, 0);
+    const markupTotal = lines.reduce((s, l) => s + l.markupAmount, 0);
+    const gatewayFee = calculateTopupFee(params.gateway, baseTotal + markupTotal);
+    const totalCharge = baseTotal + markupTotal + gatewayFee;
+
+    const reference = `INS-${randomUUID().slice(0, 8).toUpperCase()}`;
+    const { error: intentError } = await admin.from("insurance_checkout_intents").insert({
+      reference,
+      user_id: user.id,
+      application: {
+        selections: deduped,
+        nationalId: params.nationalId,
+        fullName: params.fullName,
+        phone: params.phone ?? null,
+        email: params.email ?? null,
+        dateOfBirth: params.dateOfBirth ?? null,
+        address: params.address ?? null,
+        occupation: params.occupation ?? null,
+        fieldValues: params.fieldValues ?? {},
+        lines,
+      },
+      amount: baseTotal,
+      fee: markupTotal + gatewayFee,
+      provider: params.gateway,
+    });
+    if (intentError) {
+      console.error("Insurance intent insert failed:", intentError);
+      return { error: "Couldn't start the checkout. Please try again." };
+    }
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const confirmUrl = `${appUrl}/pay/guest/confirm?reference=${encodeURIComponent(reference)}`;
+
+    if (params.gateway === "paynow") {
+      const result = await initiatePaynowPayment({
+        reference,
+        amount: totalCharge,
+        authEmail: params.email ?? "",
+        additionalInfo: "Insurance cover",
+        returnUrl: confirmUrl,
+      });
+      if (!result.ok || !result.browserUrl || !result.pollUrl) {
+        await admin.rpc("fail_insurance_checkout", { p_reference: reference });
+        return { error: result.error || "Paynow couldn't start the payment." };
+      }
+      await admin.from("insurance_checkout_intents").update({ meta: { pollUrl: result.pollUrl } }).eq("reference", reference);
+      return { success: true, gateway: "paynow", reference, redirectUrl: result.browserUrl };
+    }
+
+    if (params.gateway === "stripe") {
+      const session = await createGuestCheckoutSession({
+        amount: totalCharge,
+        reference,
+        serviceName: "Insurance cover",
+        guestEmail: params.email ?? "",
+        purpose: "insurance_payment",
+      });
+      if (!session.url) {
+        await admin.rpc("fail_insurance_checkout", { p_reference: reference });
+        return { error: "Stripe couldn't start the payment." };
+      }
+      return { success: true, gateway: "stripe", reference, redirectUrl: session.url };
+    }
+
+    // ecocash — push the approval prompt straight to the customer's phone.
+    const push = await initiateEcocashPush({ phone: params.phone!, amount: totalCharge, reference });
+    if (!push.ok || !push.endUserId) {
+      await admin.rpc("fail_insurance_checkout", { p_reference: reference });
+      return { error: push.error || "EcoCash couldn't send the approval prompt." };
+    }
+    await admin.from("insurance_checkout_intents").update({ meta: { endUserId: push.endUserId } }).eq("reference", reference);
+    return { success: true, gateway: "ecocash", reference };
+  } catch (error) {
+    console.error("startInsuranceCheckout error:", error);
+    return { error: error instanceof Error ? error.message : "Couldn't start the checkout." };
+  }
+}
+
+/**
+ * Finish an insurance gateway payment once the rail confirms it. The RPC
+ * does the atomic part (pending intent → transaction + completed intent);
+ * then the Tariqify policy flow runs per priced line — same shared helper
+ * as the wallet path, using the quote values locked in at checkout start
+ * (the money's already taken, so policies must be issued from those
+ * numbers, not re-quoted).
+ */
+export async function finalizeInsuranceCheckout(reference: string) {
+  const admin = createAdminClient();
+
+  const { data: tx, error: finalizeError } = await admin.rpc("finalize_insurance_checkout", { p_reference: reference });
+  if (finalizeError || !tx) {
+    // Already processed (webhook + redirect racing) is not an error.
+    const { data: status } = await admin.rpc("get_insurance_checkout", { p_reference: reference });
+    if (status?.status === "completed") return { success: true, alreadyProcessed: true };
+    console.error("finalize_insurance_checkout failed:", finalizeError);
+    return { error: "Payment couldn't be recorded." };
+  }
+
+  const { data: intent } = await admin
+    .from("insurance_checkout_intents")
+    .select("*")
+    .eq("reference", reference)
+    .single();
+  if (!intent) {
+    return { error: "Checkout record missing after payment." };
+  }
+  const app = intent.application as {
+    nationalId: string;
+    fullName: string;
+    phone?: string | null;
+    email?: string | null;
+    dateOfBirth?: string | null;
+    address?: string | null;
+    occupation?: string | null;
+    lines: PricedLine[];
+  };
+
+  try {
+    const tariqifyClient = await createOrGetClient({
+      national_id: app.nationalId,
+      full_name: app.fullName,
+      phone: app.phone ?? undefined,
+      email: app.email ?? undefined,
+      date_of_birth: app.dateOfBirth ?? undefined,
+      address: app.address ?? undefined,
+      occupation: app.occupation ?? undefined,
+    });
+
+    const { data: localClient } = await admin
+      .from("insurance_clients")
+      .upsert(
+        {
+          profile_id: intent.user_id,
+          national_id: app.nationalId,
+          full_name: app.fullName,
+          phone: app.phone,
+          tariqify_client_id: tariqifyClient.id,
+          raw: {
+            ...tariqifyClient.raw,
+            application: {
+              email: app.email ?? null,
+              date_of_birth: app.dateOfBirth ?? null,
+              address: app.address ?? null,
+              occupation: app.occupation ?? null,
+            },
+          },
+        },
+        { onConflict: "profile_id,national_id" }
+      )
+      .select()
+      .single();
+
+    if (!localClient) {
+      await admin.rpc("set_fulfillment_result", { p_transaction_id: tx.id, p_status: "failed", p_receipt: { message: "client record failed" } });
+      return { error: "Payment received but the client record failed — support has been notified." };
+    }
+
+    let issued = 0;
+    let pendingVerification = false;
+    for (const line of app.lines) {
+      try {
+        const { data: product } = await admin
+          .from("insurance_products")
+          .select("*")
+          .eq("id", line.productId)
+          .single();
+        if (!product) {
+          console.error(`Insurance finalize: product ${line.productId} missing`);
+          continue;
+        }
+        const result = await issuePolicyAfterPayment({
+          admin,
+          userId: intent.user_id,
+          localClientId: localClient.id,
+          tariqifyClientId: tariqifyClient.id,
+          nationalId: app.nationalId,
+          fullName: app.fullName,
+          product,
+          productId: line.productId,
+          dependants: line.dependants,
+          headCount: line.headCount,
+          basePremium: line.basePremium,
+          markupAmount: line.markupAmount,
+          totalPremium: line.totalPremium,
+          currency: line.currency,
+          transactionId: tx.id,
+        });
+        if (result.policy) issued++;
+        if (result.pendingVerification) pendingVerification = true;
+      } catch (lineError) {
+        console.error(`Insurance finalize failed for ${line.productId}:`, lineError);
+      }
+    }
+
+    await admin.rpc("set_fulfillment_result", {
+      p_transaction_id: tx.id,
+      p_status: issued > 0 ? "fulfilled" : "failed",
+      p_receipt: {
+        provider: "insurance",
+        message: issued > 0 ? `${issued}/${app.lines.length} policies issued${pendingVerification ? " (pending verification)" : ""}` : "policy issuance failed",
+      },
+    });
+
+    void logTransactionEvent(admin, {
+      transactionId: tx.id,
+      reference: tx.reference,
+      eventType: issued > 0 ? "fulfillment_success" : "fulfillment_failed",
+      message: `Insurance checkout via ${intent.provider} — ${issued}/${app.lines.length} policies issued.`,
+      meta: { reference, provider: intent.provider, lines: app.lines.length, issued },
+    });
+
+    revalidatePath("/account");
+    revalidatePath("/history");
+    return { success: true, issued, pendingVerification: pendingVerification || undefined };
+  } catch (error) {
+    console.error("finalizeInsuranceCheckout error:", error);
+    await admin.rpc("set_fulfillment_result", { p_transaction_id: tx.id, p_status: "failed", p_receipt: { message: "fulfillment error" } });
+    return { error: "Payment received but policy issuance failed — support has been notified." };
+  }
+}
+
+/**
+ * Poll the rail for an insurance intent's real status — the confirm page
+ * and the in-form EcoCash pending screen both call this. Paynow polls its
+ * pollUrl (applyPaynowResult routes insurance references back here);
+ * EcoCash checks the push status directly; Stripe is webhook-only so
+ * there's nothing to poll.
+ */
+export async function checkInsurancePaymentNow(reference: string) {
+  const admin = createAdminClient();
+  const { data: intent } = await admin
+    .from("insurance_checkout_intents")
+    .select("*")
+    .eq("reference", reference)
+    .single();
+  if (!intent || intent.status !== "pending") {
+    return { checked: true };
+  }
+
+  if (intent.provider === "paynow") {
+    const pollUrl = (intent.meta as { pollUrl?: string })?.pollUrl;
+    if (!pollUrl) return { checked: false };
+    const result = await checkPaynowStatus(pollUrl);
+    if (result.ok && result.status) {
+      await applyPaynowResult(reference, result.status, result.fields);
+    }
+    return { checked: true };
+  }
+
+  if (intent.provider === "ecocash") {
+    const endUserId = (intent.meta as { endUserId?: string })?.endUserId;
+    if (!endUserId) return { checked: false };
+    const status = await getEcocashStatus(endUserId, reference);
+    if (status === "completed") {
+      await finalizeInsuranceCheckout(reference);
+    } else if (status === "failed" || status === "cancelled") {
+      await admin.rpc("fail_insurance_checkout", { p_reference: reference });
+    }
+    return { checked: true };
+  }
+
+  return { checked: false };
+}
+
+/** Reference-gated status for the payer's own browser (confirm page). */
+export async function getInsuranceCheckoutStatus(reference: string) {
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("get_insurance_checkout", { p_reference: reference });
+  if (error) {
+    console.error("get_insurance_checkout failed:", error);
+    return { status: "not_found" };
+  }
+  return data as { status: string; transaction?: Record<string, unknown> };
 }
 
 /**

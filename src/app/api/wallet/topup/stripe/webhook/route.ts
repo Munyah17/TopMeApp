@@ -3,6 +3,7 @@ import { getStripe } from "@/lib/payments/stripe";
 import { createAdminClient } from "@/lib/supabase/server";
 import { notifyTopupResult } from "@/lib/email/notify";
 import { finalizeGuestCheckout } from "@/lib/payments/guest-checkout";
+import { finalizeInsuranceCheckout } from "@/lib/actions/insurance";
 import { recordIntegrationHealth } from "@/lib/integrations/health";
 import { logTransactionEvent } from "@/lib/transaction-events";
 import type Stripe from "stripe";
@@ -45,6 +46,16 @@ export async function POST(request: NextRequest) {
         // retries the delivery instead of considering it handled.
         console.error(`[stripe webhook] finalizeGuestCheckout failed for ${reference}:`, message);
         void logTransactionEvent(createAdminClient(), { reference, eventType: "fulfillment_failed", message: `Stripe webhook: finalizeGuestCheckout threw — ${message}` });
+        return NextResponse.json({ error: "finalize_failed" }, { status: 500 });
+      }
+      return NextResponse.json({ received: true });
+    }
+
+    if (reference && purpose === "insurance_payment") {
+      const result = await finalizeInsuranceCheckout(reference);
+      if (result.error) {
+        console.error(`[stripe webhook] finalizeInsuranceCheckout failed for ${reference}:`, result.error);
+        void logTransactionEvent(createAdminClient(), { reference, eventType: "fulfillment_failed", message: `Stripe webhook: finalizeInsuranceCheckout failed — ${result.error}` });
         return NextResponse.json({ error: "finalize_failed" }, { status: 500 });
       }
       return NextResponse.json({ received: true });

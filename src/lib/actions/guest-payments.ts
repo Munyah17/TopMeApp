@@ -196,7 +196,13 @@ export async function checkGuestPaymentNow(reference: string): Promise<{ checked
     .select("status, provider, meta")
     .eq("reference", reference)
     .single();
-  if (!intent) return { checked: false, error: "We couldn't find that payment." };
+  if (!intent) {
+    // Insurance checkouts share this confirm page — their intents live in
+    // their own table, so hand the manual check off to that flow.
+    const { checkInsurancePaymentNow } = await import("@/lib/actions/insurance");
+    const insurance = await checkInsurancePaymentNow(reference);
+    return insurance.checked ? insurance : { checked: false, error: "We couldn't find that payment." };
+  }
   if (intent.status !== "pending") return { checked: true };
   if (intent.provider !== "paynow") return { checked: false, error: "Manual check is only available for Paynow payments." };
 
@@ -214,6 +220,12 @@ export async function getGuestCheckoutStatus(reference: string) {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("get_guest_checkout", { p_reference: reference });
   if (error) throw new Error(friendlyError(error.message));
+  // Insurance checkouts share this confirm page — when the reference isn't
+  // a guest intent, try the insurance table before reporting not_found.
+  if ((data as { status?: string })?.status === "not_found") {
+    const { getInsuranceCheckoutStatus } = await import("@/lib/actions/insurance");
+    return getInsuranceCheckoutStatus(reference) as Promise<typeof data>;
+  }
   return data as
     | { status: "not_found" | "pending" | "failed" }
     | {

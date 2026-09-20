@@ -1,15 +1,21 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/icons";
 import type { InsuranceProduct, InsuranceSignupField } from "@/lib/insurance/types";
-import { purchaseInsurancePolicy } from "@/lib/actions/insurance";
+import { purchaseInsurancePolicy, startInsuranceCheckout, checkInsurancePaymentNow, getInsuranceCheckoutStatus } from "@/lib/actions/insurance";
 import { displayName } from "@/lib/insurance/types";
+import { PaymentMethodSection, type PaymentBanners, type PaymentMethod } from "@/components/payment-flow/flow-shared";
+import { calculateGatewaySurcharge } from "@/lib/fees";
 
 interface InsurancePurchaseFormProps {
   product: InsuranceProduct;
   /** Every purchasable product — powers the "add another cover" picker. */
   allProducts: InsuranceProduct[];
+  /** Logged-in wallet balance, for the wallet method button. */
+  walletBalance: number;
+  /** Admin-uploaded gateway banner images (see /admin/settings). */
+  banners?: PaymentBanners;
 }
 
 /** One dependant on a cover — mirrors the Motions /apply form exactly
@@ -57,8 +63,14 @@ const labelStyle: React.CSSProperties = {
   marginBottom: 8,
 };
 
-export default function InsurancePurchaseForm({ product, allProducts }: InsurancePurchaseFormProps) {
-  const [step, setStep] = useState<"details" | "confirm" | "pending">("details");
+export default function InsurancePurchaseForm({ product, allProducts, walletBalance, banners }: InsurancePurchaseFormProps) {
+  const [step, setStep] = useState<"details" | "confirm" | "pending" | "gateway-pending">("details");
+  // null = customer hasn't picked yet — same rule as every other flow:
+  // no default, no pre-selection.
+  const [method, setMethod] = useState<PaymentMethod | null>(null);
+  // Set once a gateway checkout is initiated — the EcoCash pending screen
+  // polls this reference until the push is approved or fails.
+  const [gatewayReference, setGatewayReference] = useState<string | null>(null);
   // The cover picker starts on the product whose page this is; "+ Add
   // another cover" appends more rows so one application can buy several.
   // Each row carries its own dependants, exactly like motions.co.zw/apply.
@@ -102,8 +114,43 @@ export default function InsurancePurchaseForm({ product, allProducts }: Insuranc
 
   const premiumTotal = lines.reduce((sum, l) => sum + l.base, 0);
   const feeTotal = lines.reduce((sum, l) => sum + l.fee, 0);
-  const grandTotal = premiumTotal + feeTotal;
+  // Gateways charge their own surcharge on top of premium+markup — same
+  // rule as every other flow (the rail's cut isn't recoverable from a
+  // wallet funding step when the customer pays directly).
+  const gatewayFee = calculateGatewaySurcharge(method, premiumTotal + feeTotal);
+  const grandTotal = premiumTotal + feeTotal + gatewayFee;
   const currency = selectedProducts[0]?.currency ?? product.currency;
+
+  // EcoCash has no redirect — the approval prompt goes to the customer's
+  // phone and this screen polls the intent until it resolves.
+  const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => {
+    if (step !== "gateway-pending" || !gatewayReference) return;
+    let stopped = false;
+    pollTimer.current = setInterval(async () => {
+      if (stopped) return;
+      try {
+        await checkInsurancePaymentNow(gatewayReference);
+        const status = await getInsuranceCheckoutStatus(gatewayReference);
+        if (status.status === "completed") {
+          stopped = true;
+          if (pollTimer.current) clearInterval(pollTimer.current);
+          setStep("confirm");
+        } else if (status.status === "failed") {
+          stopped = true;
+          if (pollTimer.current) clearInterval(pollTimer.current);
+          setStep("details");
+          setError("The EcoCash payment didn't go through — try again or pick another method.");
+        }
+      } catch {
+        // transient poll failure — keep polling
+      }
+    }, 4000);
+    return () => {
+      stopped = true;
+      if (pollTimer.current) clearInterval(pollTimer.current);
+    };
+  }, [step, gatewayReference]);
 
   function addProductRow() {
     const firstUnused = purchasable.find((p) => !selectedIds.includes(p.id));
@@ -156,11 +203,47 @@ export default function InsurancePurchaseForm({ product, allProducts }: Insuranc
     else if (!ZW_MOBILE.test(normalizedPhone)) errs.phone = "Enter a Zimbabwe mobile number, e.g. +263 78 008 6178.";
     if (!email.trim()) errs.email = "Enter your email address.";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) errs.email = "That doesn't look like a valid email address.";
+    if (!method) errs.method = "Choose how you'd like to pay.";
     setFieldErrors(errs);
     if (Object.values(errs).some(Boolean)) return;
+    if (!method) return; // narrowing — errs above already covers this
 
     setLoading(true);
     try {
+      // Gateway path — Paynow/Stripe redirect to their hosted page, EcoCash
+      // pushes an approval prompt to the phone and this form polls.
+      if (method !== "wallet") {
+        const result = await startInsuranceCheckout({
+          gateway: method,
+          selections: selections
+            .filter((s) => s.productId)
+            .map((s) => ({
+              productId: s.productId,
+              dependants: s.dependants.filter((d) => d.name.trim()),
+            })),
+          nationalId: cleanNationalId,
+          fullName: fullName.trim(),
+          phone: normalizedPhone || undefined,
+          email: email.trim() || undefined,
+          dateOfBirth: dob || undefined,
+          address: address.trim() || undefined,
+          occupation: occupation.trim() || undefined,
+          fieldValues,
+        });
+        if (result.error || !result.success) {
+          setError(result.error || "Couldn't start the payment. Please try again.");
+          return;
+        }
+        if (result.redirectUrl) {
+          window.location.href = result.redirectUrl;
+          return;
+        }
+        // ecocash — wait for the phone approval on this screen.
+        setGatewayReference(result.reference ?? null);
+        setStep("gateway-pending");
+        return;
+      }
+
       const result = await purchaseInsurancePolicy({
         selections: selections
           .filter((s) => s.productId)
@@ -229,6 +312,44 @@ export default function InsurancePurchaseForm({ product, allProducts }: Insuranc
 
   const fieldError = (key: string) =>
     fieldErrors[key] ? <div style={{ color: "var(--error)", fontSize: 12, marginTop: 4 }}>{fieldErrors[key]}</div> : null;
+
+  if (step === "gateway-pending") {
+    return (
+      <div style={{ textAlign: "center", padding: "40px 20px" }}>
+        <div
+          style={{
+            width: 80,
+            height: 80,
+            borderRadius: 24,
+            background: "var(--accent-bg)",
+            color: "var(--accent)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            margin: "0 auto 20px",
+          }}
+        >
+          <Icon name="phone" size={36} stroke={1.8} />
+        </div>
+        <h2 style={{ fontSize: 19, marginBottom: 8 }}>Approve on Your Phone</h2>
+        <p className="muted" style={{ fontSize: 13, lineHeight: 1.5, marginBottom: 8 }}>
+          An EcoCash approval prompt was sent to <strong>{phone}</strong>. Enter your PIN to approve
+          the {currency} {grandTotal.toFixed(2)} payment — this screen updates itself.
+        </p>
+        <p className="muted" style={{ fontSize: 12 }}>
+          Reference {gatewayReference}
+        </p>
+        <button
+          type="button"
+          onClick={() => { setStep("details"); setGatewayReference(null); }}
+          className="btn btn-block"
+          style={{ marginTop: 16, background: "var(--card-bg)", border: "1px solid var(--border)" }}
+        >
+          Cancel
+        </button>
+      </div>
+    );
+  }
 
   if (step === "pending") {
     return (
@@ -507,7 +628,7 @@ export default function InsurancePurchaseForm({ product, allProducts }: Insuranc
             <label style={labelStyle}>National ID *</label>
             <input
               type="text"
-              placeholder="e.g. 63-1234567A89"
+              placeholder="e.g. 631234567A00"
               value={nationalId}
               onChange={(e) => { setNationalId(e.target.value); if (fieldErrors.nationalId) setFieldErrors((p) => ({ ...p, nationalId: "" })); }}
               style={{ ...inputStyle, borderColor: fieldErrors.nationalId ? "var(--error)" : "var(--border)" }}
@@ -585,28 +706,24 @@ export default function InsurancePurchaseForm({ product, allProducts }: Insuranc
           ))
         )}
 
-        {/* ---- Payment method ---- */}
+        {/* ---- Payment method — same picker as every other flow: wallet
+             plus whichever gateways are enabled (Paynow/Stripe today,
+             EcoCash once live merchant credentials land). ---- */}
         <div>
-          <label style={labelStyle}>How would you like to pay? *</label>
-          <div
-            className="row gap-2"
-            style={{
-              border: "1.5px solid var(--accent)",
-              borderRadius: 12,
-              padding: "14px 16px",
-              background: "var(--accent-bg)",
-              alignItems: "center",
-            }}
-          >
-            <div className="ibadge round" style={{ width: 36, height: 36, background: "var(--accent)", color: "#fff", flexShrink: 0 }}>
-              <Icon name="wallet" size={17} stroke={2} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 700, fontSize: 13.5 }}>TopMe Wallet</div>
-              <div className="muted" style={{ fontSize: 11.5 }}>Charged instantly from your wallet balance.</div>
-            </div>
-            <Icon name="check" size={18} stroke={2.4} />
-          </div>
+          <PaymentMethodSection
+            showWallet
+            walletBalance={walletBalance}
+            banners={banners}
+            method={method}
+            setMethod={(m) => { setMethod(m); if (fieldErrors.method) setFieldErrors((p) => ({ ...p, method: "" })); }}
+            guestEmail={email}
+            setGuestEmail={setEmail}
+            guestPhone={phone}
+            setGuestPhone={setPhone}
+          />
+          {fieldErrors.method && (
+            <div style={{ color: "var(--error)", fontSize: 12, marginTop: 6 }}>{fieldErrors.method}</div>
+          )}
         </div>
 
         {error && (
@@ -652,6 +769,12 @@ export default function InsurancePurchaseForm({ product, allProducts }: Insuranc
             <span className="muted">Processing fee:</span>
             <span>{currency} {feeTotal.toFixed(2)}</span>
           </div>
+          {gatewayFee > 0 && (
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginTop: 4 }}>
+              <span className="muted">{method === "paynow" ? "Paynow" : method === "stripe" ? "Card" : "EcoCash"} fee:</span>
+              <span>{currency} {gatewayFee.toFixed(2)}</span>
+            </div>
+          )}
           <div
             style={{
               display: "flex",

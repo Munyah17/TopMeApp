@@ -47,6 +47,8 @@ export async function createGuestCheckoutSession(opts: {
   reference: string;
   serviceName: string;
   guestEmail: string;
+  /** Webhook routing key — "guest_service_payment" (default) or "insurance_payment". */
+  purpose?: string;
 }) {
   const stripe = getStripe();
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
@@ -65,7 +67,7 @@ export async function createGuestCheckoutSession(opts: {
         quantity: 1,
       },
     ],
-    metadata: { reference: opts.reference, purpose: "guest_service_payment" },
+    metadata: { reference: opts.reference, purpose: opts.purpose ?? "guest_service_payment" },
     success_url: `${appUrl}/pay/guest/confirm?reference=${encodeURIComponent(opts.reference)}`,
     cancel_url: `${appUrl}/pay/guest/confirm?reference=${encodeURIComponent(opts.reference)}&status=cancelled`,
   });
