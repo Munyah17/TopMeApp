@@ -20,7 +20,7 @@ export function StaffMemberDetail({ member }: { member: TeamMember }) {
     <div>
       <div className="card card-pad mb-3">
         <div className="row gap-2">
-          <div className="ibadge round" style={{ width: 46, height: 46, background: "#F1F4F9", color: "var(--text-soft)", fontWeight: 700 }}>
+          <div className="ibadge round" style={{ width: 46, height: 46, background: "var(--muted)", color: "var(--text-soft)", fontWeight: 700 }}>
             {(member.name || member.invited_email).slice(0, 2).toUpperCase()}
           </div>
           <div style={{ flex: 1 }}>

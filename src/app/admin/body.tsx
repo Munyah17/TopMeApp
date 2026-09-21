@@ -70,7 +70,7 @@ export async function AdminOverviewBody({ basePath }: { basePath: string }) {
   const top = Array.from(byService.entries())
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5)
-    .map(([id, count]) => ({ id, count, name: serviceById.get(id)?.name || id, color: serviceById.get(id)?.color || "#94A3B8" }));
+    .map(([id, count]) => ({ id, count, name: serviceById.get(id)?.name || id, color: serviceById.get(id)?.color || "var(--text-faint)" }));
   const topTotal = top.reduce((s, t) => s + t.count, 0) || 1;
 
   const prevWeekFailed = tx.filter((t) => t.status === "failed").length;

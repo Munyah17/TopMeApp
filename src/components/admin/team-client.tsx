@@ -100,7 +100,7 @@ function MemberCard({ member, basePath }: { member: TeamMember; basePath: string
     >
       <div
         className="ibadge round"
-        style={{ width: 38, height: 38, background: "#F1F4F9", color: "var(--text-soft)", fontSize: 12, fontWeight: 700, flexShrink: 0 }}
+        style={{ width: 38, height: 38, background: "var(--muted)", color: "var(--text-soft)", fontSize: 12, fontWeight: 700, flexShrink: 0 }}
       >
         {(member.name || member.invited_email).slice(0, 2).toUpperCase()}
       </div>

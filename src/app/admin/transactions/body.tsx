@@ -41,7 +41,7 @@ export async function TransactionsBody({
             display: "flex",
             alignItems: "center",
             gap: 8,
-            background: "#fff",
+            background: "var(--input-bg)",
             border: "1.5px solid var(--border)",
             borderRadius: 14,
             padding: "11px 14px",

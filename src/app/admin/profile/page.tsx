@@ -20,8 +20,8 @@ export default async function AdminProfilePage() {
           style={{
             display: "inline-block",
             marginTop: 8,
-            background: profile.role === "superadmin" ? "#F3EEFE" : "#EAF8FF",
-            color: profile.role === "superadmin" ? "#8B5CF6" : "var(--blue)",
+            background: profile.role === "superadmin" ? "var(--adm-purple-bg)" : "var(--blue-50)",
+            color: profile.role === "superadmin" ? "var(--adm-purple)" : "var(--blue)",
             fontSize: 10,
             fontWeight: 800,
             padding: "4px 9px",

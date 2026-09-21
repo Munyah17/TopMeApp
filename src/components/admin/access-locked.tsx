@@ -17,7 +17,7 @@ export function AccessLocked({ title, message }: { title: string; message: strin
               width: 74,
               height: 74,
               borderRadius: 22,
-              background: "#F1F4F9",
+              background: "var(--muted)",
               color: "var(--text-faint)",
               display: "flex",
               alignItems: "center",

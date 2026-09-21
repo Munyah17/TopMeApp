@@ -96,7 +96,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           <div style={{ fontWeight: 800, fontSize: 18, marginTop: 2 }}>{fmt(feeRevenue)}</div>
         </div>
         <div className="card card-pad" style={{ flex: "1 1 140px" }}>
-          <div className="ibadge round" style={{ width: 30, height: 30, background: "#FEF6E7", color: "var(--warning)" }}><Icon name="zap" size={15} stroke={2} /></div>
+          <div className="ibadge round" style={{ width: 30, height: 30, background: "var(--warning-bg)", color: "var(--warning)" }}><Icon name="zap" size={15} stroke={2} /></div>
           <div className="muted mt-2">Transactions</div>
           <div style={{ fontWeight: 800, fontSize: 18, marginTop: 2 }}>{successTx.length}</div>
         </div>
@@ -104,7 +104,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
       <div className="row gap-2 mt-2" style={{ flexWrap: "wrap" }}>
         <div className="card card-pad" style={{ flex: "1 1 140px" }}>
-          <div className="ibadge round" style={{ width: 30, height: 30, background: "#FDECEC", color: "var(--error)" }}><Icon name="refresh" size={15} stroke={2} /></div>
+          <div className="ibadge round" style={{ width: 30, height: 30, background: "var(--error-bg)", color: "var(--error)" }}><Icon name="refresh" size={15} stroke={2} /></div>
           <div className="muted mt-2">Refunds issued</div>
           <div style={{ fontWeight: 800, fontSize: 18, marginTop: 2, color: "var(--error)" }}>{fmt(refundTotal)}</div>
         </div>
@@ -114,12 +114,12 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           <div style={{ fontWeight: 800, fontSize: 18, marginTop: 2 }}>{fmt(adjustmentTotal)}</div>
         </div>
         <div className="card card-pad" style={{ flex: "1 1 140px" }}>
-          <div className="ibadge round" style={{ width: 30, height: 30, background: "#FEF6E7", color: "var(--warning)" }}><Icon name="shield" size={15} stroke={2} /></div>
+          <div className="ibadge round" style={{ width: 30, height: 30, background: "var(--warning-bg)", color: "var(--warning)" }}><Icon name="shield" size={15} stroke={2} /></div>
           <div className="muted mt-2">Disputes open</div>
           <div style={{ fontWeight: 800, fontSize: 18, marginTop: 2, color: disputesOpen ? "var(--warning)" : undefined }}>{disputesOpen}</div>
         </div>
         <div className="card card-pad" style={{ flex: "1 1 140px" }}>
-          <div className="ibadge round" style={{ width: 30, height: 30, background: "#FEF6E7", color: "var(--warning)" }}><Icon name="headset" size={15} stroke={2} /></div>
+          <div className="ibadge round" style={{ width: 30, height: 30, background: "var(--warning-bg)", color: "var(--warning)" }}><Icon name="headset" size={15} stroke={2} /></div>
           <div className="muted mt-2">Tickets open</div>
           <div style={{ fontWeight: 800, fontSize: 18, marginTop: 2, color: ticketsOpen ? "var(--warning)" : undefined }}>{ticketsOpen}</div>
         </div>

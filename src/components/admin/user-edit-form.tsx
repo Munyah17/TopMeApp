@@ -127,7 +127,7 @@ export function UserEditForm({
         {avatar ? (
           <img src={avatar} alt="" style={{ width: 52, height: 52, borderRadius: 14, objectFit: "cover" }} />
         ) : (
-          <div className="ibadge round" style={{ width: 52, height: 52, background: "#F1F4F9", color: "var(--text-soft)", fontWeight: 700 }}>
+          <div className="ibadge round" style={{ width: 52, height: 52, background: "var(--muted)", color: "var(--text-soft)", fontWeight: 700 }}>
             {(name || "?").slice(0, 2).toUpperCase()}
           </div>
         )}

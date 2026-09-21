@@ -120,7 +120,7 @@ function InsuranceProductRow({ product, isSuperAdmin }: { product: InsuranceProd
         </div>
       </div>
       {!product.is_purchasable && (
-        <span style={{ fontSize: 10, fontWeight: 800, color: "var(--warning)", background: "#FEF6E7", padding: "3px 8px", borderRadius: 7, flexShrink: 0 }}>
+        <span style={{ fontSize: 10, fontWeight: 800, color: "var(--warning)", background: "var(--warning-bg)", padding: "3px 8px", borderRadius: 7, flexShrink: 0 }}>
           NOT PURCHASABLE
         </span>
       )}

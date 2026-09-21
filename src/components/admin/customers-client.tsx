@@ -19,7 +19,7 @@ function CustomerRow({ customer }: { customer: Profile }) {
 
   return (
     <div className="row gap-2" style={{ padding: "12px 16px", borderBottom: "1px solid var(--border)", opacity: customer.is_suspended ? 0.6 : 1 }}>
-      <div className="ibadge round" style={{ width: 36, height: 36, background: "#F1F4F9", color: "var(--text-soft)", fontSize: 12, fontWeight: 700 }}>
+      <div className="ibadge round" style={{ width: 36, height: 36, background: "var(--muted)", color: "var(--text-soft)", fontSize: 12, fontWeight: 700 }}>
         {(customer.full_name || customer.phone || customer.email || "?").slice(0, 2).toUpperCase()}
       </div>
       <Link href={`${basePath}/users/${customer.id}`} style={{ flex: 1, minWidth: 0, textDecoration: "none", color: "inherit" }}>
@@ -34,7 +34,7 @@ function CustomerRow({ customer }: { customer: Profile }) {
         </div>
       )}
       {customer.is_suspended && (
-        <span style={{ background: "#FDECEC", color: "var(--error)", fontSize: 11, fontWeight: 700, padding: "4px 9px", borderRadius: 8 }}>
+        <span style={{ background: "var(--error-bg)", color: "var(--error)", fontSize: 11, fontWeight: 700, padding: "4px 9px", borderRadius: 8 }}>
           Suspended
         </span>
       )}

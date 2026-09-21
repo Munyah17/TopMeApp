@@ -47,7 +47,7 @@ export async function UserDetailBody({ id, basePath }: { id: string; basePath: s
           {target.avatar_url ? (
             <img src={target.avatar_url} alt="" style={{ width: 46, height: 46, borderRadius: 14, objectFit: "cover" }} />
           ) : (
-            <div className="ibadge round" style={{ width: 46, height: 46, background: "#F1F4F9", color: "var(--text-soft)", fontWeight: 700 }}>
+            <div className="ibadge round" style={{ width: 46, height: 46, background: "var(--muted)", color: "var(--text-soft)", fontWeight: 700 }}>
               {(target.full_name || target.phone || target.email || "?").slice(0, 2).toUpperCase()}
             </div>
           )}
@@ -59,8 +59,8 @@ export async function UserDetailBody({ id, basePath }: { id: string; basePath: s
           </div>
           <span
             style={{
-              background: target.role === "superadmin" ? "#F3EEFE" : target.role === "admin" ? "#EAF8FF" : "#F1F4F9",
-              color: target.role === "superadmin" ? "#8B5CF6" : target.role === "admin" ? "var(--blue)" : "var(--text-soft)",
+              background: target.role === "superadmin" ? "var(--adm-purple-bg)" : target.role === "admin" ? "var(--blue-50)" : "var(--muted)",
+              color: target.role === "superadmin" ? "var(--adm-purple)" : target.role === "admin" ? "var(--blue)" : "var(--text-soft)",
               fontSize: 10,
               fontWeight: 800,
               padding: "4px 9px",

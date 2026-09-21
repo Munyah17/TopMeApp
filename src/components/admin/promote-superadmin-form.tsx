@@ -13,15 +13,15 @@ export function PromoteSuperadminForm({ userId, email }: { userId: string; email
 
   if (!open) {
     return (
-      <button className="btn btn-secondary btn-block" style={{ color: "#8B5CF6" }} onClick={() => setOpen(true)}>
+      <button className="btn btn-secondary btn-block" style={{ color: "var(--adm-purple)" }} onClick={() => setOpen(true)}>
         Promote to Super Admin
       </button>
     );
   }
 
   return (
-    <div className="card card-pad" style={{ borderColor: "#8B5CF6" }}>
-      <div style={{ fontWeight: 700, color: "#8B5CF6" }}>Promote to Super Admin</div>
+    <div className="card card-pad" style={{ borderColor: "var(--adm-purple)" }}>
+      <div style={{ fontWeight: 700, color: "var(--adm-purple)" }}>Promote to Super Admin</div>
       <div className="muted mt-1" style={{ fontSize: 12, lineHeight: 1.5 }}>
         This is the highest-privilege action in the system — full access to everything, no permission gate. Retype
         their email to confirm.
@@ -35,7 +35,7 @@ export function PromoteSuperadminForm({ userId, email }: { userId: string; email
       <div className="row gap-2 mt-3">
         <button
           className="btn btn-primary"
-          style={{ flex: 1, background: "#8B5CF6" }}
+          style={{ flex: 1, background: "var(--adm-purple)" }}
           disabled={pending || confirmEmail.trim().toLowerCase() !== email.trim().toLowerCase()}
           onClick={() =>
             startTransition(async () => {
