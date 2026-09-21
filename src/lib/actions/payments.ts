@@ -7,6 +7,7 @@ import { validateBillAccount as vitalpayValidateBillAccount, validateElectricity
 import { isFeatureEnabled } from "@/lib/data/flags";
 import { findProfileByPhone } from "@/lib/data/queries";
 import { sendEmail } from "@/lib/email/client";
+import { alertTransaction } from "@/lib/email/transaction-alerts";
 import { giftRedeemedEmail, giftSentEmail, moneyReceivedEmail, moneySentEmail, paymentReceiptEmail } from "@/lib/email/templates";
 import { logTransactionEvent } from "@/lib/transaction-events";
 import { resolveVerifiedAmount } from "@/lib/pricing";
@@ -104,6 +105,16 @@ export async function payService(input: PayServiceInput) {
   });
 
   if (error) {
+    void alertTransaction(admin, {
+      outcome: "failed",
+      reference: `wallet_pay:${input.serviceId}`,
+      service: input.serviceName,
+      amount: verifiedAmount,
+      recipient: input.recipient,
+      method: "wallet",
+      customer: user.email ?? user.id,
+      detail: error.message,
+    });
     throw new Error(friendlyError(error.message));
   }
 
@@ -113,6 +124,19 @@ export async function payService(input: PayServiceInput) {
     reference: tx.reference,
     eventType: "payment_confirmed",
     message: `Paid from wallet balance — $${verifiedAmount.toFixed(2)}.`,
+  });
+  // Money moved — the transaction succeeded even if delivery is still
+  // pending (async providers confirm via webhook, which alerts separately
+  // on failure).
+  void alertTransaction(admin, {
+    outcome: "success",
+    reference: tx.reference,
+    service: input.serviceName,
+    amount: tx.amount,
+    fee: tx.fee,
+    recipient: tx.recipient_identifier,
+    method: "wallet",
+    customer: user.email ?? user.id,
   });
 
   const fulfillmentInput = {
@@ -164,6 +188,17 @@ export async function payService(input: PayServiceInput) {
   // money back now — automatically for a small wallet failure, or into the
   // staff approval queue otherwise (see 2026-09-10-fulfilment-auto-refund).
   if (fulfillmentResult.status === "failed") {
+    void alertTransaction(admin, {
+      outcome: "failed",
+      reference: tx.reference,
+      service: input.serviceName,
+      amount: tx.amount,
+      fee: tx.fee,
+      recipient: tx.recipient_identifier,
+      method: "wallet",
+      customer: user.email ?? user.id,
+      detail: `Delivery failed after payment — ${fulfillmentResult.message || provider.name}`,
+    });
     const { recordFailedFulfilmentRefund } = await import("@/lib/payments/refunds");
     const refund = await recordFailedFulfilmentRefund(admin, {
       transactionId: tx.id,

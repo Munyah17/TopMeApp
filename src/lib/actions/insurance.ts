@@ -12,6 +12,7 @@ import { applyPaynowResult } from "@/lib/payments/paynow-result";
 import { createGuestCheckoutSession } from "@/lib/payments/stripe";
 import { initiateEcocashPush, getEcocashStatus } from "@/lib/payments/ecocash";
 import { logTransactionEvent } from "@/lib/transaction-events";
+import { alertTransaction } from "@/lib/email/transaction-alerts";
 import { revalidatePath } from "next/cache";
 
 type Admin = ReturnType<typeof createAdminClient>;
@@ -319,6 +320,10 @@ export async function purchaseInsurancePolicy(params: {
       // Named dependants only — blank rows the customer added but never
       // filled in don't count toward the per-head price.
       const dependants = (selection.dependants ?? []).filter((d) => d.name.trim());
+      // Set only once wallet_pay has debited — lets the catch below tell a
+      // "paid but issuance threw" failure (ops must be alerted) apart from a
+      // pre-payment one (no money moved, nothing to report).
+      let charged: { reference: string; productName: string; basePremium: number; markupAmount: number } | null = null;
       try {
         // 1. Get product details
         const { data: product, error: productError } = await admin
@@ -396,9 +401,20 @@ export async function purchaseInsurancePolicy(params: {
 
         if (paymentError) {
           console.error("Wallet payment error:", paymentError);
+          void alertTransaction(admin, {
+            outcome: "failed",
+            reference: `wallet_pay:insurance-${productId}`,
+            service: `Insurance — ${product.name}`,
+            amount: totalPremium,
+            recipient: params.nationalId,
+            method: "wallet",
+            customer: user.email ?? user.id,
+            detail: paymentError.message,
+          });
           failures.push({ productId, error: paymentError.message || "Payment failed" });
           continue;
         }
+        charged = { reference: transaction.reference, productName: String(product.name ?? productId), basePremium, markupAmount };
 
         // 5-9. Policy creation → payment recording → dual confirmation —
         // shared with the gateway path (see issuePolicyAfterPayment).
@@ -426,13 +442,49 @@ export async function purchaseInsurancePolicy(params: {
         });
 
         if (issued.error) {
+          void alertTransaction(admin, {
+            outcome: "failed",
+            reference: transaction.reference,
+            service: `Insurance — ${product.name}`,
+            amount: basePremium,
+            fee: markupAmount,
+            recipient: params.nationalId,
+            method: "wallet",
+            customer: user.email ?? user.id,
+            detail: `Paid but policy issuance failed — ${issued.error}`,
+          });
           failures.push({ productId, error: issued.error });
           continue;
         }
+        // Wallet debited + policy issued — the transaction succeeded.
+        void alertTransaction(admin, {
+          outcome: "success",
+          reference: transaction.reference,
+          service: `Insurance — ${product.name}`,
+          amount: basePremium,
+          fee: markupAmount,
+          recipient: params.nationalId,
+          method: "wallet",
+          customer: user.email ?? user.id,
+          detail: issued.pendingVerification ? "Issued — underwriter confirmation pending" : null,
+        });
         if (issued.pendingVerification) pendingVerification = true;
         policies.push(issued.policy!);
       } catch (productError) {
         console.error(`Insurance purchase failed for ${productId}:`, productError);
+        if (charged) {
+          void alertTransaction(admin, {
+            outcome: "failed",
+            reference: charged.reference,
+            service: `Insurance — ${charged.productName}`,
+            amount: charged.basePremium,
+            fee: charged.markupAmount,
+            recipient: params.nationalId,
+            method: "wallet",
+            customer: user.email ?? user.id,
+            detail: `Paid but policy issuance threw — ${productError instanceof Error ? productError.message : "unknown error"}`,
+          });
+        }
         failures.push({ productId, error: productError instanceof Error ? productError.message : "Purchase failed" });
       }
     }
@@ -612,7 +664,7 @@ export async function startInsuranceCheckout(params: {
         returnUrl: confirmUrl,
       });
       if (!result.ok || !result.browserUrl || !result.pollUrl) {
-        await admin.rpc("fail_insurance_checkout", { p_reference: reference });
+        await failInsuranceCheckout(reference, `Paynow initiation failed — ${result.error ?? "no redirect"}`);
         return { error: result.error || "Paynow couldn't start the payment." };
       }
       await admin.from("insurance_checkout_intents").update({ meta: { pollUrl: result.pollUrl } }).eq("reference", reference);
@@ -628,7 +680,7 @@ export async function startInsuranceCheckout(params: {
         purpose: "insurance_payment",
       });
       if (!session.url) {
-        await admin.rpc("fail_insurance_checkout", { p_reference: reference });
+        await failInsuranceCheckout(reference, "Stripe initiation failed — no checkout URL.");
         return { error: "Stripe couldn't start the payment." };
       }
       return { success: true, gateway: "stripe", reference, redirectUrl: session.url };
@@ -637,7 +689,7 @@ export async function startInsuranceCheckout(params: {
     // ecocash — push the approval prompt straight to the customer's phone.
     const push = await initiateEcocashPush({ phone: params.phone!, amount: totalCharge, reference });
     if (!push.ok || !push.endUserId) {
-      await admin.rpc("fail_insurance_checkout", { p_reference: reference });
+      await failInsuranceCheckout(reference, `EcoCash push failed — ${push.error ?? "no endUserId"}`);
       return { error: push.error || "EcoCash couldn't send the approval prompt." };
     }
     await admin.from("insurance_checkout_intents").update({ meta: { endUserId: push.endUserId } }).eq("reference", reference);
@@ -687,6 +739,19 @@ export async function finalizeInsuranceCheckout(reference: string) {
     lines: PricedLine[];
   };
 
+  // Money captured at the gateway — the transaction succeeded even if
+  // policy issuance below hits a snag (that alerts separately as failed).
+  void alertTransaction(admin, {
+    outcome: "success",
+    reference: tx.reference,
+    service: "Insurance cover",
+    amount: tx.amount,
+    fee: tx.fee,
+    recipient: app.nationalId,
+    method: intent.provider,
+    customer: app.email ?? intent.user_id,
+  });
+
   try {
     const tariqifyClient = await createOrGetClient({
       national_id: app.nationalId,
@@ -724,6 +789,17 @@ export async function finalizeInsuranceCheckout(reference: string) {
 
     if (!localClient) {
       await admin.rpc("set_fulfillment_result", { p_transaction_id: tx.id, p_status: "failed", p_receipt: { message: "client record failed" } });
+      void alertTransaction(admin, {
+        outcome: "failed",
+        reference: tx.reference,
+        service: "Insurance cover",
+        amount: tx.amount,
+        fee: tx.fee,
+        recipient: app.nationalId,
+        method: intent.provider,
+        customer: app.email ?? intent.user_id,
+        detail: "Paid but the client record failed.",
+      });
       return { error: "Payment received but the client record failed — support has been notified." };
     }
 
@@ -780,6 +856,19 @@ export async function finalizeInsuranceCheckout(reference: string) {
       message: `Insurance checkout via ${intent.provider} — ${issued}/${app.lines.length} policies issued.`,
       meta: { reference, provider: intent.provider, lines: app.lines.length, issued },
     });
+    if (issued === 0) {
+      void alertTransaction(admin, {
+        outcome: "failed",
+        reference: tx.reference,
+        service: "Insurance cover",
+        amount: tx.amount,
+        fee: tx.fee,
+        recipient: app.nationalId,
+        method: intent.provider,
+        customer: app.email ?? intent.user_id,
+        detail: `Paid via ${intent.provider} but no policies were issued.`,
+      });
+    }
 
     revalidatePath("/account");
     revalidatePath("/history");
@@ -787,8 +876,46 @@ export async function finalizeInsuranceCheckout(reference: string) {
   } catch (error) {
     console.error("finalizeInsuranceCheckout error:", error);
     await admin.rpc("set_fulfillment_result", { p_transaction_id: tx.id, p_status: "failed", p_receipt: { message: "fulfillment error" } });
+    void alertTransaction(admin, {
+      outcome: "failed",
+      reference: tx.reference,
+      service: "Insurance cover",
+      amount: tx.amount,
+      fee: tx.fee,
+      recipient: app.nationalId,
+      method: intent.provider,
+      customer: app.email ?? intent.user_id,
+      detail: `Paid but policy issuance threw — ${error instanceof Error ? error.message : "unknown error"}`,
+    });
     return { error: "Payment received but policy issuance failed — support has been notified." };
   }
+}
+
+/**
+ * Mark an insurance intent failed + alert ops. Centralised so every rail
+ * (initiation errors, EcoCash decline, Paynow cancel) reports the same way.
+ */
+export async function failInsuranceCheckout(reference: string, detail?: string): Promise<void> {
+  const admin = createAdminClient();
+  await admin.rpc("fail_insurance_checkout", { p_reference: reference });
+  void logTransactionEvent(admin, { reference, eventType: "payment_failed", message: detail ?? "Insurance payment did not go through." });
+  const { data: intent } = await admin
+    .from("insurance_checkout_intents")
+    .select("provider, amount, fee, application")
+    .eq("reference", reference)
+    .maybeSingle();
+  const row = intent as { provider?: string; amount?: number; fee?: number; application?: { nationalId?: string; email?: string } } | null;
+  void alertTransaction(admin, {
+    outcome: "failed",
+    reference,
+    service: "Insurance cover",
+    amount: row?.amount ?? 0,
+    fee: row?.fee ?? null,
+    recipient: row?.application?.nationalId ?? null,
+    method: row?.provider ?? "gateway",
+    customer: row?.application?.email ?? null,
+    detail: detail ?? "Payment declined or cancelled at the gateway.",
+  });
 }
 
 /**
@@ -826,7 +953,7 @@ export async function checkInsurancePaymentNow(reference: string) {
     if (status === "completed") {
       await finalizeInsuranceCheckout(reference);
     } else if (status === "failed" || status === "cancelled") {
-      await admin.rpc("fail_insurance_checkout", { p_reference: reference });
+      await failInsuranceCheckout(reference, `EcoCash reported ${status}.`);
     }
     return { checked: true };
   }

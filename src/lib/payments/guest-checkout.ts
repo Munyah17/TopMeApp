@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { getFulfillmentProvider } from "@/lib/fulfillment";
 import { sendEmail } from "@/lib/email/client";
+import { alertTransaction } from "@/lib/email/transaction-alerts";
 import { paymentReceiptEmail } from "@/lib/email/templates";
 import { logTransactionEvent } from "@/lib/transaction-events";
 import type { ApiModuleSafe, Transaction } from "@/types/database";
@@ -18,7 +19,7 @@ export async function finalizeGuestCheckout(reference: string): Promise<Transact
   // transaction carries the real provider name — hardcoding "simulated"
   // made live VitalPay attempts indistinguishable from demo runs.
   const [{ data: intent }, { data: apiModules }] = await Promise.all([
-    admin.from("guest_checkout_intents").select("service_id").eq("reference", reference).single(),
+    admin.from("guest_checkout_intents").select("service_id, provider").eq("reference", reference).single(),
     admin.from("api_modules_safe").select("*").eq("status", "active"),
   ]);
   const provider = getFulfillmentProvider(intent?.service_id ?? "", (apiModules as ApiModuleSafe[]) ?? []);
@@ -34,6 +35,18 @@ export async function finalizeGuestCheckout(reference: string): Promise<Transact
     reference: tx.reference,
     eventType: "payment_confirmed",
     message: `Payment confirmed via ${tx.fulfillment_provider ?? "gateway"} — $${tx.amount.toFixed(2)} captured.`,
+  });
+  // Money captured — the transaction succeeded even if delivery is still
+  // pending (async providers confirm via webhook, which alerts on failure).
+  void alertTransaction(admin, {
+    outcome: "success",
+    reference: tx.reference,
+    service: tx.service_id,
+    amount: tx.amount,
+    fee: tx.fee,
+    recipient: tx.recipient_identifier,
+    method: (intent as { provider?: string } | null)?.provider ?? "gateway",
+    customer: tx.guest_email,
   });
 
   const { data: service } = await admin.from("services").select("name").eq("id", tx.service_id).single();
@@ -85,6 +98,17 @@ export async function finalizeGuestCheckout(reference: string): Promise<Transact
   // queue (guest checkouts have no wallet, so these are always manual —
   // see 2026-09-10-fulfilment-auto-refund).
   if (fulfillmentResult.status === "failed") {
+    void alertTransaction(admin, {
+      outcome: "failed",
+      reference: tx.reference,
+      service: tx.service_id,
+      amount: tx.amount,
+      fee: tx.fee,
+      recipient: tx.recipient_identifier,
+      method: (intent as { provider?: string } | null)?.provider ?? "gateway",
+      customer: tx.guest_email,
+      detail: `Delivery failed after payment — ${fulfillmentResult.message || provider.name}`,
+    });
     const { recordFailedFulfilmentRefund } = await import("@/lib/payments/refunds");
     await recordFailedFulfilmentRefund(admin, {
       transactionId: tx.id,
@@ -119,4 +143,20 @@ export async function failGuestCheckout(reference: string): Promise<void> {
   const admin = createAdminClient();
   await admin.rpc("fail_guest_checkout", { p_reference: reference });
   void logTransactionEvent(admin, { reference, eventType: "payment_failed", message: "Payment did not go through — gateway declined or the customer cancelled." });
+  const { data: intent } = await admin
+    .from("guest_checkout_intents")
+    .select("service_id, provider, amount, recipient_identifier, guest_email")
+    .eq("reference", reference)
+    .maybeSingle();
+  const row = intent as { service_id?: string; provider?: string; amount?: number; recipient_identifier?: string; guest_email?: string } | null;
+  void alertTransaction(admin, {
+    outcome: "failed",
+    reference,
+    service: row?.service_id ?? "guest checkout",
+    amount: row?.amount ?? 0,
+    recipient: row?.recipient_identifier ?? null,
+    method: row?.provider ?? "gateway",
+    customer: row?.guest_email ?? null,
+    detail: "Payment declined or cancelled at the gateway.",
+  });
 }

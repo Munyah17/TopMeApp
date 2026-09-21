@@ -112,8 +112,8 @@ export async function applyPaynowResult(reference: string, status: string, meta?
         void logTransactionEvent(admin, { reference, eventType: "fulfillment_failed", message: `Paynow: finalizeInsuranceCheckout failed — ${result.error}` });
       }
     } else if (failed) {
-      await admin.rpc("fail_insurance_checkout", { p_reference: reference });
-      void logTransactionEvent(admin, { reference, eventType: "payment_failed", message: `Insurance checkout via Paynow failed (status: ${status}).` });
+      const { failInsuranceCheckout } = await import("@/lib/actions/insurance");
+      await failInsuranceCheckout(reference, `Paynow reported ${status}.`);
     }
     return { kind: "insurance" as const, success, failed };
   }
