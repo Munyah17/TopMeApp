@@ -66,7 +66,9 @@ export async function sendEmail(opts: { sender: EmailSender; to: string; subject
   if (!opts.to) return;
   try {
     const from = `TopMe <${SENDER_ADDRESSES[opts.sender]}>`;
-    await getTransporter(opts.sender).sendMail({ from, to: opts.to, subject: opts.subject, html: opts.html, replyTo: opts.replyTo });
+    // Default Reply-To is info@topme.co.zw — automated mail originates from
+    // noreply@, but any customer reply must land in a monitored inbox.
+    await getTransporter(opts.sender).sendMail({ from, to: opts.to, subject: opts.subject, html: opts.html, replyTo: opts.replyTo ?? SENDER_ADDRESSES.info });
   } catch (e) {
     console.error(`[email] failed to send "${opts.subject}" to ${opts.to} via ${opts.sender}:`, e instanceof Error ? e.message : e);
   }

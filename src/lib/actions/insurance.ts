@@ -680,7 +680,7 @@ export async function startInsuranceCheckout(params: {
         purpose: "insurance_payment",
       });
       if (!session.url) {
-        await failInsuranceCheckout(reference, "Stripe initiation failed — no checkout URL.");
+        await failInsuranceCheckout(reference, "Stripe couldn't create a checkout session.");
         return { error: "Stripe couldn't start the payment." };
       }
       return { success: true, gateway: "stripe", reference, redirectUrl: session.url };

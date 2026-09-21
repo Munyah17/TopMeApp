@@ -132,7 +132,7 @@ export async function finalizeGuestCheckout(reference: string): Promise<Transact
       recipient: finalTx.recipient_identifier,
       date: new Date(finalTx.created_at).toLocaleString("en-GB"),
     });
-    void sendEmail({ sender: "noreply", to: finalTx.guest_email, subject, html, replyTo: "accounts@topme.co.zw" });
+    void sendEmail({ sender: "noreply", to: finalTx.guest_email, subject, html, replyTo: "info@topme.co.zw" });
   }
 
   return finalTx;

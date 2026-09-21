@@ -243,7 +243,7 @@ export async function payService(input: PayServiceInput) {
       date: new Date(finalTx.created_at).toLocaleString("en-GB"),
     });
     // Fire-and-forget — sendEmail never throws, so this can't fail the payment.
-    void sendEmail({ sender: "noreply", to: user.email, subject, html, replyTo: "accounts@topme.co.zw" });
+    void sendEmail({ sender: "noreply", to: user.email, subject, html, replyTo: "info@topme.co.zw" });
   }
 
   return finalTx;
@@ -311,7 +311,7 @@ export async function redeemGiftVoucher(rawCode: string) {
       code: voucher.code,
       balance: (wallet?.balance as number) ?? 0,
     });
-    void sendEmail({ sender: "noreply", to: user.email, subject, html, replyTo: "accounts@topme.co.zw" });
+    void sendEmail({ sender: "noreply", to: user.email, subject, html, replyTo: "info@topme.co.zw" });
   }
 
   return voucher;

@@ -24,9 +24,9 @@ export async function notifyTopupResult(
       reference: opts.reference,
       balance: (wallet?.balance as number) ?? 0,
     });
-    await sendEmail({ sender: "noreply", to: email, subject, html, replyTo: "accounts@topme.co.zw" });
+    await sendEmail({ sender: "noreply", to: email, subject, html, replyTo: "info@topme.co.zw" });
   } else {
     const { subject, html } = topupFailedEmail({ amount: opts.amount, provider: providerLabel });
-    await sendEmail({ sender: "noreply", to: email, subject, html, replyTo: "accounts@topme.co.zw" });
+    await sendEmail({ sender: "noreply", to: email, subject, html, replyTo: "info@topme.co.zw" });
   }
 }

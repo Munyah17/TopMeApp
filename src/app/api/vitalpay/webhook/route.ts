@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import { recordIntegrationHealth } from "@/lib/integrations/health";
 import { logTransactionEvent } from "@/lib/transaction-events";
+import { alertTransaction } from "@/lib/email/transaction-alerts";
 
 /**
  * Receives VitalPay's async fulfillment webhooks (service.completed /
@@ -66,7 +67,7 @@ export async function POST(request: NextRequest) {
 
   const { data: tx } = await admin
     .from("transactions")
-    .select("id, service_id, fulfillment_status")
+    .select("id, service_id, fulfillment_status, amount, fee, recipient_identifier, user_id, guest_email")
     .eq("reference", reference)
     .maybeSingle();
   if (!tx) return NextResponse.json({ ok: true });
@@ -99,6 +100,17 @@ export async function POST(request: NextRequest) {
   // money in limbo for up to 24h. Idempotent: safe if a refund already
   // exists (e.g. a duplicate webhook delivery).
   if (failed && tx.fulfillment_status !== "failed") {
+    void alertTransaction(admin, {
+      outcome: "failed",
+      reference,
+      service: tx.service_id,
+      amount: tx.amount,
+      fee: tx.fee,
+      recipient: tx.recipient_identifier,
+      method: "vitalpay",
+      customer: tx.guest_email ?? tx.user_id,
+      detail: "VitalPay reported delivery failed (service.failed webhook).",
+    });
     const { data: svc } = await admin.from("services").select("name").eq("id", tx.service_id).single();
     const { recordFailedFulfilmentRefund } = await import("@/lib/payments/refunds");
     await recordFailedFulfilmentRefund(admin, {

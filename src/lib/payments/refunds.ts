@@ -88,10 +88,10 @@ async function notify(
         reference: opts.reference,
         balance,
       });
-      void sendEmail({ sender: "noreply", to: email, subject, html, replyTo: "accounts@topme.co.zw" });
+      void sendEmail({ sender: "noreply", to: email, subject, html, replyTo: "info@topme.co.zw" });
     } else {
       const { subject, html } = refundQueuedEmail({ serviceName: opts.serviceName, amount: req.amount, reference: opts.reference });
-      void sendEmail({ sender: "noreply", to: email, subject, html, replyTo: "accounts@topme.co.zw" });
+      void sendEmail({ sender: "noreply", to: email, subject, html, replyTo: "info@topme.co.zw" });
     }
   }
 

@@ -1,6 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/server";
 import { recordFailedFulfilmentRefund } from "@/lib/payments/refunds";
+import { alertTransaction } from "@/lib/email/transaction-alerts";
 
 // Backstop sweep, run from the daily reconcile cron. The synchronous
 // auto-refund in payService/finalizeGuestCheckout handles the normal case
@@ -59,6 +60,16 @@ export async function reconcileFulfilments() {
         p_transaction_id: t.id,
         p_status: "failed",
         p_receipt: { ...(t.receipt as Record<string, unknown> ?? {}), message: "No provider confirmation after 24h — treated as failed by reconciler." },
+      });
+      // This tx was alerted as a success when the money moved — the
+      // reconciler just flipped it to failed, so ops needs the correction.
+      void alertTransaction(admin, {
+        outcome: "failed",
+        reference: t.reference,
+        service: svcName.get(t.service_id) ?? t.service_id,
+        amount: t.amount,
+        fee: t.fee,
+        detail: "No provider confirmation after 24h — marked failed by the reconcile sweep.",
       });
     }
     await recordFailedFulfilmentRefund(admin, {

@@ -9,6 +9,12 @@ import type { TeamMember } from "@/types/database";
 
 const MEMBER_ROLES = ["Manager", "Support", "Finance"];
 
+const STATUS_COLOR: Record<TeamMember["status"], string> = {
+  active: "var(--success)",
+  invited: "var(--warning)",
+  disabled: "var(--error)",
+};
+
 function AddUserForm({ onDone }: { onDone: () => void }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -84,7 +90,7 @@ function AddUserForm({ onDone }: { onDone: () => void }) {
   );
 }
 
-const STATUS_COLOR: Record<string, string> = { invited: "var(--warning)", active: "var(--success)", disabled: "var(--text-faint)" };
+import { statusTone } from "@/lib/data/catalog-helpers";
 
 // Compact by design — settings, status changes and permissions all moved
 // to this member's own full profile page (staff-member-detail.tsx). This

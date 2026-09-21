@@ -1,13 +1,7 @@
 import Link from "next/link";
+import { statusTone } from "@/lib/data/catalog-helpers";
 import { getSupportTickets } from "@/lib/data/support-queries";
 import { getMyPermissions } from "@/lib/auth/permissions";
-
-const STATUS_COLOR: Record<string, string> = {
-  open: "var(--warning)",
-  in_progress: "var(--blue)",
-  resolved: "var(--success)",
-  closed: "var(--text-faint)",
-};
 
 export async function SupportBody({ searchParams, basePath }: { searchParams: Promise<{ status?: string }>; basePath: string }) {
   const [params, permissions] = await Promise.all([searchParams, getMyPermissions()]);
@@ -54,7 +48,7 @@ export async function SupportBody({ searchParams, basePath }: { searchParams: Pr
                   {t.assigned_to_profile && <> · Assigned: {t.assigned_to_profile.full_name}</>}
                 </div>
               </div>
-              <span style={{ fontSize: 11, fontWeight: 700, color: STATUS_COLOR[t.status], textTransform: "capitalize", flexShrink: 0 }}>
+              <span className={`status-badge ${statusTone(t.status)}`} style={{ textTransform: "capitalize", flexShrink: 0 }}>
                 {t.status.replace("_", " ")}
               </span>
             </Link>

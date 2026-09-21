@@ -1,15 +1,8 @@
 import Link from "next/link";
 import { Icon } from "@/components/icons";
-import { fmt } from "@/lib/data/catalog-helpers";
+import { fmt, statusTone } from "@/lib/data/catalog-helpers";
 import { getTransactionsForAdmin } from "@/lib/data/admin-queries";
 import { getMyPermissions } from "@/lib/auth/permissions";
-
-const FULFILLMENT_COLOR: Record<string, string> = {
-  fulfilled: "var(--success)",
-  pending: "var(--warning)",
-  failed: "var(--error)",
-  simulated: "var(--warning)",
-};
 
 export async function TransactionsBody({
   searchParams,
@@ -86,9 +79,9 @@ export async function TransactionsBody({
               </div>
               <div style={{ textAlign: "right", flexShrink: 0 }}>
                 <div style={{ fontWeight: 800, fontSize: 13.5 }}>{fmt(t.amount + t.fee)}</div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: FULFILLMENT_COLOR[t.fulfillment_status] ?? "var(--text-soft)" }}>
+                <span className={`status-badge ${statusTone(t.fulfillment_status)}`} style={{ marginTop: 4 }}>
                   {t.fulfillment_status}
-                </div>
+                </span>
               </div>
             </Link>
           ))

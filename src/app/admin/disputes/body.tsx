@@ -1,13 +1,7 @@
 import Link from "next/link";
+import { statusTone } from "@/lib/data/catalog-helpers";
 import { getDisputes } from "@/lib/data/dispute-queries";
 import { getMyPermissions } from "@/lib/auth/permissions";
-
-const STATUS_COLOR: Record<string, string> = {
-  open: "var(--warning)",
-  investigating: "var(--blue)",
-  resolved: "var(--success)",
-  rejected: "var(--error)",
-};
 
 export async function DisputesBody({ searchParams, basePath }: { searchParams: Promise<{ status?: string }>; basePath: string }) {
   const [params, permissions] = await Promise.all([searchParams, getMyPermissions()]);
@@ -54,7 +48,7 @@ export async function DisputesBody({ searchParams, basePath }: { searchParams: P
                   {d.assigned_to_profile && <> · Assigned: {d.assigned_to_profile.full_name}</>}
                 </div>
               </div>
-              <span style={{ fontSize: 11, fontWeight: 700, color: STATUS_COLOR[d.status], textTransform: "capitalize", flexShrink: 0 }}>{d.status}</span>
+              <span className={`status-badge ${statusTone(d.status)}`} style={{ textTransform: "capitalize", flexShrink: 0 }}>{d.status}</span>
             </Link>
           ))
         )}
