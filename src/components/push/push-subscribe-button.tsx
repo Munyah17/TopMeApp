@@ -48,7 +48,15 @@ export function PushSubscribeButton() {
         return;
       }
 
-      const registration = await navigator.serviceWorker.register("/sw.js");
+      await navigator.serviceWorker.register("/sw.js");
+      // register() resolves while the worker is still installing — subscribe()
+      // throws "no active Service Worker" if it runs before activation, so
+      // wait for the worker to go active first. The timeout keeps a failed
+      // install (404, syntax error) from hanging the button on "…" forever.
+      const registration = await Promise.race([
+        navigator.serviceWorker.ready,
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Notifications couldn't start — refresh and try again.")), 15000)),
+      ]);
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(publicKey),
