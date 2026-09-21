@@ -61,6 +61,7 @@ const ICO: Record<string, string> = {
   zap: `<path d="M13 2.5 4.5 14h6l-1 7.5L19 10h-6Z"/>`,
   play: `<circle cx="12" cy="12" r="9"/><path d="M10 8.3 16.2 12 10 15.7Z" fill="currentColor" stroke="none"/>`,
   music: `<circle cx="6.5" cy="17.5" r="2.3"/><circle cx="17" cy="15.5" r="2.3"/><path d="M8.8 17.5V5.5L19.3 3v12"/>`,
+  moon: `<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/>`,
   sun: `<circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/>`,
   battery: `<rect x="3" y="8" width="16" height="8" rx="2"/><path d="M21 11v2"/><path d="M7 9.5v5M11 9.5v5"/>`,
   plug: `<path d="M9 3v5M15 3v5"/><path d="M6 8h12v4a6 6 0 0 1-12 0Z"/><path d="M12 18v3"/>`,

@@ -3,7 +3,9 @@ import { AccessLocked } from "@/components/admin/access-locked";
 import { AdminShell } from "@/components/admin/admin-shell";
 import { AnnouncementStrip } from "@/components/app-shell/announcement-strip";
 import { PERMISSION_KEYS } from "@/lib/auth/permission-keys";
+import { getAttentionCount, getPendingRefundCount, getPendingWithdrawalCount } from "@/lib/data/admin-queries";
 import { getCurrentProfile } from "@/lib/data/queries";
+import pkg from "../../../package.json";
 
 // /super-admin is the owner's own console — role: 'superadmin' only, no
 // permission filtering (they always see the full nav). Staff (role: 'admin')
@@ -20,8 +22,19 @@ export default async function SuperAdminLayout({ children }: { children: React.R
     redirect("/admin");
   }
 
+  const [attention, refunds, withdrawals] = await Promise.all([getAttentionCount(), getPendingRefundCount(), getPendingWithdrawalCount()]);
+
   return (
-    <AdminShell role={profile.role} permissions={[...PERMISSION_KEYS]} basePath="/super-admin" portalLabel="Super Admin" announcements={<AnnouncementStrip audience="staff" />}>
+    <AdminShell
+      role={profile.role}
+      permissions={[...PERMISSION_KEYS]}
+      basePath="/super-admin"
+      portalLabel="Super Admin"
+      userName={profile.full_name || profile.email || "TopMe Staff"}
+      alertCount={attention + refunds + withdrawals}
+      version={pkg.version}
+      announcements={<AnnouncementStrip audience="staff" />}
+    >
       {children}
     </AdminShell>
   );

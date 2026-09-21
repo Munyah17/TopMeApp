@@ -73,236 +73,344 @@ export async function AdminOverviewBody({ basePath }: { basePath: string }) {
     .map(([id, count]) => ({ id, count, name: serviceById.get(id)?.name || id, color: serviceById.get(id)?.color || "#94A3B8" }));
   const topTotal = top.reduce((s, t) => s + t.count, 0) || 1;
 
+  const prevWeekFailed = tx.filter((t) => t.status === "failed").length;
+  const successRate = tx.length === 0 ? null : Math.round((successTx.length / tx.length) * 100);
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const firstName = (profile.full_name || "").trim().split(/\s+/)[0] || "there";
+  const todayLabel = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
+  const alerts = [
+    attentionCount > 0 && {
+      href: `${basePath}/operations`,
+      icon: "alert",
+      title: `${attentionCount} item${attentionCount === 1 ? "" : "s"} need attention`,
+      sub: "Stuck payments or top-ups — open Operations Center",
+    },
+    pendingRefunds > 0 && {
+      href: `${basePath}/refunds`,
+      icon: "refresh",
+      title: `${pendingRefunds} refund${pendingRefunds === 1 ? "" : "s"} awaiting a decision`,
+      sub: "Payments that failed after charging — open Refunds",
+    },
+    pendingWithdrawals > 0 && {
+      href: `${basePath}/withdrawals`,
+      icon: "arrowUpR",
+      title: `${pendingWithdrawals} withdrawal${pendingWithdrawals === 1 ? "" : "s"} to process`,
+      sub: "Customers cashing out — open Withdrawals",
+    },
+  ].filter((a): a is { href: string; icon: string; title: string; sub: string } => Boolean(a));
+
+  // 7-day line chart: 600x180 viewBox, 24px padding for the axis labels.
+  const W = 600, H = 180, PX = 8, PT = 14, PB = 26;
+  const chartPts = bars.map((b, i) => {
+    const x = PX + (i / (bars.length - 1)) * (W - PX * 2);
+    const y = PT + (1 - b / maxBar) * (H - PT - PB);
+    return { x, y, v: b };
+  });
+  const linePath = chartPts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+  const areaPath = `${linePath} L${chartPts[chartPts.length - 1].x.toFixed(1)},${H - PB} L${chartPts[0].x.toFixed(1)},${H - PB} Z`;
+
+  const maxOwner = Math.max(1, ...ownerRows.map((r) => r.cost + r.revenue));
+  const ownerColors = ["var(--green)", "var(--info)", "var(--adm-purple)", "var(--adm-teal)", "var(--warning)", "var(--text-tertiary)"];
+
   return (
     <div>
-      <h2 style={{ fontSize: 19 }}>Dashboard</h2>
-      <div className="muted mb-3">Today&apos;s snapshot — see Reports for the full picture.</div>
-
-      {attentionCount > 0 && (
-        <Link
-          href={`${basePath}/operations`}
-          className="card card-pad tap row gap-2 mb-2"
-          style={{ textDecoration: "none", borderColor: "var(--warning)", background: "#FEF6E7" }}
-        >
-          <div className="ibadge round" style={{ width: 34, height: 34, background: "#fff", color: "var(--warning)" }}>
-            <Icon name="alert" size={17} stroke={2} />
+      <div className="adm-hero">
+        <div>
+          <div className="adm-eyebrow">{todayLabel}</div>
+          <h1 className="adm-hero-title">
+            {greeting}, <span className="accent">{firstName}</span>.
+          </h1>
+          <div className="adm-hero-sub">
+            {todayTx.length === 0 ? (
+              <>No transactions yet today. </>
+            ) : (
+              <>
+                <strong>{todayTx.length}</strong> transaction{todayTx.length === 1 ? "" : "s"} so far today worth <strong>{fmt(todayGross)}</strong>.{" "}
+              </>
+            )}
+            {alerts.length === 0 ? "Everything is flowing — nothing needs your attention." : `${alerts.length} queue${alerts.length === 1 ? "" : "s"} need${alerts.length === 1 ? "s" : ""} a look below.`}
           </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, fontSize: 13.5 }}>{attentionCount} item{attentionCount === 1 ? "" : "s"} need attention</div>
-            <div className="muted" style={{ fontSize: 11.5 }}>Stuck payments or top-ups — open Operations Center</div>
-          </div>
-          <Icon name="chevronR" size={16} stroke={2} />
-        </Link>
-      )}
-
-      {pendingRefunds > 0 && (
-        <Link
-          href={`${basePath}/refunds`}
-          className="card card-pad tap row gap-2 mb-2"
-          style={{ textDecoration: "none", borderColor: "var(--warning)", background: "#FEF6E7" }}
-        >
-          <div className="ibadge round" style={{ width: 34, height: 34, background: "#fff", color: "var(--warning)" }}>
-            <Icon name="refresh" size={17} stroke={2} />
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, fontSize: 13.5 }}>{pendingRefunds} refund{pendingRefunds === 1 ? "" : "s"} awaiting a decision</div>
-            <div className="muted" style={{ fontSize: 11.5 }}>Payments that failed after charging — open Refunds</div>
-          </div>
-          <Icon name="chevronR" size={16} stroke={2} />
-        </Link>
-      )}
-
-      {pendingWithdrawals > 0 && (
-        <Link
-          href={`${basePath}/withdrawals`}
-          className="card card-pad tap row gap-2 mb-2"
-          style={{ textDecoration: "none", borderColor: "var(--warning)", background: "#FEF6E7" }}
-        >
-          <div className="ibadge round" style={{ width: 34, height: 34, background: "#fff", color: "var(--warning)" }}>
-            <Icon name="arrowUpR" size={17} stroke={2} />
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, fontSize: 13.5 }}>{pendingWithdrawals} withdrawal{pendingWithdrawals === 1 ? "" : "s"} to process</div>
-            <div className="muted" style={{ fontSize: 11.5 }}>Customers cashing out — open Withdrawals</div>
-          </div>
-          <Icon name="chevronR" size={16} stroke={2} />
-        </Link>
-      )}
-
-      <div className="row gap-2" style={{ flexWrap: "wrap" }}>
-        {health.map((h) => {
-          const healthy = h.consecutive_failures === 0 && !!h.last_success_at;
-          const neverHeard = !h.last_success_at && !h.last_failure_at;
-          const color = neverHeard ? "var(--text-faint)" : healthy ? "var(--success)" : "var(--error)";
-          return (
-            <div key={h.id} className="card card-pad" style={{ flex: "1 1 100px", textAlign: "center" }}>
-              <div className="muted" style={{ fontSize: 11 }}>{h.label}</div>
-              <div style={{ fontWeight: 800, fontSize: 13, marginTop: 4, color }}>
-                {neverHeard ? "Unknown" : healthy ? "Healthy" : "Failing"}
-              </div>
-            </div>
-          );
-        })}
+        </div>
+        <div className="adm-hero-actions">
+          <Link href={`${basePath}/reports`} className="btn btn-secondary">
+            <Icon name="book" size={15} stroke={2} /> Reports
+          </Link>
+          <Link href={`${basePath}/operations`} className="btn btn-primary">
+            <Icon name="zap" size={15} stroke={2} /> Operations Center
+          </Link>
+        </div>
       </div>
 
-      {recentFailures.length > 0 && (
-        <>
-          <div className="section-title mt-3 mb-2">Recent failures</div>
-          <div className="card" style={{ overflow: "hidden" }}>
-            {recentFailures.map((f, i) => (
-              <Link
-                key={f.id}
-                href={f.transactionId ? `${basePath}/transactions/${f.transactionId}` : `${basePath}/transactions`}
-                className="row gap-2 tap"
-                style={{ padding: "12px 16px", borderBottom: i < recentFailures.length - 1 ? "1px solid var(--border)" : "none", textDecoration: "none" }}
-              >
-                <div className="ibadge round" style={{ width: 30, height: 30, background: "#FDECEC", color: "var(--error)", flexShrink: 0 }}>
-                  <Icon name="alert" size={14} stroke={2} />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13, color: "var(--text)" }}>
-                    {f.message}
-                  </div>
-                  <div className="muted" style={{ fontSize: 11 }}>
-                    {f.reference ?? f.serviceId ?? "—"} · {new Date(f.createdAt).toLocaleString("en-GB")}
-                  </div>
-                </div>
-                <span style={{ flexShrink: 0 }}>
-                  <Icon name="chevronR" size={16} stroke={2} />
-                </span>
-              </Link>
-            ))}
-          </div>
-        </>
+      {alerts.length > 0 && (
+        <div className="adm-alerts">
+          {alerts.map((a) => (
+            <Link key={a.href} href={a.href} className="adm-alert">
+              <div className="ico">
+                <Icon name={a.icon} size={16} stroke={2} />
+              </div>
+              <div>
+                <div className="title">{a.title}</div>
+                <div className="sub">{a.sub}</div>
+              </div>
+              <span className="go">
+                <Icon name="chevronR" size={16} stroke={2} />
+              </span>
+            </Link>
+          ))}
+        </div>
       )}
 
-      <div className="row gap-2 mt-2" style={{ flexWrap: "wrap" }}>
-          <div className="card card-pad" style={{ flex: "1 1 160px" }}>
-            <div className="ibadge round" style={{ width: 32, height: 32, background: "var(--green-50)", color: "var(--green-600)" }}>
-              <Icon name="wallet" size={16} stroke={2} />
+      <div className="adm-kpi-grid">
+        <div className="adm-kpi">
+          <div className="adm-kpi-top">
+            <div className="adm-kpi-id">
+              <div className="adm-kpi-icon"><Icon name="wallet" size={16} stroke={2} /></div>
+              <div className="adm-kpi-label">Gross volume today</div>
             </div>
-            <div className="muted mt-2">Today&apos;s gross volume</div>
-            <div style={{ fontWeight: 800, fontSize: 19, marginTop: 2 }}>{fmt(todayGross)}</div>
+            <span className="adm-pill">TODAY</span>
           </div>
-          <div className="card card-pad" style={{ flex: "1 1 160px" }}>
-            <div className="ibadge round" style={{ width: 32, height: 32, background: "var(--blue-50)", color: "var(--blue)" }}>
-              <Icon name="book" size={16} stroke={2} />
+          <div className="adm-kpi-value">{fmt(todayGross)}</div>
+          <div className="adm-kpi-foot">7-day settled <strong>{fmt(settled)}</strong></div>
+        </div>
+        <div className="adm-kpi c-info">
+          <div className="adm-kpi-top">
+            <div className="adm-kpi-id">
+              <div className="adm-kpi-icon"><Icon name="book" size={16} stroke={2} /></div>
+              <div className="adm-kpi-label">Net revenue today</div>
             </div>
-            <div className="muted mt-2">Today&apos;s net revenue</div>
-            <div style={{ fontWeight: 800, fontSize: 19, marginTop: 2, color: "var(--success)" }}>{fmt(todayRevenue)}</div>
+            <span className="adm-pill">OURS</span>
           </div>
-          <div className="card card-pad" style={{ flex: "1 1 160px" }}>
-            <div className="ibadge round" style={{ width: 32, height: 32, background: "#FEF6E7", color: "var(--warning)" }}>
-              <Icon name="zap" size={16} stroke={2} />
-            </div>
-            <div className="muted mt-2">Transactions today</div>
-            <div style={{ fontWeight: 800, fontSize: 19, marginTop: 2 }}>{todayTx.length}</div>
+          <div className="adm-kpi-value" style={{ color: "var(--success)" }}>{fmt(todayRevenue)}</div>
+          <div className="adm-kpi-foot">
+            {todayGross > 0 ? <>margin <strong>{Math.round((todayRevenue / todayGross) * 100)}%</strong></> : <>no settled sales yet today</>}
           </div>
         </div>
-        <div className="row gap-2 mt-2">
-          <div className="card card-pad" style={{ flex: 1, textAlign: "center" }}>
-            <div className="muted">Pending (7d)</div>
-            <div style={{ fontWeight: 800, fontSize: 17 }}>{pending}</div>
+        <div className="adm-kpi c-purple">
+          <div className="adm-kpi-top">
+            <div className="adm-kpi-id">
+              <div className="adm-kpi-icon"><Icon name="zap" size={16} stroke={2} /></div>
+              <div className="adm-kpi-label">Transactions</div>
+            </div>
+            <span className="adm-pill">7D</span>
           </div>
-          <div className="card card-pad" style={{ flex: 1, textAlign: "center" }}>
-            <div className="muted">Failed (7d)</div>
-            <div style={{ fontWeight: 800, fontSize: 17, color: "var(--error)" }}>{failed}</div>
+          <div className="adm-kpi-value">
+            {tx.length}
+            <sup>{todayTx.length} today</sup>
           </div>
-          <div className="card card-pad" style={{ flex: 1, textAlign: "center" }}>
-            <div className="muted">Settled (7d)</div>
-            <div style={{ fontWeight: 800, fontSize: 17, color: "var(--success)" }}>{fmt(settled)}</div>
+          <div className="adm-kpi-foot">
+            success rate <strong>{successRate === null ? "—" : `${successRate}%`}</strong> · pending <strong>{pending}</strong>
           </div>
         </div>
+        <div className={`adm-kpi ${failed > 0 ? "c-error" : ""}`}>
+          <div className="adm-kpi-top">
+            <div className="adm-kpi-id">
+              <div className="adm-kpi-icon"><Icon name="alert" size={16} stroke={2} /></div>
+              <div className="adm-kpi-label">Failed</div>
+            </div>
+            <span className="adm-pill">7D</span>
+          </div>
+          <div className="adm-kpi-value" style={{ color: failed > 0 ? "var(--error)" : undefined }}>{prevWeekFailed}</div>
+          <div className="adm-kpi-foot">
+            {failed > 0 ? <>latest {recentFailures[0] ? new Date(recentFailures[0].createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "—"}</> : <>clean week — nothing failed</>}
+          </div>
+        </div>
+      </div>
 
-        <div className="section-title mt-3 mb-2">Transactions · last 7 days</div>
-        <div className="card card-pad">
-          <div className="row gap-1" style={{ alignItems: "flex-end", height: 110 }}>
-            {bars.map((b, i) => (
-              <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-                <div
-                  style={{
-                    width: "100%",
-                    maxWidth: 22,
-                    height: Math.max(4, (b / maxBar) * 100),
-                    borderRadius: "6px 6px 3px 3px",
-                    background: "var(--green)",
-                  }}
-                />
-                <span style={{ fontSize: 10.5, color: "var(--text-faint)", fontWeight: 700 }}>
-                  {days[i].toLocaleDateString("en-GB", { weekday: "narrow" })}
-                </span>
-              </div>
+      <div className="adm-grid">
+        <section className="adm-panel span-8">
+          <div className="adm-panel-head">
+            <div>
+              <div className="adm-eyebrow">Activity</div>
+              <h3 className="adm-panel-title">Transactions · last 7 days</h3>
+            </div>
+            <Link href={`${basePath}/transactions`} className="adm-panel-action">
+              Full ledger <Icon name="chevronR" size={13} stroke={2.2} />
+            </Link>
+          </div>
+          <svg className="adm-chart" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ height: 180 }} role="img" aria-label="Transactions per day, last 7 days">
+            <defs>
+              <linearGradient id="admArea" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--green)" stopOpacity="0.22" />
+                <stop offset="100%" stopColor="var(--green)" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            {[0, 0.5, 1].map((f) => (
+              <line key={f} className="grid-line" x1={PX} x2={W - PX} y1={PT + f * (H - PT - PB)} y2={PT + f * (H - PT - PB)} />
             ))}
+            <path d={areaPath} fill="url(#admArea)" />
+            <path d={linePath} className="line" />
+            {chartPts.map((p, i) => (
+              <g key={i}>
+                <circle cx={p.x} cy={p.y} r={3.5} className="dot" />
+                <text x={p.x} y={H - 8} textAnchor={i === 0 ? "start" : i === chartPts.length - 1 ? "end" : "middle"} className="axis">
+                  {days[i].toLocaleDateString("en-GB", { weekday: "short" }).toUpperCase()}
+                </text>
+                {p.v > 0 && (
+                  <text x={p.x} y={p.y - 9} textAnchor="middle" className="axis" style={{ fill: "var(--text-secondary)", fontWeight: 600 }}>
+                    {p.v}
+                  </text>
+                )}
+              </g>
+            ))}
+          </svg>
+          <div className="adm-chart-foot">
+            <div>
+              <div className="adm-stat-label">Pending (7d)</div>
+              <div className="adm-stat-value">{pending}</div>
+            </div>
+            <div>
+              <div className="adm-stat-label">Failed (7d)</div>
+              <div className={`adm-stat-value ${failed > 0 ? "neg" : ""}`}>{failed}</div>
+            </div>
+            <div>
+              <div className="adm-stat-label">Settled (7d)</div>
+              <div className="adm-stat-value pos">{fmt(settled)}</div>
+            </div>
           </div>
-        </div>
+        </section>
 
-        <div className="section-title mt-3 mb-2">Revenue split by provider · last 7 days</div>
-        <div className="card" style={{ overflow: "hidden" }}>
-          {ownerRows.length === 0 ? (
-            <div className="card-pad muted">No settled transactions yet.</div>
-          ) : (
-            ownerRows.map((r, i) => (
-              <div
-                key={r.owner}
-                className="row between"
-                style={{ padding: "12px 16px", borderBottom: i < ownerRows.length - 1 ? "1px solid var(--border)" : "none" }}
-              >
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 13.5 }}>{r.owner}</div>
-                  <div className="muted" style={{ fontSize: 11.5 }}>
-                    {r.count} sale{r.count === 1 ? "" : "s"} · sold by TopMe, processed &amp; paid to {r.owner}
+        <section className="adm-panel span-4">
+          <div className="adm-panel-head">
+            <div>
+              <div className="adm-eyebrow">Integrations</div>
+              <h3 className="adm-panel-title">Gateway health</h3>
+            </div>
+            <Link href={`${basePath}/system-health`} className="adm-panel-action">
+              Details <Icon name="chevronR" size={13} stroke={2.2} />
+            </Link>
+          </div>
+          <div className="adm-health">
+            {health.length === 0 && <div className="adm-empty">No integrations reporting yet.</div>}
+            {health.map((h) => {
+              const healthy = h.consecutive_failures === 0 && !!h.last_success_at;
+              const neverHeard = !h.last_success_at && !h.last_failure_at;
+              const color = neverHeard ? "var(--text-tertiary)" : healthy ? "var(--success)" : "var(--error)";
+              const last = h.last_success_at ?? h.last_failure_at;
+              return (
+                <div key={h.id} className="adm-health-row" style={{ color }}>
+                  <span className="adm-health-dot" />
+                  <div>
+                    <div className="adm-health-name">{h.label}</div>
+                    <div className="adm-health-sub">
+                      {last ? `last seen ${new Date(last).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : "never heard from"}
+                    </div>
                   </div>
+                  <span className="adm-pill">{neverHeard ? "UNKNOWN" : healthy ? "HEALTHY" : `${h.consecutive_failures} FAIL`}</span>
                 </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontWeight: 800, fontSize: 13.5, color: "var(--success)" }}>+{fmt(r.revenue)} ours</div>
-                  <div className="muted" style={{ fontSize: 11.5 }}>{fmt(r.cost)} theirs</div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
+              );
+            })}
+          </div>
+        </section>
 
-        <div className="section-title mt-3 mb-2">Most purchased services · last 7 days</div>
-        <div className="card card-pad">
-          {top.length === 0 ? (
-            <div className="muted">No transactions yet.</div>
+        <section className="adm-panel span-7">
+          <div className="adm-panel-head">
+            <div>
+              <div className="adm-eyebrow">Needs a look</div>
+              <h3 className="adm-panel-title">Recent failures</h3>
+            </div>
+            <Link href={`${basePath}/transactions?status=failed`} className="adm-panel-action">
+              All failed <Icon name="chevronR" size={13} stroke={2.2} />
+            </Link>
+          </div>
+          {recentFailures.length === 0 ? (
+            <div className="adm-empty">No failures in the recent window.</div>
           ) : (
-            <div className="row gap-3" style={{ alignItems: "center", flexWrap: "wrap" }}>
-              <div
-                style={{
-                  width: 110,
-                  height: 110,
-                  borderRadius: "50%",
-                  flexShrink: 0,
-                  background: `conic-gradient(${(() => {
-                    let acc = 0;
-                    return top
-                      .map((t) => {
-                        const from = acc;
-                        acc += (t.count / topTotal) * 100;
-                        return `${t.color} ${from}% ${acc}%`;
-                      })
-                      .join(", ");
-                  })()})`,
-                }}
-              >
-                <div style={{ width: "100%", height: "100%", borderRadius: "50%", background: "var(--surface)", transform: "scale(0.6)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column" }}>
-                  <div style={{ fontWeight: 800, fontSize: 15 }}>{topTotal}</div>
-                  <div className="muted" style={{ fontSize: 9 }}>sales</div>
-                </div>
-              </div>
-              <div style={{ flex: "1 1 200px", minWidth: 0 }}>
-                {top.map((t) => (
-                  <div className="row gap-2 mb-2" key={t.id}>
-                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: t.color, flexShrink: 0 }} />
-                    <div style={{ flex: 1, fontSize: 13, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.name}</div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-soft)" }}>{t.count}</div>
-                  </div>
-                ))}
-              </div>
+            <div className="adm-table-scroll">
+              <table className="adm-table">
+                <thead>
+                  <tr>
+                    <th>Reference</th>
+                    <th>Error</th>
+                    <th style={{ textAlign: "right" }}>When</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentFailures.map((f) => (
+                    <tr key={f.id}>
+                      <td className="mono" style={{ whiteSpace: "nowrap" }}>
+                        <Link href={f.transactionId ? `${basePath}/transactions/${f.transactionId}` : `${basePath}/transactions`} style={{ color: "var(--text-primary)", fontWeight: 600 }}>
+                          {f.reference ?? f.serviceId ?? "—"}
+                        </Link>
+                      </td>
+                      <td style={{ color: "var(--text-secondary)", maxWidth: 360, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={f.message}>
+                        {f.message}
+                      </td>
+                      <td className="mono" style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                        {new Date(f.createdAt).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
-        </div>
+        </section>
+
+        <section className="adm-panel span-5">
+          <div className="adm-panel-head">
+            <div>
+              <div className="adm-eyebrow">Last 7 days</div>
+              <h3 className="adm-panel-title">Revenue by provider</h3>
+            </div>
+          </div>
+          {ownerRows.length === 0 ? (
+            <div className="adm-empty">No settled transactions yet.</div>
+          ) : (
+            <div className="adm-bar-list">
+              {ownerRows.slice(0, 6).map((r, i) => (
+                <div key={r.owner}>
+                  <div className="adm-bar-head">
+                    <div className="name">
+                      <i style={{ background: ownerColors[i % ownerColors.length] }} />
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.owner}</span>
+                    </div>
+                    <div className="val">
+                      <span style={{ color: "var(--success)", fontWeight: 600 }}>+{fmt(r.revenue)}</span> · {fmt(r.cost)} · {r.count}
+                    </div>
+                  </div>
+                  <div className="adm-bar-track">
+                    <div className="adm-bar-fill" style={{ width: `${Math.max(3, ((r.cost + r.revenue) / maxOwner) * 100)}%`, background: ownerColors[i % ownerColors.length] }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="adm-panel span-12">
+          <div className="adm-panel-head">
+            <div>
+              <div className="adm-eyebrow">Catalog</div>
+              <h3 className="adm-panel-title">Most purchased services · last 7 days</h3>
+            </div>
+            <Link href={`${basePath}/products`} className="adm-panel-action">
+              Manage catalog <Icon name="chevronR" size={13} stroke={2.2} />
+            </Link>
+          </div>
+          {top.length === 0 ? (
+            <div className="adm-empty">No transactions yet.</div>
+          ) : (
+            <div className="adm-bar-list" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 18 }}>
+              {top.map((t) => (
+                <div key={t.id}>
+                  <div className="adm-bar-head">
+                    <div className="name">
+                      <i style={{ background: t.color }} />
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.name}</span>
+                    </div>
+                    <div className="val">{t.count} · {Math.round((t.count / topTotal) * 100)}%</div>
+                  </div>
+                  <div className="adm-bar-track">
+                    <div className="adm-bar-fill" style={{ width: `${(t.count / topTotal) * 100}%`, background: t.color }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
     </div>
   );
 }
