@@ -3,7 +3,9 @@ import { AccessLocked } from "@/components/admin/access-locked";
 import { AdminShell } from "@/components/admin/admin-shell";
 import { AnnouncementStrip } from "@/components/app-shell/announcement-strip";
 import { getMyPermissions } from "@/lib/auth/permissions";
+import { getAttentionCount, getPendingRefundCount, getPendingWithdrawalCount } from "@/lib/data/admin-queries";
 import { getCurrentProfile } from "@/lib/data/queries";
+import pkg from "../../../package.json";
 
 // /admin is the staff console (role: 'admin') — daily operations, scoped to
 // whatever permissions the owner granted. The owner's own console is the
@@ -24,10 +26,24 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     return <AccessLocked title="Access restricted" message="This area is for TopMe staff accounts only." />;
   }
 
-  const permissions = await getMyPermissions();
+  const [permissions, attention, refunds, withdrawals] = await Promise.all([
+    getMyPermissions(),
+    getAttentionCount(),
+    getPendingRefundCount(),
+    getPendingWithdrawalCount(),
+  ]);
 
   return (
-    <AdminShell role={profile.role} permissions={permissions} basePath="/admin" portalLabel="Admin" announcements={<AnnouncementStrip audience="staff" />}>
+    <AdminShell
+      role={profile.role}
+      permissions={permissions}
+      basePath="/admin"
+      portalLabel="Admin"
+      userName={profile.full_name || profile.email || "TopMe Staff"}
+      alertCount={attention + refunds + withdrawals}
+      version={pkg.version}
+      announcements={<AnnouncementStrip audience="staff" />}
+    >
       {children}
     </AdminShell>
   );
