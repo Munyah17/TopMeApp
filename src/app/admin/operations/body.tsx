@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Icon } from "@/components/icons";
 import { StuckPaymentActions } from "@/components/admin/stuck-payment-actions";
+import { StuckTransactionActions } from "@/components/admin/stuck-transaction-actions";
 import { fmt, statusTone } from "@/lib/data/catalog-helpers";
 import { getAttentionQueue } from "@/lib/data/admin-queries";
 import { getMyPermissions } from "@/lib/auth/permissions";
@@ -33,25 +34,27 @@ export async function OperationsBody({ basePath }: { basePath: string }) {
               <div className="section-title mt-3 mb-2">Stuck transactions ({stuckTransactions.length})</div>
               <div className="card" style={{ overflow: "hidden" }}>
                 {stuckTransactions.map((t, i) => (
-                  <Link
-                    key={t.id}
-                    href={`${basePath}/transactions/${t.id}`}
-                    className="row between tap"
-                    style={{ padding: "12px 16px", borderBottom: i < stuckTransactions.length - 1 ? "1px solid var(--border)" : "none", textDecoration: "none" }}
-                  >
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 13.5 }}>{t.reference}</div>
-                      <div className="muted" style={{ fontSize: 11.5 }}>
-                        {t.service_id} · {t.recipient_identifier}
+                  <div key={t.id} style={{ padding: "12px 16px", borderBottom: i < stuckTransactions.length - 1 ? "1px solid var(--border)" : "none" }}>
+                    <Link
+                      href={`${basePath}/transactions/${t.id}`}
+                      className="row between tap"
+                      style={{ textDecoration: "none", color: "inherit" }}
+                    >
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: 13.5 }}>{t.reference}</div>
+                        <div className="muted" style={{ fontSize: 11.5 }}>
+                          {t.service_id} · {t.recipient_identifier}
+                        </div>
                       </div>
-                    </div>
-                    <div style={{ textAlign: "right", flexShrink: 0 }}>
-                      <div style={{ fontWeight: 800, fontSize: 13.5 }}>{fmt(t.amount + t.fee)}</div>
-                      <span className={`status-badge ${statusTone(t.fulfillment_status)}`} style={{ marginTop: 4 }}>
-                        {t.fulfillment_status}
-                      </span>
-                    </div>
-                  </Link>
+                      <div style={{ textAlign: "right", flexShrink: 0 }}>
+                        <div style={{ fontWeight: 800, fontSize: 13.5 }}>{fmt(t.amount + t.fee)}</div>
+                        <span className={`status-badge ${statusTone(t.fulfillment_status)}`} style={{ marginTop: 4 }}>
+                          {t.fulfillment_status}
+                        </span>
+                      </div>
+                    </Link>
+                    <StuckTransactionActions transactionId={t.id} />
+                  </div>
                 ))}
               </div>
             </>

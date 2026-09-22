@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidateAdminPath } from "@/lib/actions/admin-cache";
+import { logAdminAction } from "@/lib/actions/audit";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/auth/permissions";
 import { getFulfillmentProvider } from "@/lib/fulfillment";
@@ -173,6 +174,81 @@ export async function markRefundSettled(refundId: string, note: string) {
   if (error) throw new Error(friendlyError(error.message));
   revalidateAdminPath("/refunds");
   return data;
+}
+
+// ── Operations Center row actions ──────────────────────
+// The stuck-transactions list previously only linked to the detail page;
+// these let staff triage an item inline.
+
+// "Completed" delegates to the guarded RPC (writes receipt + audit, refuses
+// to fulfil something already refunded). "Pending" is a plain status reset
+// for items wrongly marked failed.
+export async function adminSetFulfillmentStatus(transactionId: string, status: "pending" | "fulfilled") {
+  const { user } = await requirePermission("transactions.rectify");
+  if (status === "fulfilled") {
+    return forceFulfilTransaction(transactionId, "Marked completed from Operations Center.");
+  }
+  const admin = createAdminClient();
+  const { data: updated, error } = await admin
+    .from("transactions")
+    .update({ fulfillment_status: "pending" })
+    .eq("id", transactionId)
+    .select("id")
+    .maybeSingle();
+  if (error) throw new Error(friendlyError(error.message));
+  if (!updated) throw new Error("That transaction couldn't be found.");
+  await logAdminAction(admin, { actorId: user.id, action: "transaction.set_pending", targetTable: "transactions", targetId: transactionId });
+  revalidate(transactionId);
+}
+
+// "Mark read": dismisses the row from the attention queue without touching
+// fulfilment. The flag lives inside `receipt` so no schema change is needed
+// and the detail page still shows the real status.
+export async function adminAcknowledgeTransaction(transactionId: string) {
+  const { user } = await requirePermission("transactions.rectify");
+  const admin = createAdminClient();
+  const { data: tx, error: txError } = await admin.from("transactions").select("receipt").eq("id", transactionId).single();
+  if (txError || !tx) throw new Error("That transaction couldn't be found.");
+  const { error } = await admin
+    .from("transactions")
+    .update({
+      receipt: {
+        ...((tx.receipt as Record<string, unknown>) ?? {}),
+        acknowledged_by: user.id,
+        acknowledged_at: new Date().toISOString(),
+      },
+    })
+    .eq("id", transactionId);
+  if (error) throw new Error(friendlyError(error.message));
+  await logAdminAction(admin, { actorId: user.id, action: "transaction.acknowledge", targetTable: "transactions", targetId: transactionId });
+  revalidate(transactionId);
+}
+
+// Hard delete — for junk/test rows. transaction_events and refund_requests
+// cascade; anything else referencing the row (guest checkout intents,
+// insurance records) blocks the delete and surfaces a friendly error.
+export async function adminDeleteTransaction(transactionId: string) {
+  const { user } = await requirePermission("transactions.rectify");
+  const admin = createAdminClient();
+  const { data: tx } = await admin.from("transactions").select("reference").eq("id", transactionId).single();
+  if (!tx) throw new Error("That transaction couldn't be found.");
+  // Audit BEFORE the delete — the row is gone after, the log isn't.
+  await logAdminAction(admin, {
+    actorId: user.id,
+    action: "transaction.delete",
+    targetTable: "transactions",
+    targetId: transactionId,
+    meta: { reference: tx.reference },
+  });
+  const { error } = await admin.from("transactions").delete().eq("id", transactionId);
+  if (error) {
+    if (error.code === "23503") {
+      throw new Error("This transaction is linked to a checkout or insurance record — mark it read instead of deleting.");
+    }
+    throw new Error(friendlyError(error.message));
+  }
+  revalidateAdminPath("/operations");
+  revalidateAdminPath("/transactions");
 }
 
 export async function adjustWallet(userId: string, amount: number, reason: string) {

@@ -154,6 +154,9 @@ export async function getAttentionQueue() {
       .from("transactions")
       .select("*")
       .in("fulfillment_status", ["pending", "failed"])
+      // "Mark read" stamps receipt.acknowledged_at — those stay out of the
+      // queue but keep their real status everywhere else.
+      .is("receipt->>acknowledged_at", null)
       .lte("created_at", graceWindow)
       .order("created_at", { ascending: false })
       .limit(50),
