@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Poppins, Space_Grotesk } from "next/font/google";
+import { Inter, Space_Grotesk } from "next/font/google";
+import localFont from "next/font/local";
 import { themeInitScript } from "@/lib/theme-script";
 import "./globals.css";
 
@@ -14,13 +15,17 @@ const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
   weight: ["500", "600", "700"],
 });
-
-// CoolAdmin's typeface — loaded globally as a CSS var but only applied inside
-// .admin-shell, so the customer app keeps Inter/Space Grotesk untouched.
-const poppins = Poppins({
+// CoolAdmin's typeface — self-hosted from the template's own font files so
+// builds never hit Google Fonts. Applied only inside .admin-shell, so the
+// customer app keeps Inter/Space Grotesk untouched.
+const poppins = localFont({
   variable: "--font-poppins",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  src: [
+    { path: "./fonts/poppins-400.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/poppins-500.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/poppins-600.woff2", weight: "600", style: "normal" },
+    { path: "./fonts/poppins-700.woff2", weight: "700", style: "normal" },
+  ],
 });
 
 export const metadata: Metadata = {
