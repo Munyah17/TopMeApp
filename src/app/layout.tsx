@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Space_Grotesk } from "next/font/google";
+import { Inter, Poppins, Space_Grotesk } from "next/font/google";
 import { themeInitScript } from "@/lib/theme-script";
 import "./globals.css";
 
@@ -13,6 +13,14 @@ const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
   subsets: ["latin"],
   weight: ["500", "600", "700"],
+});
+
+// CoolAdmin's typeface — loaded globally as a CSS var but only applied inside
+// .admin-shell, so the customer app keeps Inter/Space Grotesk untouched.
+const poppins = Poppins({
+  variable: "--font-poppins",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
@@ -35,9 +43,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} ${poppins.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        {/* Font Awesome 7 (bundled from the CoolAdmin template) — the Icon
+            component renders these glyphs; self-hosted, no CDN dependency. */}
+        <link rel="stylesheet" href="/vendor/fontawesome/css/all.min.css" />
       </head>
       <body>{children}</body>
     </html>
