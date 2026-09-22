@@ -38,8 +38,8 @@ const NAV: NavGroup[] = [
   {
     label: "People",
     items: [
-      { label: "Users", href: "/admin/users", icon: "users", perm: "users.view" },
-      { label: "Staff", href: "/admin/staff", icon: "user", perm: "staff.manage" },
+      { label: "User Management", href: "/admin/users", icon: "users", perm: "users.view" },
+      { label: "Staff Management", href: "/admin/staff", icon: "user", perm: "staff.manage" },
     ],
   },
   {

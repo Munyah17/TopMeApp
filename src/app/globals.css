@@ -2776,8 +2776,8 @@ html[data-theme="dark"] .admin-shell {
   .admin-shell { grid-template-columns: 240px minmax(0, 1fr); }
   .admin-sidebar {
     position: sticky;
-    top: 0;
     inset: auto;
+    top: 0;
     height: 100dvh;
     width: auto;
     max-width: none;
