@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { Icon } from "@/components/icons";
 import { subscribeToPush } from "@/lib/actions/push";
 
@@ -13,27 +13,29 @@ function urlBase64ToUint8Array(base64String: string) {
   return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
 }
 
+function canOfferPush() {
+  const supported = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+  if (!supported || Notification.permission !== "default") return false;
+  try {
+    return localStorage.getItem(DISMISS_KEY) !== "1";
+  } catch {
+    // Private browsing or storage blocked — treat as not dismissed.
+    return true;
+  }
+}
+const noopSubscribe = () => () => {};
+
 // Small, dismissible banner offering push notifications for new messages
 // and payments — appears once per browser (until enabled or dismissed),
 // only when the browser actually supports it and permission hasn't
 // already been decided one way or the other.
 export function PushSubscribeButton() {
-  const [visible, setVisible] = useState(false);
+  const offerable = useSyncExternalStore(noopSubscribe, canOfferPush, () => false);
+  const [hidden, setHidden] = useState(false);
+  const visible = offerable && !hidden;
+  const setVisible = (v: boolean) => setHidden(!v);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const supported = typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
-    if (!supported) return;
-    if (Notification.permission !== "default") return;
-    let dismissed = false;
-    try {
-      dismissed = localStorage.getItem(DISMISS_KEY) === "1";
-    } catch {
-      // Private browsing or storage blocked — treat as not dismissed.
-    }
-    if (!dismissed) setVisible(true);
-  }, []);
 
   async function enable() {
     setBusy(true);

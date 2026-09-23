@@ -67,7 +67,7 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
               Available balance
             </div>
             <div style={{ color: "#fff", fontSize: 32, fontWeight: 800, marginTop: 4, position: "relative" }}>{fmt(wallet?.balance ?? 0)}</div>
-            <div className="row gap-2 mt-3" style={{ flexWrap: "wrap" }}>
+            <div className="row gap-2 mt-3 wallet-actions" style={{ flexWrap: "wrap" }}>
               <Link href="/pay/send" className="btn wallet-action-btn" style={{ background: "rgba(255,255,255,0.12)", color: "#fff", textDecoration: "none", display: "inline-flex" }}>
                 <Icon name="arrowUpR" size={15} stroke={2.4} /> <span>Send Money</span>
               </Link>

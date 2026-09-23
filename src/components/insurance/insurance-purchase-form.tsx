@@ -235,7 +235,7 @@ export default function InsurancePurchaseForm({ product, allProducts, walletBala
           return;
         }
         if (result.redirectUrl) {
-          window.location.href = result.redirectUrl;
+          window.location.assign(result.redirectUrl);
           return;
         }
         // ecocash — wait for the phone approval on this screen.
