@@ -5,7 +5,8 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.join(__dirname),
   },
-  allowedDevOrigins: ["172.20.10.9"],
+  // Allow LAN device testing via e.g. NEXT_DEV_ORIGIN=192.168.1.20 npm run dev
+  ...(process.env.NEXT_DEV_ORIGIN ? { allowedDevOrigins: [process.env.NEXT_DEV_ORIGIN] } : {}),
   images: {
     // Every admin-uploaded/user-uploaded image (chat, product logos, promo
     // banners, payment gateway banners) lives in Supabase Storage's public

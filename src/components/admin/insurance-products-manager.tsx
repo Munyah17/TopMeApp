@@ -167,7 +167,7 @@ export function InsuranceProductsManager({ products, isSuperAdmin = false }: { p
     <>
       <div className="section-title mt-3 mb-2">Insurance products</div>
       <div className="muted mb-2" style={{ fontSize: 12 }}>
-        Synced from each underwriter — you can't add or remove a product here, only override how it's shown
+        Synced from each underwriter — you can&apos;t add or remove a product here, only override how it&apos;s shown
         and priced, or take it off the customer catalog.
       </div>
       <div className="card mb-3" style={{ overflow: "hidden" }}>

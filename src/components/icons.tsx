@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 
 /**
  * Font Awesome glyph map — the CoolAdmin reskin swaps the hand-rolled line
- * icons for FA 7 (self-hosted in /public/vendor/fontawesome). `Icon` keeps
+ * icons for FA 7 (subset built by scripts/build-fa-subset.py from /vendor/fontawesome). `Icon` keeps
  * the same API (name/size/className) so no call sites change.
  * `c` = FA class list, `r` = optional rotation in degrees (fa-rotate-by).
  */

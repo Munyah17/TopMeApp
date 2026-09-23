@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Icon } from "@/components/icons";
@@ -59,14 +59,14 @@ export function AppShell({
   const pathname = usePathname();
   const router = useRouter();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerPath, setDrawerPath] = useState(pathname);
+  if (drawerPath !== pathname) {
+    setDrawerPath(pathname);
+    setDrawerOpen(false);
+  }
   const showFab = pathname === "/home";
   const isAdminSection = pathname.startsWith("/admin");
   const navTabs = chatEnabled ? NAVTABS : NAVTABS.filter((t) => t.id !== "chat");
-
-  // Close the mobile drawer whenever the route changes.
-  useEffect(() => {
-    setDrawerOpen(false);
-  }, [pathname]);
 
   const navLinks = (onNavigate?: () => void) =>
     navTabs.map((t) => (

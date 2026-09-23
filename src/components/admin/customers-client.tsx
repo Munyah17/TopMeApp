@@ -24,7 +24,7 @@ function CustomerRow({ customer }: { customer: Profile }) {
       </div>
       <Link href={`${basePath}/users/${customer.id}`} style={{ flex: 1, minWidth: 0, textDecoration: "none", color: "inherit" }}>
         <div style={{ fontWeight: 700, fontSize: 13.5 }}>{customer.full_name || "Unnamed"}</div>
-        <div className="muted" style={{ fontSize: 11.5 }}>
+        <div className="muted" style={{ fontSize: 11.5, overflowWrap: "anywhere" }}>
           {customer.phone || "No phone"} · {customer.email || "No email"} · {ROLE_LABEL[customer.role]}
         </div>
       </Link>

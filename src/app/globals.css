@@ -189,7 +189,9 @@ html[data-theme="dark"] .app-shell {
   --bg: #0f172a;
   --surface: #1e293b;
   --surface-elevated: #334155;
-  --muted: #1e293b;
+  --muted: #2b3a52;
+  --card-bg: var(--surface);
+  --input-bg: #162032;
   
   /* Text Colors */
   --text-primary: #f1f5f9;
@@ -252,7 +254,7 @@ html[data-theme="dark"] .app-shell {
   --text: var(--text-primary);
   --text-soft: var(--text-secondary);
   --text-faint: var(--text-tertiary);
-  --badge-neutral-bg: #1c2638;
+  --badge-neutral-bg: #334155;
   --error-border-soft: rgba(248, 113, 113, 0.35);
   --chat-bubble-mine: #0b3d2a;
 }
@@ -757,6 +759,7 @@ h4 {
   width: 100%;
   max-width: 100vw;
   background: var(--bg);
+  color: var(--text);
   overflow: hidden;
 }
 .header-logo {
@@ -2070,7 +2073,7 @@ html[data-theme="dark"] .admin-shell {
   --surface-elevated: #283845;
   --card-bg: #22303d;
   --input-bg: #1c2833;
-  --muted: #2a3947;
+  --muted: #334657;
   --adm-hover: #2a3947;
   --adm-overlay: #22303d;
   --border: #34495e;
@@ -2099,7 +2102,7 @@ html[data-theme="dark"] .admin-shell {
   --adm-purple: #a78bfa; --adm-purple-bg: rgba(167, 139, 250, 0.14);
   --adm-teal: #2dd4bf; --adm-teal-bg: rgba(45, 212, 191, 0.14);
   --blue: #17a2b8; --blue-50: rgba(23, 162, 184, 0.16);
-  --badge-neutral-bg: #2a3947;
+  --badge-neutral-bg: #364a5c;
 
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35);
@@ -2802,4 +2805,67 @@ html[data-theme="dark"] .admin-shell {
 }
 @media (min-width: 1440px) {
   .admin-content, .admin-topbar, .admin-footer { padding-left: 40px; padding-right: 40px; }
+}
+
+/* ======================================================================
+   Mobile compaction (< 640px) — tighter gutters, denser cards and
+   stacked wallet actions so small screens show more content per fold.
+   ====================================================================== */
+@media (max-width: 639px) {
+  /* Customer app */
+  .px { padding-left: 16px; padding-right: 16px; }
+  .card-pad { padding: var(--space-4); }
+  .card { border-radius: var(--radius-md); }
+  .screen-pad { padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
+  .quickpay-gift-row { gap: 12px; }
+  .cats-grid { gap: 10px; }
+  .cats-grid > a { padding: 12px 14px !important; }
+  .cats-grid > a .ibadge { width: 36px; height: 36px; }
+  .cats-grid > a .muted {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .cat-section-row { gap: var(--space-2); padding: var(--space-1) 0 var(--space-2); }
+  .hist-row { padding: 10px 14px !important; }
+  .wallet-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .wallet-actions .wallet-action-btn {
+    flex-direction: column;
+    height: auto;
+    padding: 10px 6px;
+    gap: 6px;
+    font-size: 12px;
+    line-height: 1.1;
+    white-space: normal;
+    text-align: center;
+  }
+  .wallet-actions .wallet-action-btn span { overflow: visible; }
+  .empty-state { padding: var(--space-6) var(--space-4); }
+
+  /* Admin console */
+  .admin-content { padding: 14px 12px calc(32px + env(safe-area-inset-bottom)); }
+  .admin-topbar { padding: 0 12px; }
+  .admin-footer { padding: 14px 12px 20px; }
+  .adm-kpi-grid { gap: 10px; margin-bottom: 14px; }
+  .adm-kpi { padding: 12px 12px 10px; gap: 8px; }
+  .adm-kpi-icon { width: 28px; height: 28px; }
+  .adm-kpi-label { font-size: 12px; white-space: normal; line-height: 1.2; overflow-wrap: normal; word-break: keep-all; hyphens: none; }
+  .adm-kpi-top { align-items: flex-start; gap: 6px; }
+  .adm-kpi-value { font-size: 28px; }
+  .adm-kpi-foot { padding-top: 8px; font-size: 11px; flex-wrap: wrap; }
+  .adm-pill { font-size: 10px; padding: 3px 7px; }
+  .adm-grid { gap: 10px; }
+  .adm-panel { padding: 14px; }
+  .adm-panel-head { padding-bottom: 10px; margin-bottom: 12px; }
+  .adm-alert { padding: 12px 14px; }
+  .adm-hero { margin-bottom: 14px; }
+  .adm-table th { font-size: 9.5px; padding-bottom: 8px; }
+  .adm-table td { padding: 9px 8px 9px 0; font-size: 12.5px; }
+  .adm-table .mono { font-size: 11px; }
+  .adm-table-scroll { margin: 0 -14px; padding: 0 14px; }
+  .adm-empty { padding: 20px 12px; }
+  .admin-content .card-pad { padding: 14px; }
+  .admin-content .row.gap-2 { flex-wrap: wrap; }
+  .admin-content .page-header { margin-bottom: 14px; }
 }

@@ -3,23 +3,28 @@ import { Inter, Space_Grotesk } from "next/font/google";
 import localFont from "next/font/local";
 import { themeInitScript } from "@/lib/theme-script";
 import "./globals.css";
+import "./fa-subset.css";
 
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800", "900"],
+  weight: ["400", "500", "600", "700", "800"],
+  display: "swap",
 });
 
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
   subsets: ["latin"],
   weight: ["500", "600", "700"],
+  display: "swap",
 });
 // CoolAdmin's typeface — self-hosted from the template's own font files so
 // builds never hit Google Fonts. Applied only inside .admin-shell, so the
 // customer app keeps Inter/Space Grotesk untouched.
 const poppins = localFont({
   variable: "--font-poppins",
+  preload: false,
+  display: "swap",
   src: [
     { path: "./fonts/poppins-400.woff2", weight: "400", style: "normal" },
     { path: "./fonts/poppins-500.woff2", weight: "500", style: "normal" },
@@ -51,9 +56,7 @@ export default function RootLayout({
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} ${poppins.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
-        {/* Font Awesome 7 (bundled from the CoolAdmin template) — the Icon
-            component renders these glyphs; self-hosted, no CDN dependency. */}
-        <link rel="stylesheet" href="/vendor/fontawesome/css/all.min.css" />
+        <link rel="preload" href="/fonts/fa-solid-900.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
       </head>
       <body>{children}</body>
     </html>

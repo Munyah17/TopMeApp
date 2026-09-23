@@ -306,7 +306,7 @@ export default async function HomePage() {
                       widgetCursor += 1;
                       const content = (
                         // eslint-disable-next-line @next/next/no-img-element -- admin-uploaded widget tile, arbitrary host
-                        <img src={widget.image_url ?? ""} alt={widget.title ?? "Promotion"} className="cat-widget-img" />
+                        <img src={widget.image_url ?? ""} alt={widget.title ?? "Promotion"} className="cat-widget-img" loading="lazy" decoding="async" />
                       );
                       return (
                         <div key={`widget-${widget.id}-${widgetCursor}`} className="cat-widget-tile">
@@ -320,12 +320,12 @@ export default async function HomePage() {
                   promoBanner.link_url ? (
                     <Link href={promoBanner.link_url} className="mt-3 tap" style={{ display: "block", borderRadius: 16, overflow: "hidden" }}>
                       {/* eslint-disable-next-line @next/next/no-img-element -- admin-managed banner, arbitrary host */}
-                      <img src={promoBanner.image_url ?? ""} alt="Promotion" style={{ width: "100%", display: "block" }} />
+                      <img src={promoBanner.image_url ?? ""} alt="Promotion" loading="lazy" decoding="async" style={{ width: "100%", display: "block" }} />
                     </Link>
                   ) : (
                     <div className="mt-3" style={{ borderRadius: 16, overflow: "hidden" }}>
                       {/* eslint-disable-next-line @next/next/no-img-element -- admin-managed banner, arbitrary host */}
-                      <img src={promoBanner.image_url ?? ""} alt="Promotion" style={{ width: "100%", display: "block" }} />
+                      <img src={promoBanner.image_url ?? ""} alt="Promotion" loading="lazy" decoding="async" style={{ width: "100%", display: "block" }} />
                     </div>
                   )
                 )}
