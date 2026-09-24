@@ -1214,9 +1214,6 @@ a.side-user:hover {
   .bottom-nav {
     display: none !important;
   }
-  .fab {
-    display: none !important;
-  }
   .mobile-only {
     display: none !important;
   }
@@ -1381,33 +1378,6 @@ a.side-user:hover {
   border-radius: 50%;
   background: var(--error);
   border: 2px solid var(--bg);
-}
-
-/* ---------- FAB ---------- */
-.fab {
-  position: absolute;
-  right: 20px;
-  bottom: calc(82px + env(safe-area-inset-bottom));
-  z-index: 90;
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  background: var(--navy);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 10px 26px -6px rgba(15, 23, 42, 0.45);
-  cursor: pointer;
-  border: 3px solid var(--bg);
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
-}
-.fab:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 14px 30px -6px rgba(15, 23, 42, 0.5);
-}
-.fab:active {
-  transform: scale(0.94);
 }
 
 /* ---------- Top bar for sub-screens ---------- */
@@ -2774,6 +2744,20 @@ html[data-theme="dark"] .admin-shell {
    card-to-card gutter to 12px everywhere in the console. */
 @media (max-width: 899.98px) {
   .admin-content .card.mb-2 { margin-bottom: 12px; }
+
+  /* KPI cards are ~150px wide here — the desktop top row (icon + label +
+     period pill) truncates the label to "Gr…". Stack the icon above a
+     wrapping label, float the period pill in the card's corner and centre
+     the stat underneath. */
+  .adm-kpi { padding: 14px 12px 12px; gap: 8px; text-align: center; }
+  .adm-kpi-top { justify-content: center; }
+  .adm-kpi-id { flex-direction: column; align-items: center; gap: 8px; }
+  .adm-kpi-icon { width: 30px; height: 30px; }
+  .adm-kpi-label { white-space: normal; overflow: visible; font-size: 12px; }
+  .adm-kpi .adm-pill { position: absolute; top: 0; right: 0; }
+  .adm-kpi-value { font-size: 26px; }
+  .adm-kpi-value sup { font-size: 11px; }
+  .adm-kpi-foot { justify-content: center; font-size: 11px; padding-top: 8px; }
 }
 @media (min-width: 640px) {
   .admin-cmd { display: inline-flex; }

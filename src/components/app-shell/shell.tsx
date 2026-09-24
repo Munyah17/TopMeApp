@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { Icon } from "@/components/icons";
 import { AvatarMenu } from "@/components/app-shell/avatar-menu";
 import { BrandMark, Wordmark } from "@/components/logo";
@@ -57,16 +57,18 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const showFab = pathname === "/home";
   const isAdminSection = pathname.startsWith("/admin");
   const navTabs = chatEnabled ? NAVTABS : NAVTABS.filter((t) => t.id !== "chat");
 
-  // Close the mobile drawer whenever the route changes.
-  useEffect(() => {
+  // Close the mobile drawer whenever the route changes — the render-time
+  // compare, not an effect, so the drawer can't flash open for one frame
+  // on the new page (and it satisfies react-hooks/set-state-in-effect).
+  const [prevPathname, setPrevPathname] = useState(pathname);
+  if (prevPathname !== pathname) {
+    setPrevPathname(pathname);
     setDrawerOpen(false);
-  }, [pathname]);
+  }
 
   const navLinks = (onNavigate?: () => void) =>
     navTabs.map((t) => (
@@ -196,12 +198,6 @@ export function AppShell({
               so a footer would just add a scrollable gap below it. */}
           {!pathname.startsWith("/chat") && <Footer />}
         </div>
-
-        {showFab && (
-          <button className="fab tap" title="Browse services" onClick={() => router.push("/services")}>
-            <Icon name="grid" size={22} stroke={1.8} className="text-white" />
-          </button>
-        )}
 
         <nav className="bottom-nav">
           {navTabs.map((t) =>
