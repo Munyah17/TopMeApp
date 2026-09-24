@@ -37,7 +37,7 @@ function TransactionTimeline({ timeline }: { timeline: TransactionTimelineEntry[
       </div>
       <div className="mt-2">
         {timeline.map((entry) => {
-          const style = entry.source === "admin" ? { icon: "user", color: "var(--navy)" } : EVENT_STYLE[entry.eventType] ?? { icon: "clock", color: "var(--text-soft)" };
+          const style = entry.source === "admin" ? { icon: "user", color: "var(--text-primary)" } : EVENT_STYLE[entry.eventType] ?? { icon: "clock", color: "var(--text-soft)" };
           return (
             <div key={entry.id} className="row gap-2" style={{ padding: "8px 0", alignItems: "flex-start" }}>
               <div className="ibadge round" style={{ width: 26, height: 26, background: `${style.color}1a`, color: style.color, flexShrink: 0, marginTop: 1 }}>

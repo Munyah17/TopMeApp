@@ -5,6 +5,7 @@
    Premium Fintech Visual Language
    ============================================ */
 :root {
+  color-scheme: light;
   /* Brand Colors — deep emerald ramp (Linear/Stripe-style restraint).
      One accent does all the work: 50/100 soft tints for badges & icon
      chips, 600 for primary buttons, 700–950 for the sidebar gradient. */
@@ -180,6 +181,10 @@
    has no background of its own and just inherits body's — which is
    exactly what the owner explicitly said not to touch. */
 html[data-theme="dark"] .app-shell {
+  /* Tells the UA this surface is dark — native form controls, scrollbars,
+     date pickers and select dropdowns then render dark chrome instead of
+     light controls with dark text stranded on our dark surfaces. */
+  color-scheme: dark;
   /* Brand Colors (unchanged hue — emerald reads well on dark) */
   --green-50: rgba(5, 150, 105, 0.16);
   --green-100: rgba(5, 150, 105, 0.24);
@@ -249,9 +254,13 @@ html[data-theme="dark"] .app-shell {
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6);
   --shadow-green: 0 4px 12px rgba(5, 150, 105, 0.3);
   
-  /* Legacy Aliases */
-  --navy: #1e293b;
-  --navy-700: #0f172a;
+  /* Legacy Aliases — --navy is used as a *surface* (header avatar, chat
+     badges, money bubbles, .btn-navy) as much as a colour. #1e293b was
+     identical to --surface, so those all vanished into dark cards;
+     elevated slate keeps them distinct while staying dark-mode native. */
+  --navy: #334155;
+  --navy-700: #1e293b;
+  --chat-bubble-mine: #005c4b;
   --blue-50: rgba(56, 189, 248, 0.16);
   --text: var(--text-primary);
   --text-soft: var(--text-secondary);
@@ -274,6 +283,15 @@ html[data-theme="dark"] .app-shell {
 
 * {
   box-sizing: border-box;
+}
+/* Form controls default to the UA's own font + text colour — left alone
+   they render dark system text (and a system font) inside our dark
+   surfaces. Inheriting makes every unstyled input follow the theme. */
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
 }
 html,
 body {
@@ -454,7 +472,9 @@ h4 {
 
 .btn-navy {
   background: var(--navy);
-  color: var(--text-inverse);
+  /* --navy is a dark surface in BOTH themes — its text must always be light
+     (--text-inverse flips to dark in dark mode and vanished on the navy). */
+  color: #fff;
   height: 44px;
   font-size: var(--font-base);
   padding: 0 var(--space-5);
@@ -1856,6 +1876,18 @@ a.side-user:hover {
   border-radius: 100px;
   box-shadow: var(--shadow-sm);
 }
+/* WhatsApp-dark wallpaper — the pale mint is blinding inside an otherwise
+   dark app; keep the dot texture but flip it to white-on-dark. */
+html[data-theme="dark"] .app-shell .chat-wallpaper {
+  background-color: #0b141a;
+  background-image:
+    radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+}
+html[data-theme="dark"] .app-shell .chat-day-chip {
+  background: var(--surface-elevated);
+  color: var(--text-secondary);
+}
 .chat-composer-pill {
   flex: 1;
   display: flex;
@@ -2076,6 +2108,7 @@ a.side-user:hover {
   transition: background-color 280ms ease, color 280ms ease;
 }
 html[data-theme="dark"] .admin-shell {
+  color-scheme: dark;
   /* CoolAdmin-adapted dark slate */
   --bg: #1a252f;
   --surface: #22303d;

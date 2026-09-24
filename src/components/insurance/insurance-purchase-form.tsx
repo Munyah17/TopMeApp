@@ -49,11 +49,14 @@ const ZW_MOBILE = /^\+263[17]\d{8}$/;
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
+  minWidth: 0, // flex/grid children can't shrink below an input's intrinsic width without this — was overflowing the screen on mobile
   padding: "12px 16px",
   borderRadius: 12,
   border: "1px solid var(--border)",
   background: "var(--input-bg)",
-  fontSize: 14,
+  color: "var(--text-primary)",
+  fontFamily: "inherit",
+  fontSize: 16, // 16px keeps iOS from auto-zooming the page on focus
 };
 
 const labelStyle: React.CSSProperties = {
@@ -484,7 +487,7 @@ export default function InsurancePurchaseForm({ product, allProducts, walletBala
                 }}
               >
                 <div className="row gap-2" style={{ alignItems: "flex-start" }}>
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: "1 1 0px", minWidth: 0 }}>
                     <select
                       value={selection.productId}
                       onChange={(e) => setProductAt(index, e.target.value)}
@@ -624,8 +627,11 @@ export default function InsurancePurchaseForm({ product, allProducts, walletBala
           {fieldError("fullName")}
         </div>
 
-        <div className="row gap-2" style={{ alignItems: "flex-start" }}>
-          <div style={{ flex: 1 }}>
+        {/* flexWrap + 170px basis: side-by-side when there's room, stacked
+            on a phone instead of overflowing (inputs can't shrink below
+            their intrinsic width otherwise). */}
+        <div className="row gap-2" style={{ alignItems: "flex-start", flexWrap: "wrap" }}>
+          <div style={{ flex: "1 1 170px", minWidth: 0 }}>
             <label style={labelStyle}>National ID *</label>
             <input
               type="text"
@@ -636,14 +642,14 @@ export default function InsurancePurchaseForm({ product, allProducts, walletBala
             />
             {fieldError("nationalId")}
           </div>
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: "1 1 170px", minWidth: 0 }}>
             <label style={labelStyle}>Date of Birth</label>
             <input type="date" value={dob} onChange={(e) => setDob(e.target.value)} style={inputStyle} />
           </div>
         </div>
 
-        <div className="row gap-2" style={{ alignItems: "flex-start" }}>
-          <div style={{ flex: 1 }}>
+        <div className="row gap-2" style={{ alignItems: "flex-start", flexWrap: "wrap" }}>
+          <div style={{ flex: "1 1 170px", minWidth: 0 }}>
             <label style={labelStyle}>Phone Number *</label>
             <input
               type="tel"
@@ -654,7 +660,7 @@ export default function InsurancePurchaseForm({ product, allProducts, walletBala
             />
             {fieldError("phone")}
           </div>
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: "1 1 170px", minWidth: 0 }}>
             <label style={labelStyle}>Email Address *</label>
             <input
               type="email"
