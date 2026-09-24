@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { AccessLocked } from "@/components/admin/access-locked";
 import { AdminShell } from "@/components/admin/admin-shell";
+import { StaffLogin } from "@/components/admin/staff-login";
 import { AnnouncementStrip } from "@/components/app-shell/announcement-strip";
 import { getMyPermissions } from "@/lib/auth/permissions";
 import { getAttentionCount, getPendingRefundCount, getPendingWithdrawalCount } from "@/lib/data/admin-queries";
@@ -17,7 +18,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const profile = await getCurrentProfile();
 
   if (!profile) {
-    return <AccessLocked title="Log in required" message="Please log in with a TopMe staff account to access the admin console." />;
+    return <StaffLogin portal="admin" />;
   }
   if (profile.role === "superadmin") {
     redirect("/super-admin");

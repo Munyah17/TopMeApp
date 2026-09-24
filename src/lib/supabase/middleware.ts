@@ -58,23 +58,14 @@ export async function updateSession(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
 
-  // Only /admin and /super-admin hard-redirect at the edge. /wallet, /history
-  // and /account are guest-reachable too now — each page renders its own
-  // in-shell "log in" prompt (or, for /history, cached guest activity) so the
-  // app shell and its navigation stay visible instead of bouncing the visitor
-  // to a bare /login.
-  const protectedPrefixes = ["/admin", "/super-admin"];
+  // /admin and /super-admin don't redirect to /login — staff sign in at
+  // their own portal URLs (each layout renders StaffLogin for a logged-out
+  // session), keeping the customer and staff entry points fully separate.
+  // /wallet, /history and /account are guest-reachable too — each page
+  // renders its own in-shell "log in" prompt (or, for /history, cached
+  // guest activity) so the app shell and its navigation stay visible.
   const authPrefixes = ["/login", "/signup"];
-
-  const isProtected = protectedPrefixes.some((p) => pathname.startsWith(p));
   const isAuthRoute = authPrefixes.some((p) => pathname.startsWith(p));
-
-  if (!user && isProtected) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(url);
-  }
 
   if (user && isAuthRoute) {
     // Staff belong on their console, not the customer home — resolve the
@@ -85,6 +76,23 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = profile?.role === "superadmin" ? "/super-admin" : profile?.role === "admin" ? "/admin" : "/home";
     return NextResponse.redirect(url);
+  }
+
+  // Staff have no customer account: /account, /wallet, personal /pay routes
+  // and /chat are customer-profile surfaces, and an admin session reaching
+  // one is bounced to their console. Public pages (/home, /services,
+  // /pay/[serviceId] checkout, /pay/guest) stay open to them — staff can
+  // view the site like a visitor, they just can't hold a client profile.
+  const staffGatedPrefixes = ["/account", "/wallet", "/history", "/chat", "/pay/send", "/pay/receive", "/pay/scan"];
+  const isCustomerAccountRoute = staffGatedPrefixes.some((p) => pathname === p || pathname.startsWith(p + "/"));
+  if (user && isCustomerAccountRoute) {
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+    if (profile?.role === "superadmin" || profile?.role === "admin") {
+      const url = request.nextUrl.clone();
+      url.pathname = profile.role === "superadmin" ? "/super-admin" : "/admin";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
   }
 
   // Maintenance mode: blocks everyone except staff, and never blocks /admin,

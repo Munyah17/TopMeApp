@@ -12,7 +12,7 @@ const ITEMS = [
   { href: "/account#notifications", label: "Notifications", icon: "bell" },
 ] as const;
 
-export function AvatarMenu({ initials, avatarUrl }: { initials: string; avatarUrl?: string | null }) {
+export function AvatarMenu({ initials, avatarUrl, consoleHref }: { initials: string; avatarUrl?: string | null; consoleHref?: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -38,7 +38,7 @@ export function AvatarMenu({ initials, avatarUrl }: { initials: string; avatarUr
       </button>
       {open && (
         <div className="avatar-menu">
-          {ITEMS.map((item) => (
+          {(consoleHref ? [{ href: consoleHref, label: "Staff console", icon: "grid" }] : ITEMS).map((item) => (
             <Link key={item.label} href={item.href} className="avatar-menu-item" onClick={() => setOpen(false)}>
               <Icon name={item.icon} size={16} stroke={1.9} />
               <span>{item.label}</span>

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { ProfileDetailsCard } from "@/components/account/profile-details-card";
 import { NotificationsToggle } from "@/components/wallet/notifications-toggle";
 import { getCurrentProfile } from "@/lib/data/queries";
 
@@ -33,20 +33,16 @@ export default async function AdminProfilePage() {
         </span>
       </div>
 
+      <div className="mb-3">
+        <ProfileDetailsCard name={profile.full_name} phone={profile.phone} email={profile.email} />
+      </div>
+
       <div className="card card-pad row between" style={{ alignItems: "center" }}>
         <div>
           <div style={{ fontWeight: 700, fontSize: 13.5 }}>Notifications</div>
           <div className="muted" style={{ fontSize: 12 }}>Payment and account emails</div>
         </div>
         <NotificationsToggle initial={profile.notifications_enabled} />
-      </div>
-
-      <div className="muted mt-3" style={{ fontSize: 12 }}>
-        Name, phone, and password are managed from your{" "}
-        <Link href="/account" style={{ color: "var(--green)", fontWeight: 700 }}>
-          regular Account page
-        </Link>
-        .
       </div>
     </div>
   );

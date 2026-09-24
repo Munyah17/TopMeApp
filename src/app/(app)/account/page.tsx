@@ -24,9 +24,8 @@ export default async function AccountPage() {
   }
 
   // Staff don't have a customer-style "account" — their account IS business
-  // operations. /super-admin and /admin are the real destination, not a
-  // doorway bolted onto a wallet/beneficiaries page they'll never use in
-  // that capacity.
+  // operations. Middleware already bounces staff off this route; this stays
+  // as the page-level guarantee so the rule can't silently drift.
   if (profile.role === "superadmin") redirect("/super-admin");
   if (profile.role === "admin") redirect("/admin");
 

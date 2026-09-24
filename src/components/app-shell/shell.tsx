@@ -7,6 +7,8 @@ import { Icon } from "@/components/icons";
 import { AvatarMenu } from "@/components/app-shell/avatar-menu";
 import { BrandMark, Wordmark } from "@/components/logo";
 import { Footer } from "@/components/app-shell/footer";
+import { NAV as STAFF_NAV, portalHref } from "@/components/admin/nav";
+import type { PermissionKey } from "@/lib/auth/permission-keys";
 import type { Profile } from "@/types/database";
 
 const NAVTABS = [
@@ -47,19 +49,34 @@ export function AppShell({
   profile,
   unreadChatCount = 0,
   chatEnabled = true,
+  staffConsole,
   announcements,
   children,
 }: {
   profile: Profile | null;
   unreadChatCount?: number;
   chatEnabled?: boolean;
+  staffConsole?: { basePath: "/admin" | "/super-admin"; permissions: PermissionKey[] };
   announcements?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const isAdminSection = pathname.startsWith("/admin");
+  // Staff browsing the site never see the customer tabs — the sidebar and
+  // drawer carry their console's own nav instead (same table as the portal
+  // shell, so the two can't drift), and the bottom tab bar doesn't render.
+  const isStaff = !!staffConsole;
+  const consoleHref = staffConsole?.basePath ?? "/admin";
   const navTabs = chatEnabled ? NAVTABS : NAVTABS.filter((t) => t.id !== "chat");
+  const staffGroups = staffConsole
+    ? STAFF_NAV.map((g) => ({
+        ...g,
+        items: g.items.filter(
+          (item) => !item.perm || staffConsole.basePath === "/super-admin" || staffConsole.permissions.includes(item.perm)
+        ),
+      })).filter((g) => g.items.length > 0)
+    : [];
 
   // Close the mobile drawer whenever the route changes — the render-time
   // compare, not an effect, so the drawer can't flash open for one frame
@@ -84,8 +101,40 @@ export function AppShell({
       </Link>
     ));
 
+  const staffNavLinks = (onNavigate?: () => void) =>
+    staffGroups.map((g) => (
+      <div key={g.label}>
+        <div
+          style={{
+            padding: "14px 12px 4px",
+            fontSize: 10,
+            fontWeight: 800,
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            color: "rgba(236,253,245,0.45)",
+          }}
+        >
+          {g.label}
+        </div>
+        {g.items.map((item) => {
+          const href = portalHref(item.href, consoleHref);
+          return (
+            <Link
+              key={href}
+              href={href}
+              onClick={onNavigate}
+              className={`side-nav-item ${isActive(pathname, href) ? "active" : ""}`}
+            >
+              <Icon name={item.icon} size={18} stroke={2} />
+              <span>{item.label}</span>
+            </Link>
+          );
+        })}
+      </div>
+    ));
+
   const userCard = profile ? (
-    <Link href="/account" className="side-user" style={{ textDecoration: "none" }}>
+    <Link href={isStaff ? consoleHref : "/account"} className="side-user" style={{ textDecoration: "none" }}>
       <span className="side-user-avatar">
         {profile.avatar_url ? (
           // eslint-disable-next-line @next/next/no-img-element -- user-uploaded avatar from our own storage, no stored dimensions
@@ -96,7 +145,7 @@ export function AppShell({
       </span>
       <span className="side-user-meta">
         <span className="side-user-name">{profile.full_name || "Account"}</span>
-        <span className="side-user-sub">View profile</span>
+        <span className="side-user-sub">{isStaff ? "Staff console" : "View profile"}</span>
       </span>
       <Icon name="chevronR" size={16} stroke={2} className="side-user-chevron" />
     </Link>
@@ -128,7 +177,7 @@ export function AppShell({
           <Wordmark size={16} />
         </Link>
         <nav className="side-nav">
-          {navLinks()}
+          {staffConsole ? staffNavLinks() : navLinks()}
         </nav>
         <div className="side-footer">{userCard}</div>
       </aside>
@@ -145,7 +194,7 @@ export function AppShell({
             <Icon name="x" size={18} stroke={2} />
           </button>
         </div>
-        <nav className="side-nav">{navLinks(() => setDrawerOpen(false))}</nav>
+        <nav className="side-nav">{staffConsole ? staffNavLinks(() => setDrawerOpen(false)) : navLinks(() => setDrawerOpen(false))}</nav>
         <div className="side-footer">{userCard}</div>
       </aside>
 
@@ -166,7 +215,7 @@ export function AppShell({
 
             <div className="header-right">
               {profile ? (
-                <AvatarMenu initials={initials(profile.full_name)} avatarUrl={profile.avatar_url} />
+                <AvatarMenu initials={initials(profile.full_name)} avatarUrl={profile.avatar_url} consoleHref={isStaff ? consoleHref : undefined} />
               ) : (
                 <>
                   {/* Mobile gets one clean CTA; desktop keeps the split pair. */}
@@ -199,26 +248,28 @@ export function AppShell({
           {!pathname.startsWith("/chat") && <Footer />}
         </div>
 
-        <nav className="bottom-nav">
-          {navTabs.map((t) =>
-            t.id === "chat" ? (
-              <Link key={t.id} href={t.href} className={`nav-item nav-item-chat ${isActive(pathname, t.href) ? "active" : ""}`}>
-                <span className="nav-chat-badge">
-                  <Icon name={t.icon} size={23} stroke={2.2} />
-                  {unreadChatCount > 0 && <span className="nav-chat-dot" />}
-                </span>
-                <span className="nav-label">{t.label}</span>
-              </Link>
-            ) : (
-              <Link key={t.id} href={t.href} className={`nav-item ${isActive(pathname, t.href) ? "active" : ""}`}>
-                <span style={{ position: "relative", display: "inline-flex" }}>
-                  <Icon name={t.icon} size={22} stroke={2} />
-                </span>
-                <span className="nav-label">{t.label}</span>
-              </Link>
-            )
-          )}
-        </nav>
+        {!staffConsole && (
+          <nav className="bottom-nav">
+            {navTabs.map((t) =>
+              t.id === "chat" ? (
+                <Link key={t.id} href={t.href} className={`nav-item nav-item-chat ${isActive(pathname, t.href) ? "active" : ""}`}>
+                  <span className="nav-chat-badge">
+                    <Icon name={t.icon} size={23} stroke={2.2} />
+                    {unreadChatCount > 0 && <span className="nav-chat-dot" />}
+                  </span>
+                  <span className="nav-label">{t.label}</span>
+                </Link>
+              ) : (
+                <Link key={t.id} href={t.href} className={`nav-item ${isActive(pathname, t.href) ? "active" : ""}`}>
+                  <span style={{ position: "relative", display: "inline-flex" }}>
+                    <Icon name={t.icon} size={22} stroke={2} />
+                  </span>
+                  <span className="nav-label">{t.label}</span>
+                </Link>
+              )
+            )}
+          </nav>
+        )}
       </div>
     </div>
   );

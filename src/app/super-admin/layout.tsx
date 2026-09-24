@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
-import { AccessLocked } from "@/components/admin/access-locked";
 import { AdminShell } from "@/components/admin/admin-shell";
+import { StaffLogin } from "@/components/admin/staff-login";
 import { AnnouncementStrip } from "@/components/app-shell/announcement-strip";
 import { PERMISSION_KEYS } from "@/lib/auth/permission-keys";
 import { getAttentionCount, getPendingRefundCount, getPendingWithdrawalCount } from "@/lib/data/admin-queries";
@@ -16,7 +16,7 @@ export default async function SuperAdminLayout({ children }: { children: React.R
   const profile = await getCurrentProfile();
 
   if (!profile) {
-    return <AccessLocked title="Log in required" message="Please log in with the Super Admin account to access this console." />;
+    return <StaffLogin portal="superadmin" />;
   }
   if (profile.role !== "superadmin") {
     redirect("/admin");
