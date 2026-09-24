@@ -20,7 +20,10 @@ export async function POST(request: NextRequest) {
   try {
     event = getStripe().webhooks.constructEvent(rawBody, signature, webhookSecret);
   } catch (e) {
-    void recordIntegrationHealth(createAdminClient(), "stripe", { success: false, error: e instanceof Error ? e.message : "invalid_signature" });
+    // Rejected auth isn't an integration-health signal — any internet probe
+    // of this public URL produces an invalid signature, which isn't evidence
+    // that Stripe is down. Still logged for forensics.
+    console.error(`[stripe webhook] invalid signature: ${e instanceof Error ? e.message : "unknown"}`);
     return NextResponse.json({ error: "invalid_signature" }, { status: 400 });
   }
   void recordIntegrationHealth(createAdminClient(), "stripe", { success: true });

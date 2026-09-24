@@ -44,11 +44,16 @@ export async function POST(request: NextRequest) {
   const signature = request.headers.get("x-vitalpay-signature");
 
   if (!verifySignature(rawBody, signature)) {
+    // Rejected auth is NOT an integration-health signal — a signature that
+    // doesn't verify says the request isn't provably from VitalPay (a stray
+    // internet probe, a test ping), not that VitalPay is down. Counting it
+    // flagged VitalPay as failing after random scans of this public URL.
+    // console.error still captures it if the signature scheme itself is
+    // misconfigured (real deliveries would all 401 and pile up pending).
     console.error(`[vitalpay webhook] invalid signature — header present: ${!!signature}, secrets configured: ${[
       !!process.env.VITALPAY_WEBHOOK_SECRET,
       !!process.env.VITALPAY_WEBHOOK_SECRET_FALLBACK,
     ].filter(Boolean).length}`);
-    void recordIntegrationHealth(createAdminClient(), "vitalpay", { success: false, error: "invalid_signature" });
     return NextResponse.json({ error: "invalid_signature" }, { status: 401 });
   }
 
