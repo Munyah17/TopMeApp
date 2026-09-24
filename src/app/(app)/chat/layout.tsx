@@ -66,7 +66,7 @@ export default async function ChatLayout({ children }: { children: React.ReactNo
           className="row gap-2 tap chat-pinned-row"
           style={{ padding: "12px 14px", borderBottom: "1px solid var(--border)", textDecoration: "none" }}
         >
-          <div className="ibadge round" style={{ background: "var(--green)", color: "#fff" }}>
+          <div className="ibadge round" style={{ background: "var(--green)", color: "var(--text-inverse)" }}>
             <Icon name="zap" size={18} stroke={2} />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>

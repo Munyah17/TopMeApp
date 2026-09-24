@@ -305,7 +305,7 @@ export function ChatThread({
               />
             </div>
             <button className="chat-send-btn tap" disabled={sending || !text.trim()} onClick={submitText}>
-              <Icon name="send" size={18} stroke={2.2} className="text-white" />
+              <Icon name="send" size={18} stroke={2.2} />
             </button>
           </div>
         </div>

@@ -185,7 +185,18 @@ html[data-theme="dark"] .app-shell {
      date pickers and select dropdowns then render dark chrome instead of
      light controls with dark text stranded on our dark surfaces. */
   color-scheme: dark;
-  /* Brand Colors (unchanged hue — emerald reads well on dark) */
+  /* Brand Colors — the emerald ramp BRIGHTENS for dark mode. #059669 text
+     on #0f172a is ~3.3:1 contrast — green links/icons stayed "dark" and
+     were a strain to read. #34d399 is the same hue pushed light (same as
+     the admin dark accent), so green reads as green, not murk. It also
+     feeds --accent and .btn-primary's background — bright green fill with
+     dark --text-inverse text is exactly the WhatsApp-dark button look. */
+  --green: #34d399;
+  --green-600: #10b981;
+  --green-700: #059669;
+  --green-800: #047857;
+  --green-900: #065f46;
+  --green-950: #064e3b;
   --green-50: rgba(5, 150, 105, 0.16);
   --green-100: rgba(5, 150, 105, 0.24);
   --green-200: rgba(5, 150, 105, 0.35);
@@ -267,7 +278,6 @@ html[data-theme="dark"] .app-shell {
   --text-faint: var(--text-tertiary);
   --badge-neutral-bg: #1c2638;
   --error-border-soft: rgba(248, 113, 113, 0.35);
-  --chat-bubble-mine: #0b3d2a;
 }
 
 @theme inline {
@@ -1388,6 +1398,7 @@ a.side-user:hover {
   align-items: center;
   justify-content: center;
   background: var(--green);
+  color: var(--text-inverse);
   box-shadow: 0 10px 22px -6px rgba(0, 200, 83, 0.55), 0 0 0 4px var(--bg);
   transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
 }
@@ -1919,6 +1930,7 @@ html[data-theme="dark"] .app-shell .chat-day-chip {
   border-radius: 50%;
   border: none;
   background: var(--green);
+  color: var(--text-inverse);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2136,6 +2148,8 @@ html[data-theme="dark"] .admin-shell {
   --green-50: rgba(52, 211, 153, 0.12);
   --green-100: rgba(52, 211, 153, 0.2);
   --adm-ring: rgba(52, 211, 153, 0.22);
+  /* Dark text on the mint --green (pills, selections, primary buttons). */
+  --text-inverse: #052e1b;
 
   --success: #2ecc71; --success-bg: rgba(46, 204, 113, 0.14);
   --warning: #ffc107; --warning-bg: rgba(255, 193, 7, 0.14);
@@ -2486,7 +2500,7 @@ html[data-theme="dark"] .admin-shell {
 .admin-content .toggle.on .knob { transform: translateX(17px); }
 .admin-content .chip { padding: 7px 14px; font-size: 12.5px; border-radius: 4px; }
 .admin-content .status-badge { font-size: 11px; border-radius: 4px; }
-.admin-content ::selection { background: var(--green); color: #fff; }
+.admin-content ::selection { background: var(--green); color: var(--text-inverse); }
 
 .filter-pill {
   display: inline-flex;
@@ -2503,7 +2517,7 @@ html[data-theme="dark"] .admin-shell {
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 .filter-pill:hover { border-color: var(--green); color: var(--text-primary); }
-.filter-pill.selected { background: var(--green); border-color: var(--green); color: #fff; }
+.filter-pill.selected { background: var(--green); border-color: var(--green); color: var(--text-inverse); }
 
 /* ---------- Dashboard ---------- */
 .adm-eyebrow {

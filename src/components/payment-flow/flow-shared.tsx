@@ -173,7 +173,7 @@ export function NetworkTile({ network, selected, onClick }: { network: Network; 
 export type PaymentMethod = "wallet" | GuestGateway;
 
 const METHOD_STYLES: Record<PaymentMethod, { label: string; background: string; color: string; icon: string }> = {
-  wallet: { label: "Pay With Wallet Balance", background: "var(--green)", color: "#fff", icon: "wallet" },
+  wallet: { label: "Pay With Wallet Balance", background: "var(--green)", color: "var(--text-inverse)", icon: "wallet" },
   paynow: { label: "Pay With Paynow", background: "#155EAB", color: "#fff", icon: "lock" },
   ecocash: { label: "Pay With Ecocash Instant", background: "#E4032E", color: "#fff", icon: "phone" },
   stripe: { label: "Pay With Stripe", background: "#635BFF", color: "#fff", icon: "smartphone" },

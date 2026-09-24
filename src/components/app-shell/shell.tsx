@@ -204,7 +204,7 @@ export function AppShell({
             t.id === "chat" ? (
               <Link key={t.id} href={t.href} className={`nav-item nav-item-chat ${isActive(pathname, t.href) ? "active" : ""}`}>
                 <span className="nav-chat-badge">
-                  <Icon name={t.icon} size={23} stroke={2.2} className="text-white" />
+                  <Icon name={t.icon} size={23} stroke={2.2} />
                   {unreadChatCount > 0 && <span className="nav-chat-dot" />}
                 </span>
                 <span className="nav-label">{t.label}</span>
