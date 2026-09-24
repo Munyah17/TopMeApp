@@ -47,13 +47,16 @@ export default async function ChatLayout({ children }: { children: React.ReactNo
 
   const listPanel = (
     <div className="px content-wrap" style={{ paddingTop: 6 }}>
-      <h2 style={{ fontSize: 20 }}>Chat & Pay</h2>
-      <div className="muted">Talk and pay — send money or a red packet right in the conversation</div>
-      <div className="mt-3 mb-3">
-        <Link href="/chat/new" className="btn btn-primary" style={{ height: 38, padding: "0 14px", fontSize: 13 }}>
-          <Icon name="plus" size={15} stroke={2.4} /> New chat
+      <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+        <div>
+          <h2 style={{ fontSize: 20 }}>Chat & Pay</h2>
+          <div className="muted" style={{ fontSize: 12 }}>Talk and pay — send money or a red packet right in the conversation</div>
+        </div>
+        <Link href="/chat/new" className="btn btn-primary" style={{ height: 36, padding: "0 12px", fontSize: 12.5, flexShrink: 0 }}>
+          <Icon name="plus" size={14} stroke={2.4} /> New chat
         </Link>
       </div>
+      <div style={{ height: 10 }} />
 
       <PushSubscribeButton />
 
@@ -61,7 +64,7 @@ export default async function ChatLayout({ children }: { children: React.ReactNo
         <Link
           href="/chat/topme"
           className="row gap-2 tap chat-pinned-row"
-          style={{ padding: "14px 16px", borderBottom: "1px solid var(--border)", textDecoration: "none" }}
+          style={{ padding: "12px 14px", borderBottom: "1px solid var(--border)", textDecoration: "none" }}
         >
           <div className="ibadge round" style={{ background: "var(--green)", color: "#fff" }}>
             <Icon name="zap" size={18} stroke={2} />
@@ -91,7 +94,7 @@ export default async function ChatLayout({ children }: { children: React.ReactNo
               href={`/chat/${c.id}`}
               className="row gap-2 tap"
               style={{
-                padding: "14px 16px",
+                padding: "12px 14px",
                 borderBottom: i < conversations.length - 1 ? "1px solid var(--border)" : "none",
                 textDecoration: "none",
               }}

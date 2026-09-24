@@ -53,7 +53,11 @@ export function ChatThread({
   const [moneyBusy, setMoneyBusy] = useState(false);
   const [moneyError, setMoneyError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const wallpaperRef = useRef<HTMLDivElement>(null);
+  // Track whether the user is already at the bottom so a new message only
+  // scrolls when they're following the conversation — never yanks them
+  // away from history they're reading (WhatsApp behaviour).
+  const stickToBottom = useRef(true);
 
   // Adds a message to local state exactly once, however it arrived —
   // pushed straight from a successful send (see submitText/submitImage/
@@ -96,8 +100,17 @@ export function ChatThread({
     };
   }, [conversationId]);
 
+  // Scroll the wallpaper container directly — scrollIntoView scrolls EVERY
+  // scrollable ancestor (the whole page included), which is what made the
+  // screen visibly shift when a thread opened.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = wallpaperRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, []);
+
+  useEffect(() => {
+    const el = wallpaperRef.current;
+    if (el && stickToBottom.current) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }, [messages.length]);
 
   useEffect(() => {
@@ -165,10 +178,20 @@ export function ChatThread({
         <div className="ibadge round" style={{ width: 36, height: 36, background: "rgba(255,255,255,0.18)", color: "#fff", fontWeight: 700, fontSize: 12 }}>
           {initials(counterpart?.full_name, counterpart?.phone)}
         </div>
-        <div style={{ flex: 1, fontWeight: 700, fontSize: 15, color: "#fff" }}>{counterpart?.full_name || counterpart?.phone || "TopMe user"}</div>
+        <div style={{ flex: 1, minWidth: 0, fontWeight: 700, fontSize: 15, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {counterpart?.full_name || counterpart?.phone || "TopMe user"}
+        </div>
       </div>
 
-      <div className="chat-wallpaper px content-narrow" style={{ paddingTop: 10, paddingBottom: 16 }}>
+      <div
+        ref={wallpaperRef}
+        className="chat-wallpaper px content-narrow"
+        style={{ paddingTop: 10, paddingBottom: 16 }}
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 96;
+        }}
+      >
         {messages.length === 0 && (
           <div className="muted" style={{ textAlign: "center", padding: "30px 0" }}>
             Say hello 👋
@@ -178,7 +201,7 @@ export function ChatThread({
         {messages.map((m, i) => {
           const showDivider = i === 0 || dayLabel(messages[i - 1].created_at) !== dayLabel(m.created_at);
           const divider = showDivider && (
-            <div key={`day-${m.id}`} style={{ display: "flex", justifyContent: "center", margin: "14px 0" }}>
+            <div key={`day-${m.id}`} style={{ display: "flex", justifyContent: "center", margin: "10px 0" }}>
               <span className="chat-day-chip">{dayLabel(m.created_at)}</span>
             </div>
           );
@@ -189,11 +212,11 @@ export function ChatThread({
             return (
               <Fragment key={m.id}>
                 {divider}
-                <div style={{ display: "flex", justifyContent: mine ? "flex-end" : "flex-start", marginBottom: 12 }}>
+                <div style={{ display: "flex", justifyContent: mine ? "flex-end" : "flex-start", marginBottom: 10 }}>
                   <div
                     className="tap"
                     style={{
-                      maxWidth: 240,
+                      maxWidth: "min(260px, 80%)",
                       borderRadius: 18,
                       padding: 16,
                       color: "#fff",
@@ -220,8 +243,8 @@ export function ChatThread({
             return (
               <Fragment key={m.id}>
                 {divider}
-                <div style={{ display: "flex", justifyContent: mine ? "flex-end" : "flex-start", marginBottom: 12 }}>
-                  <div style={{ maxWidth: 220, borderRadius: 16, overflow: "hidden", boxShadow: "0 1px 3px rgba(15,23,42,0.15)" }}>
+                <div style={{ display: "flex", justifyContent: mine ? "flex-end" : "flex-start", marginBottom: 10 }}>
+                  <div style={{ maxWidth: "min(240px, 72%)", borderRadius: 16, overflow: "hidden", boxShadow: "0 1px 3px rgba(15,23,42,0.15)" }}>
                     {/* eslint-disable-next-line @next/next/no-img-element -- user-uploaded chat image, variable aspect ratio with no stored dimensions (next/image needs one or the other) */}
                     <img src={m.image_url} alt="Shared photo" loading="lazy" decoding="async" style={{ width: "100%", display: "block" }} />
                     <div style={{ background: mine ? "var(--chat-bubble-mine)" : "var(--surface)", padding: "4px 8px", fontSize: 10, opacity: 0.65, textAlign: "right" }}>
@@ -236,13 +259,13 @@ export function ChatThread({
           return (
             <Fragment key={m.id}>
               {divider}
-              <div style={{ display: "flex", justifyContent: mine ? "flex-end" : "flex-start", marginBottom: 10 }}>
+              <div style={{ display: "flex", justifyContent: mine ? "flex-end" : "flex-start", marginBottom: 8 }}>
                 <div
                   className="chat-bubble"
                   style={{
-                    maxWidth: 260,
+                    maxWidth: "min(280px, 80%)",
                     borderRadius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
-                    padding: "10px 14px",
+                    padding: "9px 12px",
                     fontSize: 14,
                     boxShadow: "0 1px 2px rgba(15,23,42,0.1)",
                     background: mine ? "var(--chat-bubble-mine)" : "var(--surface)",
@@ -256,7 +279,6 @@ export function ChatThread({
             </Fragment>
           );
         })}
-        <div ref={bottomRef} />
       </div>
 
       <div className="content-narrow" style={{ flexShrink: 0, width: "100%", background: "var(--bg)", paddingTop: 8, paddingBottom: 8 }}>
@@ -270,12 +292,16 @@ export function ChatThread({
               <button className="chat-composer-icon tap" style={{ color: "var(--green)" }} onClick={() => setMoneySheet("transfer")} title="Send money or a red packet">
                 <Icon name="wallet" size={19} stroke={1.8} />
               </button>
+              {/* fontSize 16 — iOS zooms the viewport on any focused input
+                  under 16px, which was the "auto zoom" when the composer
+                  (or the money sheet's .field inputs) opened. */}
               <input
                 placeholder="Message"
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && submitText()}
-                style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontFamily: "inherit", fontSize: 14, minWidth: 0 }}
+                style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontFamily: "inherit", fontSize: 16, minWidth: 0 }}
+                enterKeyHint="send"
               />
             </div>
             <button className="chat-send-btn tap" disabled={sending || !text.trim()} onClick={submitText}>
