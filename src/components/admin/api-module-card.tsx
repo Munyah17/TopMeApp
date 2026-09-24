@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import { Icon } from "@/components/icons";
-import { hexA } from "@/lib/data/catalog-helpers";
+import { hexA, statusTone } from "@/lib/data/catalog-helpers";
 import { toggleApiModule } from "@/lib/actions/admin";
 import type { ApiModuleSafe } from "@/types/database";
 
@@ -26,14 +26,7 @@ export function ApiModuleCard({ module }: { module: ApiModuleSafe }) {
           {module.key_last4 ? `••••${module.key_last4}` : "No key set"}
         </span>
         <div className="row gap-2">
-          <span
-            style={{
-              fontSize: 10.5,
-              fontWeight: 800,
-              textTransform: "uppercase",
-              color: module.status === "active" ? "var(--success)" : "var(--text-faint)",
-            }}
-          >
+          <span className={`status-badge ${statusTone(module.status)}`} style={{ textTransform: "capitalize" }}>
             {module.status}
           </span>
           <div

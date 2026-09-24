@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icons";
-import { fmt } from "@/lib/data/catalog-helpers";
+import { fmt, statusTone } from "@/lib/data/catalog-helpers";
 import { ReviewRow } from "@/components/payment-flow/flow-shared";
 import { forceFulfilTransaction, refundTransaction, retryFulfillment } from "@/lib/actions/rectification";
 import type { TransactionTimelineEntry } from "@/lib/data/admin-queries";
@@ -58,11 +58,11 @@ function TransactionTimeline({ timeline }: { timeline: TransactionTimelineEntry[
   );
 }
 
-const FULFILLMENT_LABEL: Record<string, { label: string; color: string }> = {
-  fulfilled: { label: "Fulfilled", color: "var(--success)" },
-  pending: { label: "Pending", color: "var(--warning)" },
-  failed: { label: "Failed", color: "var(--error)" },
-  simulated: { label: "Simulated", color: "var(--warning)" },
+const FULFILLMENT_LABEL: Record<string, string> = {
+  fulfilled: "Fulfilled",
+  pending: "Pending",
+  failed: "Failed",
+  simulated: "Simulated",
 };
 
 export function TransactionDetail({
@@ -83,7 +83,7 @@ export function TransactionDetail({
 
   const already = transaction.fulfillment_status === "fulfilled";
   const alreadyRefunded = transaction.status === "failed" && ledgerRows.some((r) => r.type === "refund");
-  const fulfillmentMeta = FULFILLMENT_LABEL[transaction.fulfillment_status] ?? { label: transaction.fulfillment_status, color: "var(--text)" };
+  const fulfillmentLabel = FULFILLMENT_LABEL[transaction.fulfillment_status] ?? transaction.fulfillment_status;
 
   function run(action: "retry" | "force" | "refund", fn: () => Promise<unknown>) {
     setError(null);
@@ -108,19 +108,8 @@ export function TransactionDetail({
         <div className="card-pad" style={{ textAlign: "center", borderBottom: "1px dashed var(--border)" }}>
           <div className="muted">Amount + fee</div>
           <div style={{ fontSize: 30, fontWeight: 800, marginTop: 4 }}>{fmt(transaction.amount + transaction.fee)}</div>
-          <span
-            style={{
-              display: "inline-block",
-              marginTop: 8,
-              background: `${fulfillmentMeta.color}1a`,
-              color: fulfillmentMeta.color,
-              fontSize: 11,
-              fontWeight: 800,
-              padding: "4px 10px",
-              borderRadius: 8,
-            }}
-          >
-            {fulfillmentMeta.label}
+          <span className={`status-badge ${statusTone(transaction.fulfillment_status)}`} style={{ marginTop: 8 }}>
+            {fulfillmentLabel}
           </span>
         </div>
         <div style={{ padding: "6px 18px" }}>

@@ -164,6 +164,9 @@ export async function getAttentionQueue() {
       .from("topup_intents")
       .select("*")
       .eq("status", "pending")
+      // "Clear all" stamps meta.cleared_at — cleared items stay out of the
+      // queue but keep their real status everywhere else.
+      .is("meta->>cleared_at", null)
       .lte("created_at", graceWindow)
       .order("created_at", { ascending: false })
       .limit(50),
@@ -171,6 +174,7 @@ export async function getAttentionQueue() {
       .from("guest_checkout_intents")
       .select("*")
       .eq("status", "pending")
+      .is("meta->>cleared_at", null)
       .lte("created_at", graceWindow)
       .order("created_at", { ascending: false })
       .limit(50),

@@ -3,6 +3,7 @@ import { Icon } from "@/components/icons";
 import { fmt } from "@/lib/data/catalog-helpers";
 import { getAllServices, getCurrentProfile } from "@/lib/data/queries";
 import { getAttentionCount, getPendingRefundCount, getPendingWithdrawalCount, getRecentFailures } from "@/lib/data/admin-queries";
+import { ClearAttentionButton } from "@/components/admin/clear-attention-button";
 import { createClient } from "@/lib/supabase/server";
 import type { IntegrationHealth, Transaction } from "@/types/database";
 
@@ -86,6 +87,7 @@ export async function AdminOverviewBody({ basePath }: { basePath: string }) {
       icon: "alert",
       title: `${attentionCount} item${attentionCount === 1 ? "" : "s"} need attention`,
       sub: "Stuck payments or top-ups — open Operations Center",
+      clearable: true,
     },
     pendingRefunds > 0 && {
       href: `${basePath}/refunds`,
@@ -99,7 +101,7 @@ export async function AdminOverviewBody({ basePath }: { basePath: string }) {
       title: `${pendingWithdrawals} withdrawal${pendingWithdrawals === 1 ? "" : "s"} to process`,
       sub: "Customers cashing out — open Withdrawals",
     },
-  ].filter((a): a is { href: string; icon: string; title: string; sub: string } => Boolean(a));
+  ].filter((a): a is { href: string; icon: string; title: string; sub: string; clearable?: boolean } => Boolean(a));
 
   // 7-day line chart: 600x180 viewBox, 24px padding for the axis labels.
   const W = 600, H = 180, PX = 8, PT = 14, PB = 26;
@@ -145,20 +147,40 @@ export async function AdminOverviewBody({ basePath }: { basePath: string }) {
 
       {alerts.length > 0 && (
         <div className="adm-alerts">
-          {alerts.map((a) => (
-            <Link key={a.href} href={a.href} className="adm-alert">
-              <div className="ico">
-                <Icon name={a.icon} size={16} stroke={2} />
+          {alerts.map((a) =>
+            a.clearable ? (
+              // A <button> can't live inside a <Link>, so clearable alerts are
+              // a div with the text + chevron as links around the button.
+              <div key={a.href} className="adm-alert">
+                <div className="ico">
+                  <Icon name={a.icon} size={16} stroke={2} />
+                </div>
+                <Link href={a.href} style={{ textDecoration: "none", color: "inherit", minWidth: 0 }}>
+                  <div className="title">{a.title}</div>
+                  <div className="sub">{a.sub}</div>
+                </Link>
+                <div className="go">
+                  <ClearAttentionButton />
+                  <Link href={a.href} aria-label="Open Operations Center" style={{ display: "flex", color: "inherit" }}>
+                    <Icon name="chevronR" size={16} stroke={2} />
+                  </Link>
+                </div>
               </div>
-              <div>
-                <div className="title">{a.title}</div>
-                <div className="sub">{a.sub}</div>
-              </div>
-              <span className="go">
-                <Icon name="chevronR" size={16} stroke={2} />
-              </span>
-            </Link>
-          ))}
+            ) : (
+              <Link key={a.href} href={a.href} className="adm-alert">
+                <div className="ico">
+                  <Icon name={a.icon} size={16} stroke={2} />
+                </div>
+                <div>
+                  <div className="title">{a.title}</div>
+                  <div className="sub">{a.sub}</div>
+                </div>
+                <span className="go">
+                  <Icon name="chevronR" size={16} stroke={2} />
+                </span>
+              </Link>
+            ),
+          )}
         </div>
       )}
 

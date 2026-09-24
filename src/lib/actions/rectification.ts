@@ -251,6 +251,74 @@ export async function adminDeleteTransaction(transactionId: string) {
   revalidateAdminPath("/transactions");
 }
 
+// "Clear all" on the dashboard alert: dismisses every item currently in the
+// attention queue in one shot. Transactions get receipt.acknowledged_at (same
+// flag as "Mark read"); pending top-up / guest-checkout intents get
+// meta.cleared_at. Nothing's status is changed — this only hides them from
+// the queue, so anything that later settles still reconciles normally.
+export async function adminClearAttentionQueue() {
+  const { user } = await requirePermission("transactions.rectify");
+  const admin = createAdminClient();
+  const graceWindow = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+  const now = new Date().toISOString();
+  let cleared = 0;
+
+  const { data: txs } = await admin
+    .from("transactions")
+    .select("id, receipt")
+    .in("fulfillment_status", ["pending", "failed"])
+    .is("receipt->>acknowledged_at", null)
+    .lte("created_at", graceWindow)
+    .limit(50);
+  for (const tx of txs ?? []) {
+    const { error } = await admin
+      .from("transactions")
+      .update({
+        receipt: {
+          ...((tx.receipt as Record<string, unknown>) ?? {}),
+          acknowledged_by: user.id,
+          acknowledged_at: now,
+        },
+      })
+      .eq("id", tx.id);
+    if (!error) cleared++;
+  }
+
+  for (const table of ["topup_intents", "guest_checkout_intents"] as const) {
+    const { data: intents } = await admin
+      .from(table)
+      .select("id, meta")
+      .eq("status", "pending")
+      .is("meta->>cleared_at", null)
+      .lte("created_at", graceWindow)
+      .limit(50);
+    for (const intent of intents ?? []) {
+      const { error } = await admin
+        .from(table)
+        .update({
+          meta: {
+            ...((intent.meta as Record<string, unknown>) ?? {}),
+            cleared_by: user.id,
+            cleared_at: now,
+          },
+        })
+        .eq("id", intent.id);
+      if (!error) cleared++;
+    }
+  }
+
+  await logAdminAction(admin, {
+    actorId: user.id,
+    action: "attention_queue.clear_all",
+    targetTable: "transactions",
+    targetId: "bulk",
+    meta: { cleared },
+  });
+  revalidateAdminPath("/operations");
+  revalidateAdminPath("");
+  return cleared;
+}
+
 export async function adjustWallet(userId: string, amount: number, reason: string) {
   await requirePermission("wallet.adjust");
   const supabase = await createClient();

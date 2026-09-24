@@ -5,15 +5,10 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Icon } from "@/components/icons";
 import { addTeamMember } from "@/lib/actions/admin";
+import { statusTone } from "@/lib/data/catalog-helpers";
 import type { TeamMember } from "@/types/database";
 
 const MEMBER_ROLES = ["Manager", "Support", "Finance"];
-
-const STATUS_COLOR: Record<TeamMember["status"], string> = {
-  active: "var(--success)",
-  invited: "var(--warning)",
-  disabled: "var(--error)",
-};
 
 function AddUserForm({ onDone }: { onDone: () => void }) {
   const [name, setName] = useState("");
@@ -90,7 +85,6 @@ function AddUserForm({ onDone }: { onDone: () => void }) {
   );
 }
 
-import { statusTone } from "@/lib/data/catalog-helpers";
 
 // Compact by design — settings, status changes and permissions all moved
 // to this member's own full profile page (staff-member-detail.tsx). This
@@ -116,7 +110,7 @@ function MemberCard({ member, basePath }: { member: TeamMember; basePath: string
           {member.invited_email} · {member.role}
         </div>
       </div>
-      <span style={{ fontSize: 10.5, fontWeight: 800, color: STATUS_COLOR[member.status], textTransform: "uppercase", flexShrink: 0 }}>{member.status}</span>
+      <span className={`status-badge ${statusTone(member.status)}`} style={{ textTransform: "capitalize", flexShrink: 0 }}>{member.status}</span>
       <Icon name="chevronR" size={16} stroke={2} />
     </Link>
   );

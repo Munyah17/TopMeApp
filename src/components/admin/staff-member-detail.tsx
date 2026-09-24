@@ -4,9 +4,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { activateTeamMember, deactivateTeamMember, togglePermission } from "@/lib/actions/admin";
 import { PERMISSION_GROUPS, PERMISSION_LABEL } from "@/lib/auth/permission-keys";
+import { statusTone } from "@/lib/data/catalog-helpers";
 import type { TeamMember } from "@/types/database";
-
-const STATUS_COLOR: Record<string, string> = { invited: "var(--warning)", active: "var(--success)", disabled: "var(--text-faint)" };
 
 // The full profile page a staff member's Manage link opens onto — settings,
 // permissions and status changes live here, not on the main Staff
@@ -27,7 +26,7 @@ export function StaffMemberDetail({ member }: { member: TeamMember }) {
             <div style={{ fontWeight: 700, fontSize: 15 }}>{member.name || member.invited_email}</div>
             <div className="muted" style={{ fontSize: 12 }}>{member.invited_email} · {member.role}</div>
           </div>
-          <span style={{ fontSize: 10.5, fontWeight: 800, color: STATUS_COLOR[member.status], textTransform: "uppercase" }}>{member.status}</span>
+          <span className={`status-badge ${statusTone(member.status)}`} style={{ textTransform: "capitalize" }}>{member.status}</span>
         </div>
 
         {error && <div className="muted mt-2" style={{ color: "var(--error)" }}>{error}</div>}

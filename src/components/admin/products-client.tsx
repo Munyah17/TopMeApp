@@ -31,12 +31,12 @@ function ServiceRow({ service, categoryColor, categories }: { service: Service; 
   return (
     <div
       className="row gap-2"
-      style={{ padding: "12px 16px", borderBottom: "1px solid var(--border)", opacity: service.is_active ? 1 : 0.5 }}
+      style={{ padding: "12px 16px", borderBottom: "1px solid var(--border)", opacity: service.is_active ? 1 : 0.5, flexWrap: "wrap" }}
     >
       <div className="ibadge round" style={{ width: 36, height: 36, background: hexA(categoryColor, 0.12), color: categoryColor }}>
         <Icon name={service.icon} size={16} stroke={1.8} />
       </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ flex: "1 1 160px", minWidth: 0 }}>
         <div style={{ fontWeight: 700, fontSize: 13.5 }}>{service.name}</div>
         <div className="muted" style={{ fontSize: 11.5 }}>
           {service.id} · {service.provider_label || "—"} · cost {service.cost_percentage}%
@@ -111,11 +111,11 @@ export function ProductsClient({ categories, services }: { categories: ServiceCa
 
       {categories.map((c) => (
         <div key={c.id} className="card mb-3" style={{ overflow: "hidden" }}>
-          <div className="row gap-2" style={{ padding: 16, borderBottom: "1px solid var(--border)" }}>
+          <div className="row gap-2" style={{ padding: 16, borderBottom: "1px solid var(--border)", flexWrap: "wrap" }}>
             <div className="ibadge" style={{ background: c.bg, color: c.color }}>
               <Icon name={c.icon} size={20} stroke={1.8} />
             </div>
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: "1 1 140px", minWidth: 0 }}>
               <div style={{ fontWeight: 700 }}>{c.name}</div>
               <div className="muted">{(servicesByCategory.get(c.id) ?? []).length} services</div>
             </div>

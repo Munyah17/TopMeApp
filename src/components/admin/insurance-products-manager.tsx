@@ -109,11 +109,11 @@ function InsuranceProductRow({ product, isSuperAdmin }: { product: InsuranceProd
   }
 
   return (
-    <div className="row gap-2" style={{ padding: "12px 16px", borderBottom: "1px solid var(--border)", opacity: product.is_active ? 1 : 0.5 }}>
+    <div className="row gap-2" style={{ padding: "12px 16px", borderBottom: "1px solid var(--border)", opacity: product.is_active ? 1 : 0.5, flexWrap: "wrap" }}>
       <div className="ibadge round" style={{ width: 36, height: 36, background: "var(--green-50)", color: "var(--green-600)", flexShrink: 0 }}>
         <Icon name="shield" size={16} stroke={1.8} />
       </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ flex: "1 1 140px", minWidth: 0 }}>
         <div style={{ fontWeight: 700, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{displayName(product)}</div>
         <div className="muted" style={{ fontSize: 11.5 }}>
           {PROVIDER_LABEL[product.provider] ?? product.provider} · ${displayPremium(product).toFixed(2)}/mo · {product.markup_percent}% markup

@@ -32,7 +32,7 @@ function NetworkRow({ network }: { network: Network }) {
   }
 
   return (
-    <div className="row gap-2" style={{ padding: "12px 16px", borderBottom: "1px solid var(--border)", opacity: network.is_active ? 1 : 0.55 }}>
+    <div className="row gap-2" style={{ padding: "12px 16px", borderBottom: "1px solid var(--border)", opacity: network.is_active ? 1 : 0.55, flexWrap: "wrap" }}>
       <div
         style={{
           width: 44,
@@ -58,7 +58,7 @@ function NetworkRow({ network }: { network: Network }) {
         )}
       </div>
 
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ flex: "1 1 140px", minWidth: 0 }}>
         <div style={{ fontWeight: 700, fontSize: 13.5 }}>
           {network.name}
           {!network.is_active && (
