@@ -28,6 +28,7 @@
   --muted: #f1f5f9;
   --card-bg: var(--surface);
   --input-bg: var(--surface);
+  --nav-bg: rgba(255, 255, 255, 0.96);
 
   /* Text Colors */
   --text-primary: #0f172a;
@@ -191,11 +192,14 @@ html[data-theme="dark"] .app-shell {
   --surface-elevated: #334155;
   --muted: #1e293b;
   
-  /* Text Colors */
-  --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --text-tertiary: #64748b;
+  /* Text Colors — secondary/tertiary pushed a step lighter than slate's
+     defaults: #64748b on #1e293b is ~3:1 contrast and small .muted/eyebrow
+     text was unreadable in dark mode. */
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-tertiary: #94a3b8;
   --text-inverse: #0f172a;
+  --nav-bg: rgba(30, 41, 59, 0.94);
   
   /* Border Colors */
   --border: #334155;
@@ -309,7 +313,9 @@ body {
   display: inline-flex;
 }
 .wordmark .wm-top {
-  color: var(--navy);
+  /* text-primary, not --navy: identical in light mode, but --navy becomes
+     a dark slate in dark mode and the "Top" half vanished into the header. */
+  color: var(--text-primary);
 }
 .wordmark .wm-me {
   color: var(--green);
@@ -555,7 +561,7 @@ h4 {
 
 /* ---------- Skeleton / shimmer ---------- */
 .skel {
-  background: linear-gradient(90deg, #edf1f6 25%, #f7f9fc 37%, #edf1f6 63%);
+  background: linear-gradient(90deg, var(--muted) 25%, var(--surface-elevated) 37%, var(--muted) 63%);
   background-size: 400% 100%;
   animation: shimmer 1.4s ease infinite;
   border-radius: 10px;
@@ -1289,7 +1295,7 @@ a.side-user:hover {
   box-sizing: border-box;
   height: calc(68px + env(safe-area-inset-bottom));
   padding-bottom: env(safe-area-inset-bottom);
-  background: rgba(255, 255, 255, 0.96);
+  background: var(--nav-bg);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   border-top: 1px solid var(--border);
@@ -1708,7 +1714,7 @@ a.side-user:hover {
 .receipt-card {
   position: relative;
   width: 100%;
-  background: #fff;
+  background: var(--card-bg);
   border-radius: 20px;
   padding: 22px;
   box-shadow: var(--shadow-md);
@@ -1745,7 +1751,7 @@ a.side-user:hover {
   }
 }
 .item-row-anim:hover {
-  background: #fafbfd;
+  background: var(--muted);
 }
 
 .see-all-link {
@@ -2761,6 +2767,15 @@ html[data-theme="dark"] .admin-shell {
 }
 @media (min-width: 640px) {
   .admin-cmd { display: inline-flex; }
+}
+@media (max-width: 639.98px) {
+  /* Phone topbar: hamburger + crumbs + bell + theme + avatar is five items
+     on a ~360px row. Drop the portal root crumb and separators — the
+     current page label is the only part that earns the space. */
+  .admin-crumbs > a,
+  .admin-crumbs .sep { display: none; }
+  .admin-crumbs { font-size: 14px; }
+  .admin-topbar { gap: 8px; }
 }
 @media (min-width: 900px) {
   .admin-shell { grid-template-columns: 240px minmax(0, 1fr); }

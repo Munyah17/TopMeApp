@@ -85,7 +85,7 @@ export default async function InsuranceProductPage({ params }: { params: Promise
                 textTransform: "uppercase",
                 letterSpacing: "0.04em",
                 color: "var(--warning)",
-                background: "#FEF6E7",
+                background: "var(--warning-bg)",
                 padding: "5px 10px",
                 borderRadius: 7,
               }}
@@ -123,7 +123,7 @@ export default async function InsuranceProductPage({ params }: { params: Promise
             className="row gap-2"
             style={{ background: "var(--card-bg)", borderRadius: 14, padding: 16, alignItems: "flex-start" }}
           >
-            <div className="ibadge round" style={{ width: 34, height: 34, background: "#FEF6E7", color: "var(--warning)", flexShrink: 0 }}>
+            <div className="ibadge round" style={{ width: 34, height: 34, background: "var(--warning-bg)", color: "var(--warning)", flexShrink: 0 }}>
               <Icon name="clock" size={17} stroke={2} />
             </div>
             <div>

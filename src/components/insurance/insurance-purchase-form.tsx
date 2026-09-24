@@ -114,6 +114,7 @@ export default function InsurancePurchaseForm({ product, allProducts, walletBala
 
   const premiumTotal = lines.reduce((sum, l) => sum + l.base, 0);
   const feeTotal = lines.reduce((sum, l) => sum + l.fee, 0);
+  const markupPcts = new Set(selectedProducts.map((p) => p.markup_percent));
   // Gateways charge their own surcharge on top of premium+markup — same
   // rule as every other flow (the rail's cut isn't recoverable from a
   // wallet funding step when the customer pays directly).
@@ -359,7 +360,7 @@ export default function InsurancePurchaseForm({ product, allProducts, walletBala
             width: 80,
             height: 80,
             borderRadius: 24,
-            background: "#FEF6E7",
+            background: "var(--warning-bg)",
             color: "var(--warning)",
             display: "flex",
             alignItems: "center",
@@ -383,7 +384,7 @@ export default function InsurancePurchaseForm({ product, allProducts, walletBala
               textAlign: "left",
               padding: "12px 16px",
               borderRadius: 12,
-              background: "#FEF6E7",
+              background: "var(--warning-bg)",
               color: "var(--warning)",
               fontSize: 12.5,
               marginBottom: 16,
@@ -438,7 +439,7 @@ export default function InsurancePurchaseForm({ product, allProducts, walletBala
               textAlign: "left",
               padding: "12px 16px",
               borderRadius: 12,
-              background: "#FEF6E7",
+              background: "var(--warning-bg)",
               color: "var(--warning)",
               fontSize: 12.5,
               marginBottom: 16,
@@ -766,7 +767,9 @@ export default function InsurancePurchaseForm({ product, allProducts, walletBala
             <span>{currency} {premiumTotal.toFixed(2)}</span>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginTop: 4 }}>
-            <span className="muted">Processing fee:</span>
+            {/* The % makes the markup visibly proportional — on a $2 plan
+                5% lands exactly on $0.10 and reads like the old flat fee. */}
+            <span className="muted">Processing fee{markupPcts.size === 1 ? ` (${[...markupPcts][0]}%)` : ""}:</span>
             <span>{currency} {feeTotal.toFixed(2)}</span>
           </div>
           {gatewayFee > 0 && (
