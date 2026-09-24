@@ -7,19 +7,45 @@ import { ClearAttentionButton } from "@/components/admin/clear-attention-button"
 import { createClient } from "@/lib/supabase/server";
 import type { IntegrationHealth, Transaction } from "@/types/database";
 
-export async function AdminOverviewBody({ basePath }: { basePath: string }) {
+type KpiRange = "today" | "7d" | "30d";
+
+const KPI_RANGES: { id: KpiRange; label: string; short: string }[] = [
+  { id: "today", label: "Today", short: "TODAY" },
+  { id: "7d", label: "7 days", short: "7D" },
+  { id: "30d", label: "30 days", short: "30D" },
+];
+const DEFAULT_CARDS = ["gross", "revenue", "transactions", "failed"];
+
+type KpiStat = { id: string; label: string; icon: string; tone: string; value: string; valueTone?: string; foot: string };
+
+export async function AdminOverviewBody({ basePath, searchParams }: { basePath: string; searchParams?: Promise<{ range?: string; cards?: string }> }) {
   const profile = await getCurrentProfile();
   if (!profile) return null;
+
+  const params = searchParams ? await searchParams : {};
+  const range: KpiRange = params.range === "7d" || params.range === "30d" ? params.range : "today";
+  const rangeMeta = KPI_RANGES.find((r) => r.id === range)!;
+  const cardIds = (params.cards ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const selectedCards = cardIds.length === 4 ? cardIds : DEFAULT_CARDS;
 
   const supabase = await createClient();
   const since7dDate = new Date();
   since7dDate.setDate(since7dDate.getDate() - 7);
   const since7d = since7dDate.toISOString();
+  const since30dDate = new Date();
+  since30dDate.setDate(since30dDate.getDate() - 30);
+  const since30d = since30dDate.toISOString();
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
+  // Cards follow the selected range; the chart + panels below stay on their
+  // own fixed 7-day window, so the fetch is always at least 7d wide.
+  const fetchSince = range === "30d" ? since30d : since7d;
 
   const [{ data: recentTx }, services, attentionCount, pendingRefunds, pendingWithdrawals, { data: healthData }, recentFailures] = await Promise.all([
-    supabase.from("transactions").select("*").gte("created_at", since7d).order("created_at", { ascending: false }),
+    supabase.from("transactions").select("*").gte("created_at", fetchSince).order("created_at", { ascending: false }),
     getAllServices(true),
     getAttentionCount(),
     getPendingRefundCount(),
@@ -34,12 +60,14 @@ export async function AdminOverviewBody({ basePath }: { basePath: string }) {
   const todayTx = tx.filter((t) => new Date(t.created_at) >= startOfToday);
   const todaySuccess = todayTx.filter((t) => t.status === "success");
   const todayGross = todaySuccess.reduce((s, t) => s + t.amount, 0);
-  const todayRevenue = todaySuccess.reduce((s, t) => s + t.revenue, 0);
-  const pending = tx.filter((t) => t.status === "pending").length;
-  const failed = tx.filter((t) => t.status === "failed").length;
-  const settled = tx.filter((t) => t.status === "success").reduce((s, t) => s + t.amount, 0);
+  // Panels and chart below are all "last 7 days" regardless of the cards'
+  // range — when range=30d the fetch is wider, so scope them back down.
+  const tx7 = tx.filter((t) => t.created_at >= since7d);
+  const pending = tx7.filter((t) => t.status === "pending").length;
+  const failed = tx7.filter((t) => t.status === "failed").length;
+  const settled = tx7.filter((t) => t.status === "success").reduce((s, t) => s + t.amount, 0);
 
-  const successTx = tx.filter((t) => t.status === "success");
+  const successTx = tx7.filter((t) => t.status === "success");
   const byOwner = new Map<string, { revenue: number; cost: number; count: number }>();
   for (const t of successTx) {
     const key = t.owner_label || serviceById.get(t.service_id)?.provider_label || "Unlabelled";
@@ -62,20 +90,48 @@ export async function AdminOverviewBody({ basePath }: { basePath: string }) {
   const bars = days.map((d) => {
     const next = new Date(d);
     next.setDate(next.getDate() + 1);
-    return tx.filter((t) => new Date(t.created_at) >= d && new Date(t.created_at) < next).length;
+    return tx7.filter((t) => new Date(t.created_at) >= d && new Date(t.created_at) < next).length;
   });
   const maxBar = Math.max(1, ...bars);
 
   const byService = new Map<string, number>();
-  for (const t of tx) byService.set(t.service_id, (byService.get(t.service_id) ?? 0) + 1);
+  for (const t of tx7) byService.set(t.service_id, (byService.get(t.service_id) ?? 0) + 1);
   const top = Array.from(byService.entries())
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5)
     .map(([id, count]) => ({ id, count, name: serviceById.get(id)?.name || id, color: serviceById.get(id)?.color || "var(--text-faint)" }));
   const topTotal = top.reduce((s, t) => s + t.count, 0) || 1;
 
-  const prevWeekFailed = tx.filter((t) => t.status === "failed").length;
-  const successRate = tx.length === 0 ? null : Math.round((successTx.length / tx.length) * 100);
+  // Range-scoped figures for the KPI cards — everything above this line is
+  // the fixed 7-day window used by the chart and panels below.
+  const rangeStart = range === "today" ? startOfToday.toISOString() : range === "7d" ? since7d : since30d;
+  const txRange = tx.filter((t) => t.created_at >= rangeStart);
+  const rangeSuccess = txRange.filter((t) => t.status === "success");
+  const rangeGross = rangeSuccess.reduce((s, t) => s + t.amount, 0);
+  const rangeRevenue = rangeSuccess.reduce((s, t) => s + t.revenue, 0);
+  const rangePending = txRange.filter((t) => t.status === "pending").length;
+  const rangeFailed = txRange.filter((t) => t.status === "failed").length;
+  const rangeRate = txRange.length === 0 ? null : Math.round((rangeSuccess.length / txRange.length) * 100);
+  const avgTicket = rangeSuccess.length ? rangeGross / rangeSuccess.length : 0;
+  const rangePhrase = range === "today" ? "today" : `in the last ${rangeMeta.label.toLowerCase()}`;
+
+  // Every stat the cards can show — the four chosen slots pick from here.
+  const STATS: KpiStat[] = [
+    { id: "gross", label: "Gross volume", icon: "wallet", tone: "", value: fmt(rangeGross), foot: `${rangeSuccess.length} successful payment${rangeSuccess.length === 1 ? "" : "s"}` },
+    { id: "revenue", label: "Net revenue", icon: "book", tone: "c-info", value: fmt(rangeRevenue), valueTone: "var(--success)", foot: rangeGross > 0 ? `margin ${Math.round((rangeRevenue / rangeGross) * 100)}% of gross` : `no settled sales ${rangePhrase}` },
+    { id: "transactions", label: "Transactions", icon: "zap", tone: "c-purple", value: `${txRange.length}`, foot: rangeRate === null ? `no payments ${rangePhrase}` : `${rangeRate}% success · ${rangePending} pending` },
+    { id: "failed", label: "Failed", icon: "alert", tone: rangeFailed > 0 ? "c-error" : "", value: `${rangeFailed}`, valueTone: rangeFailed > 0 ? "var(--error)" : undefined, foot: rangeFailed > 0 ? `latest ${recentFailures[0] ? new Date(recentFailures[0].createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "—"}` : `nothing failed ${rangePhrase}` },
+    { id: "pending", label: "Pending", icon: "clock", tone: rangePending > 0 ? "c-warning" : "", value: `${rangePending}`, foot: "awaiting fulfilment" },
+    { id: "rate", label: "Success rate", icon: "check", tone: "", value: rangeRate === null ? "—" : `${rangeRate}%`, foot: `${rangeSuccess.length} of ${txRange.length} payments` },
+    { id: "avg", label: "Avg. ticket", icon: "scale", tone: "", value: fmt(avgTicket), foot: "per successful payment" },
+    { id: "attention", label: "Needs attention", icon: "alert", tone: attentionCount > 0 ? "c-warning" : "", value: `${attentionCount}`, foot: "open items — all time" },
+    { id: "refunds", label: "Refunds queued", icon: "refresh", tone: pendingRefunds > 0 ? "c-warning" : "", value: `${pendingRefunds}`, foot: "awaiting a decision" },
+    { id: "withdrawals", label: "Withdrawals queued", icon: "arrowUpR", tone: pendingWithdrawals > 0 ? "c-warning" : "", value: `${pendingWithdrawals}`, foot: "customers cashing out" },
+  ];
+  const statById = new Map(STATS.map((s) => [s.id, s]));
+  const cards = selectedCards.map((id) => statById.get(id) ?? statById.get("gross")!);
+  // Keep the cards param out of the URL while it's just the defaults.
+  const cardsQuery = selectedCards.join(",") === DEFAULT_CARDS.join(",") ? "" : `&cards=${selectedCards.join(",")}`;
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const firstName = (profile.full_name || "").trim().split(/\s+/)[0] || "there";
@@ -184,60 +240,59 @@ export async function AdminOverviewBody({ basePath }: { basePath: string }) {
         </div>
       )}
 
+      {/* KPI row — period picker + four selectable stat cards. Cards default
+          to today's numbers; the ▾ on each card swaps which stat it shows
+          (the choice rides in the URL so it survives reloads and shares). */}
+      <div className="adm-range-row">
+        <span className="adm-eyebrow">Stats for</span>
+        {KPI_RANGES.map((r) => (
+          <Link key={r.id} href={`${basePath}?range=${r.id}${cardsQuery}`} scroll={false} className={`filter-pill${r.id === range ? " selected" : ""}`}>
+            {r.label}
+          </Link>
+        ))}
+      </div>
       <div className="adm-kpi-grid">
-        <div className="adm-kpi">
-          <div className="adm-kpi-top">
-            <div className="adm-kpi-id">
-              <div className="adm-kpi-icon"><Icon name="wallet" size={16} stroke={2} /></div>
-              <div className="adm-kpi-label">Gross volume today</div>
+        {cards.map((stat, slot) => (
+          <div key={slot} className="adm-kpi-wrap">
+            <div className={`adm-kpi ${stat.tone}`}>
+              <div className="adm-kpi-top">
+                <div className="adm-kpi-id">
+                  <div className="adm-kpi-icon"><Icon name={stat.icon} size={16} stroke={2} /></div>
+                  <div className="adm-kpi-label">{stat.label}</div>
+                </div>
+              </div>
+              <div className="adm-kpi-value" style={stat.valueTone ? { color: stat.valueTone } : undefined}>{stat.value}</div>
+              <div className="adm-kpi-foot">{stat.foot}</div>
             </div>
-            <span className="adm-pill">TODAY</span>
-          </div>
-          <div className="adm-kpi-value">{fmt(todayGross)}</div>
-          <div className="adm-kpi-foot">7-day settled <strong>{fmt(settled)}</strong></div>
-        </div>
-        <div className="adm-kpi c-info">
-          <div className="adm-kpi-top">
-            <div className="adm-kpi-id">
-              <div className="adm-kpi-icon"><Icon name="book" size={16} stroke={2} /></div>
-              <div className="adm-kpi-label">Net revenue today</div>
+            <div className="adm-kpi-tools">
+              <span className="adm-pill">{rangeMeta.short}</span>
+              <details className="adm-kpi-pick">
+                <summary aria-label={`Change stat on card ${slot + 1}`}>
+                  <Icon name="chevronD" size={11} />
+                </summary>
+                <div className="adm-kpi-menu">
+                  <div className="adm-kpi-menu-title">Show on this card</div>
+                  {STATS.map((s) => {
+                    const next = [...selectedCards];
+                    const at = next.indexOf(s.id);
+                    if (at >= 0 && at !== slot) [next[at], next[slot]] = [next[slot], next[at]];
+                    else next[slot] = s.id;
+                    const current = s.id === stat.id;
+                    return (
+                      <Link key={s.id} href={`${basePath}?range=${range}&cards=${next.join(",")}`} scroll={false} className={current ? "on" : ""}>
+                        <span>{s.label}</span>
+                        {current && <Icon name="check" size={12} />}
+                      </Link>
+                    );
+                  })}
+                  <Link href={`${basePath}?range=${range}`} scroll={false} className="adm-kpi-menu-reset">
+                    Reset cards
+                  </Link>
+                </div>
+              </details>
             </div>
-            <span className="adm-pill">OURS</span>
           </div>
-          <div className="adm-kpi-value" style={{ color: "var(--success)" }}>{fmt(todayRevenue)}</div>
-          <div className="adm-kpi-foot">
-            {todayGross > 0 ? <>margin <strong>{Math.round((todayRevenue / todayGross) * 100)}%</strong></> : <>no settled sales yet today</>}
-          </div>
-        </div>
-        <div className="adm-kpi c-purple">
-          <div className="adm-kpi-top">
-            <div className="adm-kpi-id">
-              <div className="adm-kpi-icon"><Icon name="zap" size={16} stroke={2} /></div>
-              <div className="adm-kpi-label">Transactions</div>
-            </div>
-            <span className="adm-pill">7D</span>
-          </div>
-          <div className="adm-kpi-value">
-            {tx.length}
-            <sup>{todayTx.length} today</sup>
-          </div>
-          <div className="adm-kpi-foot">
-            success rate <strong>{successRate === null ? "—" : `${successRate}%`}</strong> · pending <strong>{pending}</strong>
-          </div>
-        </div>
-        <div className={`adm-kpi ${failed > 0 ? "c-error" : ""}`}>
-          <div className="adm-kpi-top">
-            <div className="adm-kpi-id">
-              <div className="adm-kpi-icon"><Icon name="alert" size={16} stroke={2} /></div>
-              <div className="adm-kpi-label">Failed</div>
-            </div>
-            <span className="adm-pill">7D</span>
-          </div>
-          <div className="adm-kpi-value" style={{ color: failed > 0 ? "var(--error)" : undefined }}>{prevWeekFailed}</div>
-          <div className="adm-kpi-foot">
-            {failed > 0 ? <>latest {recentFailures[0] ? new Date(recentFailures[0].createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "—"}</> : <>clean week — nothing failed</>}
-          </div>
-        </div>
+        ))}
       </div>
 
       <div className="adm-grid">

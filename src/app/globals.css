@@ -2531,15 +2531,15 @@ html[data-theme="dark"] .admin-shell {
 }
 .adm-kpi:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
 .adm-kpi:hover::before { opacity: 0.14; }
-.adm-kpi:nth-child(1) { animation-delay: 60ms; }
-.adm-kpi:nth-child(2) { animation-delay: 120ms; }
-.adm-kpi:nth-child(3) { animation-delay: 180ms; }
-.adm-kpi:nth-child(4) { animation-delay: 240ms; }
+.adm-kpi-grid > :nth-child(1) .adm-kpi { animation-delay: 60ms; }
+.adm-kpi-grid > :nth-child(2) .adm-kpi { animation-delay: 120ms; }
+.adm-kpi-grid > :nth-child(3) .adm-kpi { animation-delay: 180ms; }
+.adm-kpi-grid > :nth-child(4) .adm-kpi { animation-delay: 240ms; }
 .adm-kpi.c-info { color: var(--info); }
 .adm-kpi.c-warning { color: var(--warning); }
 .adm-kpi.c-error { color: var(--error); }
 .adm-kpi.c-purple { color: var(--adm-purple); }
-.adm-kpi-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; position: relative; }
+.adm-kpi-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; position: relative; padding-right: 58px; }
 .adm-kpi-id { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .adm-kpi-icon {
   width: 32px;
@@ -2589,6 +2589,85 @@ html[data-theme="dark"] .admin-shell {
   position: relative;
 }
 .adm-kpi-foot strong { color: var(--text-primary); font-family: var(--adm-font-display); font-size: 11.5px; font-weight: 600; }
+/* Card slot wrapper — the pill + stat-picker sit here, OUTSIDE .adm-kpi, so
+   the picker menu isn't clipped by the card's overflow:hidden (which exists
+   to crop the radial ::before glow). */
+.adm-kpi-wrap { position: relative; min-width: 0; }
+.adm-kpi-wrap .adm-kpi { height: 100%; }
+.adm-kpi-tools {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  z-index: 5;
+}
+.adm-kpi-pick { position: relative; }
+.adm-kpi-pick summary {
+  list-style: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+.adm-kpi-pick summary::-webkit-details-marker { display: none; }
+.adm-kpi-pick summary:hover { background: var(--adm-hover); color: var(--text-primary); }
+.adm-kpi-pick[open] summary { background: var(--muted); color: var(--text-primary); }
+.adm-kpi-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 172px;
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: var(--shadow-md);
+  padding: 4px;
+  z-index: 30;
+}
+.adm-kpi-menu-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  padding: 6px 10px 4px;
+}
+.adm-kpi-menu a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 4px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+.adm-kpi-menu a:hover { background: var(--muted); color: var(--text-primary); }
+.adm-kpi-menu a.on { color: var(--text-primary); font-weight: 600; }
+.adm-kpi-menu a.adm-kpi-menu-reset {
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 4px 4px;
+  margin-top: 4px;
+  padding-top: 8px;
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+  justify-content: center;
+}
+.adm-range-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
 .adm-pill {
   font-family: var(--adm-font-display);
   font-size: 10.5px;
@@ -2760,7 +2839,9 @@ html[data-theme="dark"] .admin-shell {
   .adm-kpi-id { flex-direction: column; align-items: center; gap: 8px; }
   .adm-kpi-icon { width: 30px; height: 30px; }
   .adm-kpi-label { white-space: normal; overflow: visible; font-size: 12px; }
-  .adm-kpi .adm-pill { position: absolute; top: 0; right: 0; }
+  /* Pill now sits inside .adm-kpi-tools (absolutely positioned on the wrap)
+     — no per-pill positioning needed. */
+  .adm-kpi-top { padding-right: 0; }
   .adm-kpi-value { font-size: 26px; }
   .adm-kpi-value sup { font-size: 11px; }
   .adm-kpi-foot { justify-content: center; font-size: 11px; padding-top: 8px; }
