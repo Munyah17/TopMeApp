@@ -174,13 +174,14 @@
    themes; only backgrounds/text/borders and the pale tint colors (which
    would look washed out on a dark surface) actually change.
 
-   Scoped to .app-shell (the customer app's own root), NOT :root — the
-   toggle is a customer-only preference (see /account#appearance; staff
-   never reach it, /admin and /super-admin redirect away from /account
-   entirely). Scoping at :root would leak into .admin-shell too, since it
-   has no background of its own and just inherits body's — which is
-   exactly what the owner explicitly said not to touch. */
-html[data-theme="dark"] .app-shell {
+   Set on <html> itself (not .app-shell) so EVERY surface goes dark — body
+   background, auth pages, error pages, anything rendered outside the app
+   shell. Scoping to .app-shell left those areas on the light tokens, which
+   is what made dark mode look "half dark" (light background patches, dark
+   text on dark surfaces). .admin-shell is unaffected: it re-declares its
+   own dark token set under html[data-theme="dark"] .admin-shell further
+   down, which wins by specificity on every token it uses. */
+html[data-theme="dark"] {
   /* Tells the UA this surface is dark — native form controls, scrollbars,
      date pickers and select dropdowns then render dark chrome instead of
      light controls with dark text stranded on our dark surfaces. */

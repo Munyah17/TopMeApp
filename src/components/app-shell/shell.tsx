@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon } from "@/components/icons";
 import { AvatarMenu } from "@/components/app-shell/avatar-menu";
+import { ThemeIconButton } from "@/components/wallet/theme-toggle";
 import { BrandMark, Wordmark } from "@/components/logo";
 import { Footer } from "@/components/app-shell/footer";
 import { NAV as STAFF_NAV, portalHref } from "@/components/admin/nav";
@@ -63,9 +64,10 @@ export function AppShell({
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const isAdminSection = pathname.startsWith("/admin");
-  // Staff browsing the site never see the customer tabs — the sidebar and
-  // drawer carry their console's own nav instead (same table as the portal
-  // shell, so the two can't drift), and the bottom tab bar doesn't render.
+  // Staff browsing the site never see the customer tabs in the sidebar or
+  // drawer — those carry their console's own nav instead (same table as the
+  // portal shell, so the two can't drift). The bottom tab bar still renders
+  // for everyone on mobile.
   const isStaff = !!staffConsole;
   const consoleHref = staffConsole?.basePath ?? "/admin";
   const navTabs = chatEnabled ? NAVTABS : NAVTABS.filter((t) => t.id !== "chat");
@@ -214,6 +216,7 @@ export function AppShell({
             <div className="topbar-title desktop-only">{pageTitle(pathname)}</div>
 
             <div className="header-right">
+              <ThemeIconButton />
               {profile ? (
                 <AvatarMenu initials={initials(profile.full_name)} avatarUrl={profile.avatar_url} consoleHref={isStaff ? consoleHref : undefined} />
               ) : (
@@ -248,8 +251,7 @@ export function AppShell({
           {!pathname.startsWith("/chat") && <Footer />}
         </div>
 
-        {!staffConsole && (
-          <nav className="bottom-nav">
+        <nav className="bottom-nav">
             {navTabs.map((t) =>
               t.id === "chat" ? (
                 <Link key={t.id} href={t.href} className={`nav-item nav-item-chat ${isActive(pathname, t.href) ? "active" : ""}`}>
@@ -268,8 +270,7 @@ export function AppShell({
                 </Link>
               )
             )}
-          </nav>
-        )}
+        </nav>
       </div>
     </div>
   );
