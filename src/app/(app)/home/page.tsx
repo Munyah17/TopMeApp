@@ -109,7 +109,7 @@ export default async function HomePage() {
                 </Link>
                 <Link
                   href={profile ? "/pay/send?kind=red_packet" : "/login"}
-                  className="btn tap"
+                  className="btn tap gift-packet-btn"
                   style={{
                     flex: "40 1 0",
                     height: 44,

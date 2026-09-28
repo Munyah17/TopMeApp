@@ -1604,6 +1604,11 @@ a.side-user:hover {
 .quickpay-card {
   box-shadow: var(--shadow-sm);
 }
+@media (max-width: 819.98px) {
+  /* Mobile: drop the Red Packet button — Top Up and Gift keep equal
+     flex weights, so they split the freed space 50/50. */
+  .gift-packet-btn { display: none; }
+}
 
 /* ---------- Browse by category ---------- */
 .browse-category-grid {
