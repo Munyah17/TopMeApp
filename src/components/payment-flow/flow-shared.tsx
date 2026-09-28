@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Icon } from "@/components/icons";
+import { textOn } from "@/lib/data/catalog-helpers";
 import type { GuestGateway } from "@/lib/actions/guest-payments";
 import type { Network } from "@/types/database";
 
@@ -156,7 +157,7 @@ export function NetworkTile({ network, selected, onClick }: { network: Network; 
               alignItems: "center",
               justifyContent: "center",
               background: network.color,
-              color: "#fff",
+              color: textOn(network.color),
               fontWeight: 800,
               fontSize: 16,
             }}

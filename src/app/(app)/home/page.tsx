@@ -68,7 +68,7 @@ export default async function HomePage() {
             >
               <div style={{ position: "absolute", right: -40, top: -40, width: 120, height: 120, borderRadius: "50%", background: "rgba(167,243,208,0.10)" }} />
               <div style={{ position: "absolute", right: 40, bottom: -30, width: 80, height: 80, borderRadius: "50%", background: "rgba(167,243,208,0.07)" }} />
-              <div className="eyebrow" style={{ color: "var(--green-200)", position: "relative" }}>
+              <div className="eyebrow" style={{ color: "#a7f3d0", position: "relative" }}>
                 New
               </div>
               <div style={{ color: "#fff", fontWeight: 700, fontSize: 20, marginTop: 4, position: "relative" }}>

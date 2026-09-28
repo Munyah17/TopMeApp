@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
 import { Icon } from "@/components/icons";
-import { hexA } from "@/lib/data/catalog-helpers";
+import { hexA, mutedOn, textOn } from "@/lib/data/catalog-helpers";
 import { calculatePlatformFee, calculateGatewaySurcharge } from "@/lib/fees";
 import { payService, validateBillAccount } from "@/lib/actions/payments";
 import { watchFulfillment } from "@/lib/payments/fulfillment-watch";
@@ -330,9 +330,9 @@ export function CouncilFlow({
             <h2 style={{ fontSize: 19, marginTop: 6 }}>Review payment</h2>
             <div className="muted mb-3">Tap the pencil to fix anything</div>
             <div className="card" style={{ overflow: "hidden" }}>
-              <div className="card-pad" style={{ textAlign: "center", borderBottom: "1px dashed var(--border)", background: service.color }}>
-                <div className="muted" style={{ color: "rgba(255,255,255,0.75)" }}>You&apos;re paying</div>
-                <div style={{ fontSize: 34, fontWeight: 800, marginTop: 4, color: "#fff" }}>${total.toFixed(2)}</div>
+              <div className="card-pad" style={{ textAlign: "center", borderBottom: "1px dashed var(--border)", background: service.color, color: textOn(service.color) }}>
+                <div className="muted" style={{ color: mutedOn(service.color) }}>You&apos;re paying</div>
+                <div style={{ fontSize: 34, fontWeight: 800, marginTop: 4 }}>${total.toFixed(2)}</div>
               </div>
               <div style={{ padding: "6px 18px" }}>
                 <EditableRow label={service.id_label} value={account} onSave={setAccount} placeholder={service.id_placeholder ?? ""} />

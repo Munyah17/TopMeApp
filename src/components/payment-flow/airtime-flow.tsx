@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
 import { Icon } from "@/components/icons";
-import { hexA } from "@/lib/data/catalog-helpers";
+import { hexA, mutedOn, textOn } from "@/lib/data/catalog-helpers";
 import { calculatePlatformFee, calculateGatewaySurcharge } from "@/lib/fees";
 import { payService } from "@/lib/actions/payments";
 import { startGuestCheckout, type GuestGateway } from "@/lib/actions/guest-payments";
@@ -369,11 +369,11 @@ export function AirtimeFlow({
             <h2 style={{ fontSize: 19, marginTop: 6 }}>Review purchase</h2>
             <div className="muted mb-3">Tap the pencil to fix anything</div>
             <div className="card" style={{ overflow: "hidden" }}>
-              <div className="card-pad" style={{ textAlign: "center", borderBottom: "1px dashed var(--border)", background: network?.color ?? service.color }}>
-                <div className="muted" style={{ color: "rgba(255,255,255,0.75)" }}>You&apos;re sending</div>
-                <div style={{ fontSize: 34, fontWeight: 800, marginTop: 4, color: "#fff" }}>${total.toFixed(2)}</div>
+              <div className="card-pad" style={{ textAlign: "center", borderBottom: "1px dashed var(--border)", background: network?.color ?? service.color, color: textOn(network?.color ?? service.color) }}>
+                <div className="muted" style={{ color: mutedOn(network?.color ?? service.color) }}>You&apos;re sending</div>
+                <div style={{ fontSize: 34, fontWeight: 800, marginTop: 4 }}>${total.toFixed(2)}</div>
                 {isVoucher(service) && quantity > 1 && (
-                  <div className="muted" style={{ color: "rgba(255,255,255,0.75)", marginTop: 2 }}>{quantity} × ${unitPrice.toFixed(2)} vouchers</div>
+                  <div className="muted" style={{ color: mutedOn(network?.color ?? service.color), marginTop: 2 }}>{quantity} × ${unitPrice.toFixed(2)} vouchers</div>
                 )}
               </div>
               <div style={{ padding: "6px 18px" }}>

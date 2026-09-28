@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icons";
+import { textOn } from "@/lib/data/catalog-helpers";
 import { setNetworkActive, setNetworkLogo, uploadNetworkLogo } from "@/lib/actions/admin";
 import type { Network } from "@/types/database";
 
@@ -44,7 +45,7 @@ function NetworkRow({ network }: { network: Network }) {
           justifyContent: "center",
           background: network.logo_url ? "var(--surface)" : network.color,
           border: network.logo_url ? "1px solid var(--border)" : "none",
-          color: "#fff",
+          color: textOn(network.color),
           fontWeight: 800,
           fontSize: 15,
           overflow: "hidden",

@@ -127,7 +127,7 @@ export function DisputeThread({
                       padding: "9px 13px",
                       fontSize: 13.5,
                       background: mine ? "var(--green)" : "var(--bg)",
-                      color: mine ? "#fff" : "var(--text)",
+                      color: mine ? "var(--text-inverse)" : "var(--text)",
                     }}
                   >
                     {m.body}

@@ -56,3 +56,41 @@ export function hexA(hex: string, a: number) {
   const b = parseInt(c.substring(4, 6), 16);
   return `rgba(${r},${g},${b},${a})`;
 }
+
+// WCAG relative luminance of a hex/rgb color; null when the string can't be
+// parsed (var(), gradients, named colors).
+function luminance(color: string): number | null {
+  const s = color.trim();
+  let rgb: [number, number, number] | null = null;
+  const hex = s.replace("#", "");
+  if (/^[0-9a-fA-F]{6}$/.test(hex)) {
+    rgb = [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)];
+  } else if (/^[0-9a-fA-F]{3}$/.test(hex)) {
+    rgb = hex.split("").map((h) => parseInt(h + h, 16)) as [number, number, number];
+  } else {
+    const m = s.match(/rgba?\((\d+)[^\d]+(\d+)[^\d]+(\d+)/);
+    if (m) rgb = [Number(m[1]), Number(m[2]), Number(m[3])];
+  }
+  if (!rgb) return null;
+  const [r, g, b] = rgb.map((v) => {
+    const c = v / 255;
+    return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+// Readable text color for text painted on an arbitrary brand fill. Several
+// seeded service/network colors are light (amber #F59E0B, sky #38BDF8, bright
+// green #00C853), so the old hardcoded "#fff" rendered white-on-light.
+// Whichever of dark/light wins on contrast is returned; anything unparseable
+// keeps the previous default of white.
+export function textOn(bg: string) {
+  const l = luminance(bg);
+  return l !== null && l > 0.23 ? "#0f172a" : "#fff";
+}
+
+// Softer secondary label on the same fill.
+export function mutedOn(bg: string) {
+  const l = luminance(bg);
+  return l !== null && l > 0.23 ? "rgba(15,23,42,0.72)" : "rgba(255,255,255,0.75)";
+}

@@ -140,7 +140,7 @@ export function SupportThread({
                       padding: "9px 13px",
                       fontSize: 13.5,
                       background: mine ? "var(--green)" : "var(--bg)",
-                      color: mine ? "#fff" : "var(--text)",
+                      color: mine ? "var(--text-inverse)" : "var(--text)",
                     }}
                   >
                     <div style={{ fontSize: 10.5, fontWeight: 700, opacity: 0.7, marginBottom: 2 }}>{isCustomer ? "Customer" : "Staff"}</div>
