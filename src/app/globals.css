@@ -2916,19 +2916,31 @@ html[data-theme="dark"] .admin-shell {
 
   /* KPI cards are ~150px wide here — the desktop top row (icon + label +
      period pill) truncates the label to "Gr…". Stack the icon above a
-     wrapping label, float the period pill in the card's corner and centre
-     the stat underneath. */
-  .adm-kpi { padding: 14px 12px 12px; gap: 8px; text-align: center; }
-  .adm-kpi-top { justify-content: center; }
+     wrapping label and centre the stat underneath. The pill + stat-picker
+     float in a dedicated header band at the card's top (reserved by
+     padding-top) so they can never overlap the icon, label or figure. */
+  .adm-kpi { padding: 42px 12px 12px; gap: 8px; text-align: center; }
+  .adm-kpi-top { justify-content: center; padding-right: 0; }
   .adm-kpi-id { flex-direction: column; align-items: center; gap: 8px; }
   .adm-kpi-icon { width: 30px; height: 30px; }
-  .adm-kpi-label { white-space: normal; overflow: visible; font-size: 12px; }
-  /* Pill now sits inside .adm-kpi-tools (absolutely positioned on the wrap)
-     — no per-pill positioning needed. */
-  .adm-kpi-top { padding-right: 0; }
-  .adm-kpi-value { font-size: 26px; }
+  .adm-kpi-label { white-space: normal; overflow: visible; font-size: 12px; line-height: 1.3; }
+  /* Figure scales with card width so long money values can't overflow. */
+  .adm-kpi-value { font-size: clamp(20px, 7vw, 26px); }
   .adm-kpi-value sup { font-size: 11px; }
   .adm-kpi-foot { justify-content: center; font-size: 11px; padding-top: 8px; }
+  /* The 11-item picker menu would run off a short screen — cap + scroll. */
+  .adm-kpi-menu { max-height: 60dvh; overflow-y: auto; }
+
+  /* Space optimisation: reclaim chrome so content breathes on ~360px. */
+  .adm-hero { gap: 14px; margin-bottom: 16px; }
+  .adm-hero-actions { width: 100%; }
+  .adm-hero-actions .btn { flex: 1; justify-content: center; }
+  .adm-kpi-grid { gap: 10px; }
+  .adm-grid { gap: 12px; }
+  .adm-panel { padding: 14px; }
+  .adm-panel-head { padding-bottom: 10px; margin-bottom: 12px; }
+  .adm-chart-foot { gap: 8px; }
+  .adm-stat-value { font-size: 16px; }
 }
 @media (min-width: 640px) {
   .admin-cmd { display: inline-flex; }
