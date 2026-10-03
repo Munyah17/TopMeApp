@@ -113,6 +113,7 @@ async function issuePolicyAfterPayment(opts: {
   const tariqifyPolicy = await createPolicy({
     product_id: productId,
     client_id: opts.tariqifyClientId,
+    client_national_id: opts.nationalId,
     premium: basePremium,
     currency,
     dependants,

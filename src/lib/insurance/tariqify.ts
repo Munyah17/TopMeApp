@@ -5,7 +5,39 @@ import type { InsuranceSignupField } from "./types";
  * Base URL: https://portal.motions.co.zw/api/v1
  * Auth: Authorization: Bearer <api_key>
  * Rate limit: 60 req/min per key
+ *
+ * The API is strictly camelCase on the wire — requests it can't map to its
+ * expected field names (clientId/productId/nationalId/policyNumber, NOT the
+ * snake_case TopMe uses internally) fail validation, which was the real
+ * cause of "clientId and productId must be valid UUIDs": Tariqify read
+ * clientId as undefined. Every function here takes snake_case params
+ * (TopMe's convention) and translates at the request boundary.
+ *
+ * Confirmed against the live API 2026-10-04 — POST /clients requires
+ * name+phone+nationalId; POST /policies accepts a UUID, a national ID
+ * directly in clientId, or a separate clientNationalId field; POST /quotes
+ * needs only productId; POST /payments needs policyNumber+amount.
  */
+
+/** Tariqify rejects a duplicate POST /clients with 409 — the id is
+ *  national-ID-keyed upstream, so callers can still reference the client by
+ *  that national ID at policy time. */
+export class TariqifyApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly body: unknown
+  ) {
+    super(message);
+    this.name = "TariqifyApiError";
+  }
+}
+
+/** Tariqify stores national IDs in canonical form (no separators, upper
+ *  case) — send it that way so our records match what it echoes back. */
+function canonicalNationalId(raw: string): string {
+  return raw.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+}
 
 function config() {
   const baseUrl = process.env.TARIQIFY_BASE_URL;
@@ -56,7 +88,11 @@ async function tariqifyRequest<T>(
   }
   if (!res.ok) {
     const envelope = parsed as TariqifyEnvelope<T>;
-    throw new Error(`TariqifyIMS ${path} failed (${res.status}): ${envelope?.error || envelope?.message || text.slice(0, 300)}`);
+    throw new TariqifyApiError(
+      `TariqifyIMS ${path} failed (${res.status}): ${envelope?.error || envelope?.message || text.slice(0, 300)}`,
+      res.status,
+      parsed
+    );
   }
   const envelope = parsed as TariqifyEnvelope<T>;
   return (envelope && typeof envelope === "object" && "data" in envelope ? envelope.data : parsed) as T;
@@ -189,37 +225,101 @@ export async function createOrGetClient(params: {
   address?: string;
   occupation?: string;
 }): Promise<TariqifyClient> {
-  // Forward the whole application — Tariqify persists the fields its schema
-  // knows (national_id/full_name/phone at minimum) and ignores the rest, so
-  // sending email/dob/address/occupation is safe even where unmapped.
-  const data = await tariqifyRequest<Record<string, unknown>>("/clients", {
-    method: "POST",
-    body: params,
-  });
+  const nationalId = canonicalNationalId(params.national_id);
+  const body: Record<string, unknown> = {
+    name: params.full_name,
+    nationalId,
+    phone: params.phone,
+    email: params.email,
+    dateOfBirth: params.date_of_birth,
+    address: params.address,
+    occupation: params.occupation,
+  };
+  // Strip undefineds so optional fields don't serialise as JSON nulls.
+  for (const k of Object.keys(body)) if (body[k] === undefined) delete body[k];
+  try {
+    const data = await tariqifyRequest<Record<string, unknown>>("/clients", {
+      method: "POST",
+      body,
+    });
+    return {
+      id: String(data.id ?? nationalId),
+      national_id: String(data.nationalId ?? data.national_id ?? nationalId),
+      full_name: String(data.name ?? data.full_name ?? data.fullName ?? params.full_name),
+      phone: data.phone ? String(data.phone) : params.phone,
+      raw: data,
+    };
+  } catch (error) {
+    // 409 = the national ID is already registered (any agent's book — the
+    // client id isn't returned, but /policies resolves national IDs
+    // directly, so id= national ID keeps the whole flow working).
+    if (error instanceof TariqifyApiError && error.status === 409) {
+      return {
+        id: nationalId,
+        national_id: nationalId,
+        full_name: params.full_name,
+        phone: params.phone,
+        raw: { duplicate: true, nationalId },
+      };
+    }
+    throw error;
+  }
+}
+
+/**
+ * GET /api/v1/clients?nationalId=
+ * Look up a client in our own book by national ID (added by Tariqify
+ * 2026-10-04, under the existing policies:read scope). Returns null when
+ * the national ID isn't registered.
+ */
+export async function getClientByNationalId(nationalId: string): Promise<TariqifyClient | null> {
+  let data: unknown;
+  try {
+    data = await tariqifyRequest<unknown>(`/clients?nationalId=${encodeURIComponent(canonicalNationalId(nationalId))}`);
+  } catch (error) {
+    // A miss may come back as a 404 rather than an empty list.
+    if (error instanceof TariqifyApiError && error.status === 404) return null;
+    throw error;
+  }
+  const rows = (Array.isArray(data) ? data : [data]) as Record<string, unknown>[];
+  const client = rows.find((r) => r && typeof r === "object" && (r.id || r.nationalId || r.national_id));
+  if (!client) return null;
   return {
-    id: String(data.id),
-    national_id: String(data.national_id),
-    full_name: String(data.full_name),
-    phone: data.phone ? String(data.phone) : undefined,
-    raw: data,
+    id: String(client.id),
+    national_id: String(client.nationalId ?? client.national_id),
+    full_name: String(client.name ?? client.fullName ?? client.full_name),
+    phone: client.phone ? String(client.phone) : undefined,
+    raw: client,
   };
 }
 
 /**
  * POST /api/v1/quotes
  * Get a premium quote and eligibility check for a product.
+ *
+ * Verified live (2026-10-04): requires `productId`; the response is
+ * `{data: {productId, productName, eligible, premium, coverAmount,
+ * waitingPeriodDays}}` — the premium comes back as `premium`, not
+ * `base_premium`.
  */
 export async function getQuote(params: {
   product_id: string;
   national_id: string;
   field_values?: Record<string, unknown>;
 }): Promise<TariqifyQuote> {
+  // Live quote response (2026-10-04): {productId, productName, eligible,
+  // premium, coverAmount, waitingPeriodDays} — the premium arrives as
+  // `premium`, not `base_premium`, and there is no currency field.
   const data = await tariqifyRequest<Record<string, unknown>>("/quotes", {
     method: "POST",
-    body: params,
+    body: {
+      productId: params.product_id,
+      nationalId: canonicalNationalId(params.national_id),
+      fieldValues: params.field_values,
+    },
   });
   return {
-    base_premium: Number(data.base_premium),
+    base_premium: Number(data.premium ?? data.base_premium ?? data.basePremium),
     currency: String(data.currency || "USD"),
     eligible: data.eligible === true,
     message: data.message ? String(data.message) : undefined,
@@ -230,27 +330,52 @@ export async function getQuote(params: {
 /**
  * POST /api/v1/policies
  * Create a policy for a client. Attributed to the developer as agent.
+ *
+ * Verified live (2026-10-04): requires `clientId` (the UUID from
+ * POST /clients, or a national ID — Tariqify resolves it against
+ * clients.national_id) or `clientNationalId`, plus `productId`. This was
+ * the "clientId and productId must be valid UUIDs" failure: we sent
+ * snake_case keys, so both arrived undefined.
  */
 export async function createPolicy(params: {
   product_id: string;
+  /** Tariqify client UUID — OR a national ID, which /policies resolves
+   *  directly since their national-ID fix (2026-10-04). */
   client_id: string;
+  /** Always send the customer's national ID too when known — guarantees
+   *  client resolution even if the UUID isn't in our agent book. */
+  client_national_id?: string;
   premium: number;
   currency: string;
   /** Dependant rows from the application — Tariqify persists fields its
    *  schema knows and ignores the rest, so sending these is safe. */
   dependants?: { name: string; relationship?: string; dob?: string; national_id?: string }[];
 }): Promise<TariqifyPolicy> {
+  const body: Record<string, unknown> = {
+    productId: params.product_id,
+    clientId: params.client_id,
+    premium: params.premium,
+    currency: params.currency,
+    dependants: params.dependants?.map((d) => ({
+      name: d.name,
+      relationship: d.relationship,
+      dob: d.dob,
+      nationalId: d.national_id ? canonicalNationalId(d.national_id) : undefined,
+    })),
+  };
+  if (params.client_national_id) body.clientNationalId = canonicalNationalId(params.client_national_id);
+  if (!body.dependants) delete body.dependants;
   const data = await tariqifyRequest<Record<string, unknown>>("/policies", {
     method: "POST",
-    body: params,
+    body,
   });
   return {
-    policy_number: String(data.policy_number),
-    product_id: String(data.product_id),
-    client_id: String(data.client_id),
+    policy_number: String(data.policyNumber ?? data.policy_number),
+    product_id: String(data.productId ?? data.product_id ?? params.product_id),
+    client_id: String(data.clientId ?? data.client_id ?? params.client_id),
     status: String(data.status),
-    premium: Number(data.premium),
-    currency: String(data.currency),
+    premium: Number(data.premium ?? params.premium),
+    currency: String(data.currency ?? params.currency),
     raw: data,
   };
 }
@@ -262,12 +387,12 @@ export async function createPolicy(params: {
 export async function getPolicy(policyNumber: string): Promise<TariqifyPolicy> {
   const data = await tariqifyRequest<Record<string, unknown>>(`/policies/${policyNumber}`);
   return {
-    policy_number: String(data.policy_number),
-    product_id: String(data.product_id),
-    client_id: String(data.client_id),
+    policy_number: String(data.policyNumber ?? data.policy_number ?? policyNumber),
+    product_id: String(data.productId ?? data.product_id),
+    client_id: String(data.clientId ?? data.client_id),
     status: String(data.status),
     premium: Number(data.premium),
-    currency: String(data.currency),
+    currency: String(data.currency ?? "USD"),
     raw: data,
   };
 }
@@ -275,6 +400,9 @@ export async function getPolicy(policyNumber: string): Promise<TariqifyPolicy> {
 /**
  * POST /api/v1/payments
  * Record a premium payment against a policy.
+ *
+ * Verified live (2026-10-04): requires `policyNumber` and a positive
+ * `amount` — snake_case `policy_number` was rejected.
  */
 export async function recordPayment(params: {
   policy_number: string;
@@ -283,13 +411,17 @@ export async function recordPayment(params: {
 }): Promise<TariqifyPayment> {
   const data = await tariqifyRequest<Record<string, unknown>>("/payments", {
     method: "POST",
-    body: params,
+    body: {
+      policyNumber: params.policy_number,
+      amount: params.amount,
+      currency: params.currency,
+    },
   });
   return {
     id: String(data.id),
-    policy_number: String(data.policy_number),
-    amount: Number(data.amount),
-    currency: String(data.currency),
+    policy_number: String(data.policyNumber ?? data.policy_number ?? params.policy_number),
+    amount: Number(data.amount ?? params.amount),
+    currency: String(data.currency ?? params.currency),
     status: String(data.status),
     raw: data,
   };
@@ -298,15 +430,52 @@ export async function recordPayment(params: {
 /**
  * POST /api/v1/tickets
  * File a support ticket for one of your clients.
+ *
+ * Verified live (2026-10-04): requires `subject`, `description` and
+ * `clientId` — the previous body (`message`/`client_id`) was rejected.
  */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function createTicket(params: {
   policy_number?: string;
   client_id?: string;
   subject: string;
   message: string;
 }): Promise<Record<string, unknown>> {
+  // /tickets is stricter than /policies: clientId must be a UUID — national
+  // IDs are rejected. When our stored client ref is a national ID (the
+  // duplicate-registration path), resolve it to the UUID via the pull
+  // endpoint first.
+  let clientId = params.client_id;
+  if (clientId && !UUID_RE.test(clientId)) {
+    const resolved = await getClientByNationalId(clientId);
+    if (!resolved || !UUID_RE.test(resolved.id)) {
+      throw new Error(
+        `TariqifyIMS /tickets requires a UUID clientId — could not resolve "${clientId}" to a client UUID`
+      );
+    }
+    clientId = resolved.id;
+  }
+  const body: Record<string, unknown> = {
+    policyNumber: params.policy_number,
+    clientId,
+    subject: params.subject,
+    description: params.message,
+  };
+  for (const k of Object.keys(body)) if (body[k] === undefined) delete body[k];
   return tariqifyRequest<Record<string, unknown>>("/tickets", {
     method: "POST",
-    body: params,
+    body,
   });
+}
+
+/**
+ * GET /api/v1/policies
+ * List our whole book with client + product names (added by Tariqify
+ * 2026-10-04 under the existing policies:read scope). Rows are returned
+ * as-is in `raw` — their exact shape isn't verified yet.
+ */
+export async function getPolicies(): Promise<Record<string, unknown>[]> {
+  const data = await tariqifyRequest<unknown>("/policies");
+  return (Array.isArray(data) ? data : [data]) as Record<string, unknown>[];
 }
