@@ -1,6 +1,7 @@
 import type { ApiModuleSafe } from "@/types/database";
 import { SimulatedProvider } from "./simulated";
 import { VitalPayProvider } from "./vitalpay";
+import { BillPayProvider } from "./billpay";
 import { InsuranceProvider } from "./insurance";
 import type { FulfillmentProvider } from "./types";
 
@@ -17,6 +18,7 @@ export type { FulfillmentInput, FulfillmentResult, FulfillmentProvider } from ".
  * once without stepping on each other.
  */
 const PROVIDER_REGISTRY: Record<string, () => FulfillmentProvider> = {
+  billpay: () => new BillPayProvider(),
   vitalpay: () => new VitalPayProvider(),
   insurance: () => new InsuranceProvider(),
 };
