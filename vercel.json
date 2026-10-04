@@ -8,6 +8,10 @@
     {
       "path": "/api/cron/sync-insurance-products",
       "schedule": "0 4 */3 * *"
+    },
+    {
+      "path": "/api/cron/sync-billpay-catalog",
+      "schedule": "30 4 * * *"
     }
   ]
 }
