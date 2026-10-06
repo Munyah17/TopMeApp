@@ -22,6 +22,7 @@ export default async function ChatThreadPage({ params }: { params: Promise<{ con
       conversationId={conversationId}
       counterpart={conversation.counterpart}
       currentUserId={profile.id}
+      myShowLastSeen={profile.show_last_seen !== false}
       initialMessages={messages}
     />
   );

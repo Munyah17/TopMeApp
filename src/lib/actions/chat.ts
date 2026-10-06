@@ -121,6 +121,51 @@ export async function sendImageMessage(conversationId: string, formData: FormDat
   return data as ChatMessage;
 }
 
+export async function sendVoiceMessage(conversationId: string, formData: FormData): Promise<ChatMessage> {
+  const { supabase, user } = await requireUser();
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) throw new Error("Nothing was recorded. Hold the mic and try again.");
+  if (!file.type.startsWith("audio/")) throw new Error("That recording wasn't recognised as audio.");
+  if (file.size > 4 * 1024 * 1024) throw new Error("Voice notes must be under 4MB.");
+  const durationMs = Math.max(0, Math.min(Number(formData.get("durationMs")) || 0, 10 * 60 * 1000));
+
+  const ext = file.name.split(".").pop()?.toLowerCase() || "webm";
+  const path = `messages/${conversationId}/${randomUUID()}.${ext}`;
+  const { error: uploadError } = await supabase.storage.from("chat-voice").upload(path, file, { contentType: file.type });
+  if (uploadError) throw new Error(uploadError.message);
+
+  const { data: pub } = supabase.storage.from("chat-voice").getPublicUrl(path);
+
+  const { data, error } = await supabase
+    .from("messages")
+    .insert({ conversation_id: conversationId, sender_id: user.id, kind: "voice", voice_url: pub.publicUrl, voice_duration_ms: durationMs || null })
+    .select()
+    .single();
+  if (error) throw new Error(friendlyError(error.message));
+
+  await touchConversation(conversationId, "🎤 Voice note");
+  void notifyOtherParticipant(conversationId, user.id, "🎤 Sent a voice note");
+  revalidatePath(`/chat/${conversationId}`);
+  revalidatePath("/chat");
+  return data as ChatMessage;
+}
+
+// Presence: the thread client heartbeats while it's open and writes once
+// more on leave, so last_seen_at always reflects genuine recent activity.
+// The realtime presence channel handles the live "online" dot; this column
+// is the durable fallback ("last seen 14:32") shown when they're offline.
+export async function touchLastSeen() {
+  const { supabase, user } = await requireUser();
+  await supabase.from("profiles").update({ last_seen_at: new Date().toISOString() }).eq("id", user.id);
+}
+
+export async function setLastSeenVisibility(visible: boolean) {
+  const { supabase, user } = await requireUser();
+  const { error } = await supabase.from("profiles").update({ show_last_seen: visible }).eq("id", user.id);
+  if (error) throw new Error(friendlyError(error.message));
+  revalidatePath("/chat");
+}
+
 export type SendMoneyMessageResult = { ok: true; message: ChatMessage } | { ok: false; error: string };
 
 export async function sendMoneyMessage(conversationId: string, receiverPhone: string, amount: number, note: string | undefined, kind: "transfer" | "red_packet"): Promise<SendMoneyMessageResult> {

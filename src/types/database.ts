@@ -29,6 +29,9 @@ export interface Profile {
   notifications_enabled: boolean;
   is_suspended: boolean;
   created_at: string;
+  /** Chat presence — added by the voice/presence migration. */
+  last_seen_at?: string | null;
+  show_last_seen?: boolean;
 }
 
 export interface Wallet {
@@ -204,6 +207,8 @@ export interface ProfileLookup {
   id: string;
   full_name: string | null;
   phone: string | null;
+  last_seen_at?: string | null;
+  show_last_seen?: boolean;
 }
 
 export interface Conversation {
@@ -219,9 +224,11 @@ export interface ChatMessage {
   id: string;
   conversation_id: string;
   sender_id: string;
-  kind: "text" | "image" | "p2p_transfer";
+  kind: "text" | "image" | "voice" | "p2p_transfer";
   body: string | null;
   image_url: string | null;
+  voice_url: string | null;
+  voice_duration_ms: number | null;
   p2p_transfer_id: string | null;
   created_at: string;
   // Joined in when kind === "p2p_transfer".

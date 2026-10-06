@@ -71,14 +71,14 @@ export async function getConversation(conversationId: string, userId: string): P
 
   const counterpartId = convo.user_a === userId ? convo.user_b : convo.user_a;
   const [{ data: profile }, { data: read }] = await Promise.all([
-    supabase.from("profiles").select("id, full_name, phone").eq("id", counterpartId).abortSignal(AbortSignal.timeout(8000)).single(),
+    supabase.from("profiles").select("id, full_name, phone, last_seen_at, show_last_seen").eq("id", counterpartId).abortSignal(AbortSignal.timeout(8000)).single(),
     supabase.from("conversation_reads").select("last_read_at").eq("conversation_id", conversationId).eq("user_id", userId).abortSignal(AbortSignal.timeout(8000)).maybeSingle(),
   ]);
   const readAt = (read as { last_read_at: string } | null)?.last_read_at;
 
   return {
     ...convo,
-    counterpart: (profile as Pick<Profile, "id" | "full_name" | "phone">) ?? null,
+    counterpart: (profile as Pick<Profile, "id" | "full_name" | "phone" | "last_seen_at" | "show_last_seen">) ?? null,
     unread: !readAt || new Date(readAt) < new Date(convo.last_message_at),
   };
 }

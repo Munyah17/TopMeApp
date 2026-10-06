@@ -76,6 +76,8 @@ const ICO: Record<string, { c: string; r?: number }> = {
   laptop: { c: "fa-solid fa-laptop" },
   monitor: { c: "fa-solid fa-desktop" },
   headphones: { c: "fa-solid fa-headphones" },
+  mic: { c: "fa-solid fa-microphone" },
+  camera: { c: "fa-solid fa-camera" },
 };
 
 export type IconName = keyof typeof ICO;
