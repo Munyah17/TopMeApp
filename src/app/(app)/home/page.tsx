@@ -6,6 +6,7 @@ import { ProductCard } from "@/components/home/product-card";
 import { QuickSearch } from "@/components/home/quick-search";
 import { fmt } from "@/lib/data/catalog-helpers";
 import { getInsuranceProducts } from "@/lib/actions/insurance";
+import { getReadyServiceIds } from "@/lib/fulfillment/availability";
 import { InsuranceCard } from "@/components/insurance/insurance-card";
 import {
   getActivePromoBanner,
@@ -33,6 +34,7 @@ export default async function HomePage() {
     profile ? getGridWidgetBanners() : Promise.resolve([]),
     getInsuranceProducts(),
   ]);
+  const readyServiceIds = await getReadyServiceIds(services.map((service) => service.id));
   // Cursor shared across all category rows below so, with more than one
   // active widget, they rotate rather than always showing the same one.
   let widgetCursor = 0;
@@ -213,10 +215,14 @@ export default async function HomePage() {
             <div className="card" style={{ overflow: "hidden" }}>
               {recent.map((t, i) => {
                 const svc = services.find((s) => s.id === t.service_id);
+                const receiptMeta = (t.receipt ?? {}) as { biller?: string; product?: string };
+                const label = svc?.name
+                  ?? (receiptMeta.biller ? `${receiptMeta.biller}${receiptMeta.product ? ` — ${receiptMeta.product}` : ""}` : null)
+                  ?? t.service_id;
                 return (
                   <Link
                     key={t.id}
-                    href="/history"
+                    href={`/history/${t.id}`}
                     className="row gap-2 tap"
                     style={{
                       padding: "14px 16px",
@@ -228,7 +234,7 @@ export default async function HomePage() {
                       <Icon name={svc?.icon || "wallet"} size={20} stroke={1.8} />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 13.5 }}>{svc?.name || t.service_id}</div>
+                      <div style={{ fontWeight: 700, fontSize: 13.5 }}>{label}</div>
                       <div className="muted">
                         {new Date(t.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}
                       </div>
@@ -297,7 +303,7 @@ export default async function HomePage() {
                 </div>
                 <div className="cat-section-row">
                   {items.map((i) => (
-                    <ProductCard key={i.id} service={i} categoryColor={c.color} />
+                    <ProductCard key={i.id} service={i} categoryColor={c.color} comingSoon={!readyServiceIds.has(i.id)} />
                   ))}
                   {gridWidgets.length > 0 &&
                     items.length < CAT_ROW_DESKTOP_COLUMNS &&
@@ -358,8 +364,8 @@ export default async function HomePage() {
         </div>
 
         {profile && (
-          <div className="col-side">
-            <Link href="/chat" className="card card-pad row gap-2 tap" style={{ alignItems: "center", textDecoration: "none" }}>
+          <div className="col-side home-side">
+            <Link href="/chat" className="card card-pad row gap-2 tap home-help-card" style={{ alignItems: "center", textDecoration: "none" }}>
               <div className="ibadge round" style={{ background: "var(--blue-50)", color: "var(--blue)" }}>
                 <Icon name="headset" size={20} stroke={1.8} />
               </div>

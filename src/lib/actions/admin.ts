@@ -150,6 +150,80 @@ export async function toggleApiModule(id: string, currentStatus: "active" | "ina
   revalidateAdminPath("/apis");
 }
 
+// ─── Service provider map (fulfillment routing) ──────────────────────────
+// Which provider fulfils which service: priority ordering, margins on top
+// of provider cost, per-mapping enable/disable, and manual rows that the
+// catalog sync must never overwrite (source='admin').
+
+export async function getProviderMap() {
+  await requirePermission("apis.manage");
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("service_provider_map")
+    .select("*")
+    .order("service_id")
+    .order("provider")
+    .order("priority", { ascending: false });
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+export async function updateProviderMapEntry(
+  id: string,
+  patch: { enabled?: boolean; margin_pct?: number | null; commission_pct?: number | null; priority?: number; notes?: string | null }
+) {
+  await requirePermission("apis.manage");
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("service_provider_map")
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidateAdminPath("/apis");
+}
+
+export async function createProviderMapEntry(input: {
+  service_id: string;
+  provider: string;
+  provider_product_id?: string;
+  provider_sku?: string;
+  network_id?: string;
+  cost_amount?: number | null;
+  commission_pct?: number | null;
+  margin_pct?: number | null;
+  priority?: number;
+  notes?: string;
+}) {
+  await requirePermission("apis.manage");
+  const admin = createAdminClient();
+  const { error } = await admin.from("service_provider_map").upsert(
+    {
+      service_id: input.service_id.trim(),
+      provider: input.provider.trim().toLowerCase(),
+      provider_product_id: (input.provider_product_id ?? "").trim(),
+      provider_sku: (input.provider_sku ?? "").trim(),
+      network_id: (input.network_id ?? "").trim().toLowerCase(),
+      cost_amount: input.cost_amount ?? null,
+      commission_pct: input.commission_pct ?? null,
+      margin_pct: input.margin_pct ?? null,
+      priority: input.priority ?? 0,
+      notes: input.notes || null,
+      meta: { source: "admin" }, // the BillPay sync never overwrites manual rows
+    },
+    { onConflict: "service_id,provider,provider_product_id,provider_sku,network_id" }
+  );
+  if (error) throw new Error(error.message);
+  revalidateAdminPath("/apis");
+}
+
+export async function deleteProviderMapEntry(id: string) {
+  await requirePermission("apis.manage");
+  const admin = createAdminClient();
+  const { error } = await admin.from("service_provider_map").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidateAdminPath("/apis");
+}
+
 // Directly creates a real, ready-to-use staff account — no email-invite
 // round trip. The owner wanted staff to be added the way any admin panel
 // lets you add a teammate, not "invited" like a guest to someone else's

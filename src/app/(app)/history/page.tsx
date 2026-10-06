@@ -9,6 +9,7 @@ const FILTERS = ["All", "Airtime", "ZESA", "DStv", "Bills"] as const;
 
 function matchesFilter(tx: Transaction, service: Service | undefined, filter: string) {
   if (filter === "All") return true;
+  if (filter === "Bills" && tx.service_id.startsWith("billpay-")) return true;
   if (!service) return false;
   if (filter === "Airtime") return service.category_id === "airtimedata";
   if (filter === "ZESA") return service.id === "zesa";
@@ -115,17 +116,25 @@ export default async function HistoryPage({
             <div className="card" style={{ overflow: "hidden", marginBottom: 14 }}>
               {list.map((t, i) => {
                 const svc = serviceById.get(t.service_id);
+                // Transactions for non-services-catalogue rails (billpay-*
+                // billers, insurance-* policies) carry their own naming in
+                // the receipt — use it instead of the raw service_id.
+                const receiptMeta = (t.receipt ?? {}) as { biller?: string; product?: string };
+                const label = svc?.name
+                  ?? (receiptMeta.biller ? `${receiptMeta.biller}${receiptMeta.product ? ` — ${receiptMeta.product}` : ""}` : null)
+                  ?? t.service_id;
                 return (
-                  <div
+                  <Link
                     key={t.id}
-                    className="row gap-2 hist-row"
-                    style={{ padding: "14px 16px", borderBottom: i < list.length - 1 ? "1px solid var(--border)" : "none" }}
+                    href={`/history/${t.id}`}
+                    className="row gap-2 hist-row tap"
+                    style={{ padding: "14px 16px", borderBottom: i < list.length - 1 ? "1px solid var(--border)" : "none", textDecoration: "none", color: "inherit" }}
                   >
                     <div className="ibadge" style={{ background: svc ? `${svc.color}1a` : "var(--badge-neutral-bg)", color: svc?.color }}>
                       <Icon name={svc?.icon || "wallet"} size={20} stroke={1.8} />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: 13.5, letterSpacing: "-0.01em" }}>{svc?.name || t.service_id}</div>
+                      <div style={{ fontWeight: 600, fontSize: 13.5, letterSpacing: "-0.01em" }}>{label}</div>
                       <div className="muted">
                         {new Date(t.created_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })} · {t.reference}
                       </div>
@@ -153,7 +162,7 @@ export default async function HistoryPage({
                         </div>
                       );
                     })()}
-                  </div>
+                  </Link>
                 );
               })}
             </div>

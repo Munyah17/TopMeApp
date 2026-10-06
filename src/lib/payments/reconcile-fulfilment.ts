@@ -15,7 +15,45 @@ const BATCH = 100;
 
 export async function reconcileFulfilments() {
   const admin = createAdminClient();
-  const summary = { failedSwept: 0, stalePendingSwept: 0, skipped: 0 };
+  const summary = { failedSwept: 0, stalePendingSwept: 0, skipped: 0, billpayInquiries: 0, billpaySettled: 0 };
+
+  // 0. Status inquiries for in-flight BillPay payments (BeingProcessed /
+  //    Flagged). Unlike VitalPay, BillPay has no fulfilment webhook for the
+  //    vendor side — the ONLY way a pending PAY resolves is a STATUS call
+  //    (docs: first inquiry ≥120s, then ≥180s). The BillPay Reference is the
+  //    transaction id (BillPayProvider passes input.transactionId), and the
+  //    BillPayReference lives in receipt.providerRef.
+  const billpayMinAge = new Date(Date.now() - 120_000).toISOString();
+  const { data: billpayPending } = await admin
+    .from("transactions")
+    .select("id, reference, receipt")
+    .eq("fulfillment_status", "pending")
+    .eq("receipt->>provider", "billpay")
+    .lte("created_at", billpayMinAge)
+    .order("created_at", { ascending: true })
+    .limit(BATCH);
+
+  for (const t of billpayPending ?? []) {
+    summary.billpayInquiries++;
+    try {
+      const { paymentStatus, statusToResult } = await import("@/lib/fulfillment/billpay");
+      const res = await paymentStatus(t.id);
+      const result = statusToResult(res);
+      if (result.status === "pending") continue; // still in flight — next sweep
+      await admin.rpc("set_fulfillment_result", {
+        p_transaction_id: t.id,
+        p_status: result.status,
+        p_receipt: {
+          ...(t.receipt as Record<string, unknown> ?? {}),
+          message: result.message ?? null,
+          ...(result.extra ?? {}),
+        },
+      });
+      summary.billpaySettled++;
+    } catch (e) {
+      console.error(`[reconcile] BillPay status inquiry failed for ${t.reference}:`, e);
+    }
+  }
 
   // 1. Every `failed` transaction with no refund_request yet.
   const { data: failed } = await admin

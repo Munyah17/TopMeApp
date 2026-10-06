@@ -5,16 +5,18 @@ import { Icon } from "@/components/icons";
 import { THEME_STORAGE_KEY } from "@/lib/theme-script";
 
 // data-theme lives on <html>, set by the blocking init script before
-// hydration (see src/lib/theme-script.ts) and mutated directly by
-// toggleTheme() below — neither goes through React, so useSyncExternalStore
-// (not state+effect) is the correct way to read it: getServerSnapshot
-// matches what the server actually rendered (always light), and React
-// reconciles to the real client value right after hydration with no
-// mismatch warning.
-const listeners = new Set<() => void>();
+// hydration (see src/lib/theme-script.ts). Observe the DOM itself instead
+// of relying on an in-memory listener set: that remains correct across hot
+// reloads, duplicate client bundles, initialization, and storage changes in
+// another tab.
 function subscribe(callback: () => void) {
-  listeners.add(callback);
-  return () => listeners.delete(callback);
+  const observer = new MutationObserver(callback);
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  window.addEventListener("storage", callback);
+  return () => {
+    observer.disconnect();
+    window.removeEventListener("storage", callback);
+  };
 }
 function getSnapshot() {
   return document.documentElement.getAttribute("data-theme") === "dark";
@@ -36,7 +38,6 @@ export function toggleTheme() {
     // Private browsing / storage blocked — the toggle still works for
     // this page view, it just won't be remembered next visit.
   }
-  listeners.forEach((l) => l());
 }
 
 export function ThemeToggle() {

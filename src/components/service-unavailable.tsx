@@ -24,11 +24,11 @@ export function ServiceUnavailable({ service }: { service: Service }) {
             justifyContent: "center",
           }}
         >
-          <Icon name="alert" size={38} stroke={1.6} />
+          <Icon name="clock" size={38} stroke={1.6} />
         </div>
-        <h2 style={{ fontSize: 19, marginTop: 18 }}>Temporarily Not Available</h2>
-        <div className="muted mt-1" style={{ maxWidth: 280, lineHeight: 1.5 }}>
-          {service.name} isn&apos;t available for purchase right now. We&apos;re working on adding real support for it — please check back soon.
+        <h2 style={{ fontSize: 19, marginTop: 18 }}>Coming Soon</h2>
+        <div className="muted mt-1" style={{ maxWidth: 300, lineHeight: 1.5 }}>
+          We&apos;re preparing {service.name} for TopMe. It will be available as soon as our provider connection is activated.
         </div>
         <Link href="/services" className="btn btn-primary btn-block mt-4" style={{ textDecoration: "none" }}>
           Browse other services

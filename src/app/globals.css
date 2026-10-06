@@ -1288,6 +1288,23 @@ a.side-user:hover {
      breathing room, so page content never slides under the badge. */
   padding-bottom: calc(104px + env(safe-area-inset-bottom));
 }
+/* Footer is a sibling after .screen-pad, not inside its bottom clearance.
+   It therefore needs its own mobile reservation or its copyright/contact
+   lines become the final scroll content directly underneath the nav. */
+.app-footer {
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: 24px;
+  padding: 32px 22px calc(104px + env(safe-area-inset-bottom));
+  text-align: center;
+  border-top: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+@media (min-width: 1024px) {
+  .app-footer {
+    padding: 32px 22px;
+  }
+}
 .px {
   padding-left: 22px;
   padding-right: 22px;
@@ -1465,13 +1482,15 @@ a.side-user:hover {
    slots blank rather than stretching existing cards to fill the row. */
 .cat-section-row {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  /* minmax(0, 1fr) prevents long product names/content from increasing a
+     track's minimum width and pushing its neighbour over another card. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-3);
   padding: var(--space-1) var(--space-1) var(--space-2);
 }
 .catpage-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-3);
 }
 @media (min-width: 640px) {
@@ -1513,6 +1532,24 @@ a.side-user:hover {
   justify-content: center;
   flex-shrink: 0;
   background: var(--muted);
+}
+.prod-coming-soon {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  color: var(--warning);
+  border: 1px solid color-mix(in srgb, var(--warning) 35%, transparent);
+  box-shadow: var(--shadow-xs);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  backdrop-filter: blur(8px);
 }
 .prod-media img {
   width: 100%;
@@ -1565,7 +1602,7 @@ a.side-user:hover {
 }
 @media (min-width: 820px) {
   .cat-section-row {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: var(--space-4);
   }
   .cat-widget-tile {
@@ -1697,6 +1734,37 @@ a.side-user:hover {
 .col-main,
 .col-side {
   min-width: 0;
+}
+@media (max-width: 819.98px) {
+  /* Explicit mobile containment: the account side rail follows the complete
+     catalog in normal flow, never retaining sticky/column geometry after a
+     viewport resize. */
+  .home-grid {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+  }
+  .home-grid > .col-main,
+  .home-grid > .col-side {
+    position: static;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+  .home-side {
+    margin-top: var(--space-6);
+    clear: both;
+  }
+  .home-help-card {
+    width: 100%;
+    overflow: hidden;
+  }
+  .home-help-card > div:nth-child(2) {
+    min-width: 0;
+  }
+  .home-help-card .muted {
+    overflow-wrap: anywhere;
+  }
 }
 @media (min-width: 820px) {
   .home-grid {

@@ -39,6 +39,26 @@ export default async function ServicesPage() {
               </div>
             </Link>
           ))}
+          {/* BillPay storefront — the full Paynow biller catalog (councils,
+              universities, medical aid, vouchers) beyond the curated
+              services above. */}
+          <Link
+            href="/bills"
+            className="card tap row gap-2"
+            data-hover
+            style={{ padding: "var(--space-4)", textDecoration: "none", gap: "var(--space-3)" }}
+          >
+            <div className="ibadge" style={{ background: "var(--badge-neutral-bg)", color: "var(--text-secondary)" }}>
+              <Icon name="building" size={20} stroke={1.8} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 600, fontSize: 15, letterSpacing: "-0.01em", color: "var(--text-primary)" }}>Pay a Bill</div>
+              <div className="muted">All BillPay billers — councils, schools, medical aid, vouchers</div>
+            </div>
+            <div style={{ color: "var(--text-tertiary)", flexShrink: 0 }}>
+              <Icon name="chevronR" size={18} stroke={2} />
+            </div>
+          </Link>
         </div>
       </div>
     </div>

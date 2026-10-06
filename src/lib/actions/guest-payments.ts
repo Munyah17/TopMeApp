@@ -8,6 +8,7 @@ import { createGuestCheckoutSession } from "@/lib/payments/stripe";
 import { initiateEcocashPush } from "@/lib/payments/ecocash";
 import { failGuestCheckout } from "@/lib/payments/guest-checkout";
 import { hasRealCoverage } from "@/lib/fulfillment";
+import { hasMappedProvider } from "@/lib/fulfillment/select";
 import { calculatePlatformFee, calculateTopupFee } from "@/lib/fees";
 import { resolveVerifiedAmount } from "@/lib/pricing";
 import { assertRateLimit, getClientIp } from "@/lib/rate-limit";
@@ -16,7 +17,8 @@ import type { ApiModuleSafe } from "@/types/database";
 const FRIENDLY_ERRORS: Record<string, string> = {
   invalid_amount: "Enter a valid amount.",
   not_found_or_processed: "This payment has already been processed or expired.",
-  service_unavailable: "This service isn't available right now. Please check back soon.",
+  service_unavailable: "This service isn't available right now.",
+  service_coming_soon: "Coming soon — we're preparing this service and will activate it when its provider connection is ready.",
 };
 
 function friendlyError(message: string) {
@@ -69,8 +71,11 @@ export async function startGuestCheckout(input: StartGuestCheckoutInput) {
     admin.from("services").select("id, amount_mode, outstanding").eq("id", input.serviceId).single(),
   ]);
   if (!service) throw new Error(FRIENDLY_ERRORS.service_unavailable);
-  if (!hasRealCoverage(input.serviceId, (activeModules as ApiModuleSafe[]) ?? [])) {
-    throw new Error(FRIENDLY_ERRORS.service_unavailable);
+  if (
+    !hasRealCoverage(input.serviceId, (activeModules as ApiModuleSafe[]) ?? []) &&
+    !(await hasMappedProvider(input.serviceId, admin, input.networkId))
+  ) {
+    throw new Error(FRIENDLY_ERRORS.service_coming_soon);
   }
 
   // Never trust a client-supplied amount for a fixed-price catalog item —
@@ -197,6 +202,18 @@ export async function checkGuestPaymentNow(reference: string): Promise<{ checked
     .eq("reference", reference)
     .single();
   if (!intent) {
+    // BillPay checkouts share this confirm page — dispatch by table so an
+    // unknown-to-insurance reference doesn't get swallowed as "checked".
+    const { data: bpIntent } = await admin
+      .from("billpay_checkout_intents")
+      .select("reference")
+      .eq("reference", reference)
+      .maybeSingle();
+    if (bpIntent) {
+      const { checkBillPayPaymentNow } = await import("@/lib/actions/billpay");
+      const billpay = await checkBillPayPaymentNow(reference);
+      return billpay.checked ? billpay : { checked: false, error: "Payment status couldn't be checked yet — try again in a moment." };
+    }
     // Insurance checkouts share this confirm page — their intents live in
     // their own table, so hand the manual check off to that flow.
     const { checkInsurancePaymentNow } = await import("@/lib/actions/insurance");
@@ -220,11 +237,14 @@ export async function getGuestCheckoutStatus(reference: string) {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("get_guest_checkout", { p_reference: reference });
   if (error) throw new Error(friendlyError(error.message));
-  // Insurance checkouts share this confirm page — when the reference isn't
-  // a guest intent, try the insurance table before reporting not_found.
+  // Insurance/billpay checkouts share this confirm page — when the
+  // reference isn't a guest intent, try their tables before not_found.
   if ((data as { status?: string })?.status === "not_found") {
     const { getInsuranceCheckoutStatus } = await import("@/lib/actions/insurance");
-    return getInsuranceCheckoutStatus(reference) as Promise<typeof data>;
+    const insurance = await getInsuranceCheckoutStatus(reference);
+    if (insurance.status !== "not_found") return insurance as typeof data;
+    const { getBillPayCheckoutStatus } = await import("@/lib/actions/billpay");
+    return getBillPayCheckoutStatus(reference) as Promise<typeof data>;
   }
   return data as
     | { status: "not_found" | "pending" | "failed" }

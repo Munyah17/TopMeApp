@@ -1,4 +1,7 @@
 import { ApiModulesClient } from "@/components/admin/api-modules-client";
+import { ProviderMapClient, type ProviderMapRow } from "@/components/admin/provider-map-client";
+import { getProviderMap } from "@/lib/actions/admin";
+import { getAllServices } from "@/lib/data/queries";
 import { getMyPermissions } from "@/lib/auth/permissions";
 import { createClient } from "@/lib/supabase/server";
 import type { ApiModuleSafe } from "@/types/database";
@@ -11,7 +14,11 @@ export default async function ApiManagementPage() {
   }
 
   const supabase = await createClient();
-  const { data } = await supabase.from("api_modules_safe").select("*").order("created_at", { ascending: false });
+  const [{ data }, providerRows, services] = await Promise.all([
+    supabase.from("api_modules_safe").select("*").order("created_at", { ascending: false }),
+    getProviderMap(),
+    getAllServices(true),
+  ]);
   const modules = (data as ApiModuleSafe[]) ?? [];
 
   async function syncInsuranceProducts() {
@@ -25,6 +32,23 @@ export default async function ApiManagementPage() {
       });
       const result = await response.json();
       revalidatePath("/insurance");
+      return result;
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+    }
+  }
+
+  async function syncBillPayCatalog() {
+    "use server";
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/cron/sync-billpay-catalog`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${process.env.CRON_SECRET || ""}`,
+        },
+      });
+      const result = await response.json();
+      revalidatePath("/bills");
       return result;
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
@@ -49,6 +73,22 @@ export default async function ApiManagementPage() {
           </form>
         </div>
       </div>
+      <div className="card card-pad mb-3">
+        <div className="row between" style={{ alignItems: "center" }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 14 }}>BillPay Catalog Sync</div>
+            <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+              Pull latest billers &amp; products from Paynow BillPay (daily cron + config webhook also do this)
+            </div>
+          </div>
+          <form action={syncBillPayCatalog}>
+            <button type="submit" className="btn btn-primary" style={{ fontSize: 13, padding: "8px 16px" }}>
+              Sync Now
+            </button>
+          </form>
+        </div>
+      </div>
+      <ProviderMapClient rows={providerRows as ProviderMapRow[]} serviceIds={services.map((s) => s.id)} />
       <ApiModulesClient modules={modules} />
     </div>
   );

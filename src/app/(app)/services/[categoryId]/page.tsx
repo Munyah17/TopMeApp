@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Icon } from "@/components/icons";
 import { ProductCard } from "@/components/home/product-card";
+import { getReadyServiceIds } from "@/lib/fulfillment/availability";
 import { getAllServices, getCategories, getCategory, getServicesByCategory, shuffle } from "@/lib/data/queries";
 
 export default async function CategoryPage({ params }: { params: Promise<{ categoryId: string }> }) {
@@ -21,6 +22,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ categ
   ]);
 
   const others = shuffle(allServices.filter((s) => s.category_id !== categoryId)).slice(0, 8);
+  const readyServiceIds = await getReadyServiceIds([...items, ...others].map((service) => service.id));
   const categoryById = new Map(categories.map((c) => [c.id, c]));
 
   return (
@@ -44,7 +46,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ categ
       <div className="px content-wrap">
         <div className="catpage-grid">
           {items.map((i) => (
-            <ProductCard key={i.id} service={i} categoryColor={category.color} />
+            <ProductCard key={i.id} service={i} categoryColor={category.color} comingSoon={!readyServiceIds.has(i.id)} />
           ))}
         </div>
 
@@ -56,7 +58,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ categ
             <div className="catpage-grid">
               {others.map((i) => {
                 const c = categoryById.get(i.category_id);
-                return <ProductCard key={i.id} service={i} categoryColor={c?.color || i.color} />;
+                return <ProductCard key={i.id} service={i} categoryColor={c?.color || i.color} comingSoon={!readyServiceIds.has(i.id)} />;
               })}
             </div>
           </>

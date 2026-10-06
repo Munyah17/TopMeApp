@@ -64,6 +64,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ received: true });
     }
 
+    if (reference && purpose === "billpay_payment") {
+      const { finalizeBillPayCheckout } = await import("@/lib/actions/billpay");
+      const result = await finalizeBillPayCheckout(reference);
+      if (result.error) {
+        console.error(`[stripe webhook] finalizeBillPayCheckout failed for ${reference}:`, result.error);
+        void logTransactionEvent(createAdminClient(), { reference, eventType: "fulfillment_failed", message: `Stripe webhook: finalizeBillPayCheckout failed — ${result.error}` });
+        return NextResponse.json({ error: "finalize_failed" }, { status: 500 });
+      }
+      return NextResponse.json({ received: true });
+    }
+
     const userId = session.metadata?.userId;
     if (reference && userId) {
       const admin = createAdminClient();

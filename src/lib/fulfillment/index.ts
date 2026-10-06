@@ -1,8 +1,9 @@
 import type { ApiModuleSafe } from "@/types/database";
 import { SimulatedProvider } from "./simulated";
 import { VitalPayProvider } from "./vitalpay";
-import { BillPayProvider } from "./billpay";
+import { BillPayProvider, billpayConfigured } from "./billpay";
 import { InsuranceProvider } from "./insurance";
+import { TxtZwAirtimeProvider, txtZwAirtimeConfigured } from "./txtzw";
 import type { FulfillmentProvider } from "./types";
 
 export type { FulfillmentInput, FulfillmentResult, FulfillmentProvider } from "./types";
@@ -21,7 +22,14 @@ const PROVIDER_REGISTRY: Record<string, () => FulfillmentProvider> = {
   billpay: () => new BillPayProvider(),
   vitalpay: () => new VitalPayProvider(),
   insurance: () => new InsuranceProvider(),
+  txtzw: () => new TxtZwAirtimeProvider(),
 };
+
+export function isProviderConfigured(name: string): boolean {
+  if (name === "billpay") return billpayConfigured();
+  if (name === "txtzw") return txtZwAirtimeConfigured();
+  return true;
+}
 
 /**
  * Picks the active api_modules row whose registered provider actually
@@ -33,7 +41,7 @@ export function getFulfillmentProvider(serviceId: string, activeModules: ApiModu
   for (const apiModule of activeModules) {
     if (apiModule.status !== "active") continue;
     const factory = PROVIDER_REGISTRY[apiModule.provider];
-    if (!factory) continue;
+    if (!factory || !isProviderConfigured(apiModule.provider)) continue;
     const provider = factory();
     if (provider.coverage.includes(serviceId) || provider.coverage.includes("*")) return provider;
   }
@@ -42,7 +50,7 @@ export function getFulfillmentProvider(serviceId: string, activeModules: ApiModu
 
 /**
  * Whether a service has an actual active, working provider behind it right
- * now — used to decline a purchase upfront ("Temporarily Not Available")
+ * now — used to show a purchase as "Coming Soon" before checkout
  * instead of ever letting SimulatedProvider fake a successful outcome for
  * something we can't really deliver. Deliberately does NOT special-case
  * providers like InsuranceProvider that register coverage but always throw —
@@ -53,7 +61,7 @@ export function hasRealCoverage(serviceId: string, activeModules: ApiModuleSafe[
   for (const apiModule of activeModules) {
     if (apiModule.status !== "active") continue;
     const factory = PROVIDER_REGISTRY[apiModule.provider];
-    if (!factory) continue;
+    if (!factory || !isProviderConfigured(apiModule.provider)) continue;
     const provider = factory();
     if (provider.coverage.includes(serviceId) || provider.coverage.includes("*")) return true;
   }

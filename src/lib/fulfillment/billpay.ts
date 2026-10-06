@@ -474,7 +474,7 @@ export async function payPayment(
   return resp;
 }
 
-function statusToResult(res: BillPayPaymentResponse): FulfillmentResult {
+export function statusToResult(res: BillPayPaymentResponse): FulfillmentResult {
   const ref = res.BillPayReference ?? res.BillerPaymentReference;
   const narration = res.Narration || res.TechnicalNarration;
   switch (res.Status) {

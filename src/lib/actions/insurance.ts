@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import { createOrGetClient, getQuote, createPolicy, getPolicy, recordPayment as recordTariqifyPayment, createTicket as createTariqifyTicket, getProducts as getTariqifyProducts } from "@/lib/insurance/tariqify";
 import { enrichInsuranceProduct } from "@/lib/insurance/types";
-import { isExcludedProduct } from "@/lib/insurance/exclusions";
+import { isAgricultureInsuranceProduct } from "@/lib/insurance/availability";
 import { calculateTopupFee } from "@/lib/fees";
 import { initiatePaynowPayment, checkPaynowStatus } from "@/lib/payments/paynow";
 import { applyPaynowResult } from "@/lib/payments/paynow-result";
@@ -33,11 +33,11 @@ export async function getInsuranceQuote(params: {
 
   const { data: product } = await supabase
     .from("insurance_products")
-    .select("provider, is_purchasable")
+    .select("provider, is_purchasable, name, category, description")
     .eq("id", params.productId)
     .single();
-  if (!product || !product.is_purchasable) {
-    return { error: "This product isn't available to buy yet." };
+  if (!product || !product.is_purchasable || isAgricultureInsuranceProduct(product)) {
+    return { error: "This insurance product isn't offered by TopMe." };
   }
 
   try {
@@ -338,8 +338,8 @@ export async function purchaseInsurancePolicy(params: {
           failures.push({ productId, error: "Product not found or inactive" });
           continue;
         }
-        if (!product.is_purchasable) {
-          failures.push({ productId, error: `${product.name} isn't available to buy yet.` });
+        if (!product.is_purchasable || isAgricultureInsuranceProduct(product)) {
+          failures.push({ productId, error: `${product.name} isn't offered by TopMe.` });
           continue;
         }
 
@@ -584,7 +584,7 @@ export async function startInsuranceCheckout(params: {
         .eq("is_active", true)
         .single();
       if (!product) return { error: "One of the selected covers is no longer available." };
-      if (!product.is_purchasable) return { error: `${product.name} isn't available to buy yet.` };
+      if (!product.is_purchasable || isAgricultureInsuranceProduct(product)) return { error: `${product.name} isn't offered by TopMe.` };
 
       const quote = await getQuote({
         product_id: selection.productId,
@@ -1009,7 +1009,7 @@ export async function getInsuranceProducts() {
           // columns may not exist yet (migrations not applied). Everything
           // is preserved in `raw` and enriched on read via enrichInsuranceProduct.
           await admin.from("insurance_products").upsert(
-            tariqifyProducts.map((product) => ({
+            tariqifyProducts.filter((product) => !isAgricultureInsuranceProduct(product)).map((product) => ({
               id: product.id,
               name: product.name,
               description: product.description,
@@ -1029,7 +1029,9 @@ export async function getInsuranceProducts() {
             .select("*")
             .eq("is_active", true)
             .order("sort_order");
-          return (refreshed ?? []).map((row) => enrichInsuranceProduct(row as Record<string, unknown>)).filter((p) => !isExcludedProduct(p));
+          return (refreshed ?? [])
+            .map((row) => enrichInsuranceProduct(row as Record<string, unknown>))
+            .filter((product) => !isAgricultureInsuranceProduct(product));
         }
       } catch (syncError) {
         console.error("Lazy insurance product sync failed:", syncError);
@@ -1037,7 +1039,9 @@ export async function getInsuranceProducts() {
     }
   }
 
-  return data.map((row) => enrichInsuranceProduct(row as Record<string, unknown>)).filter((p) => !isExcludedProduct(p));
+  return data
+    .map((row) => enrichInsuranceProduct(row as Record<string, unknown>))
+    .filter((product) => !isAgricultureInsuranceProduct(product));
 }
 
 /**

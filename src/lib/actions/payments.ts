@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { getFulfillmentProvider, hasRealCoverage } from "@/lib/fulfillment";
+import { hasMappedProvider, selectFulfillmentProvider } from "@/lib/fulfillment/select";
 import { validateBillAccount as vitalpayValidateBillAccount, validateElectricityMeter } from "@/lib/fulfillment/vitalpay";
 import { isFeatureEnabled } from "@/lib/data/flags";
 import { findProfileByPhone } from "@/lib/data/queries";
@@ -21,7 +22,8 @@ const FRIENDLY_ERRORS: Record<string, string> = {
   invalid_amount: "Enter a valid amount.",
   recipient_not_found: "No TopMe account found with that phone number.",
   cannot_pay_self: "You can't send money to your own number.",
-  service_unavailable: "This service isn't available right now. Please check back soon.",
+  service_unavailable: "This service isn't available right now.",
+  service_coming_soon: "Coming soon — we're preparing this service and will activate it when its provider connection is ready.",
   feature_disabled: "This feature is temporarily turned off. Please check back soon.",
 };
 
@@ -61,8 +63,11 @@ export async function payService(input: PayServiceInput) {
     admin.from("services").select("id, amount_mode, outstanding").eq("id", input.serviceId).single(),
   ]);
   if (!service) throw new Error(FRIENDLY_ERRORS.service_unavailable);
-  if (!hasRealCoverage(input.serviceId, (activeModules as ApiModuleSafe[]) ?? [])) {
-    throw new Error(FRIENDLY_ERRORS.service_unavailable);
+  if (
+    !hasRealCoverage(input.serviceId, (activeModules as ApiModuleSafe[]) ?? []) &&
+    !(await hasMappedProvider(input.serviceId, admin, input.networkId))
+  ) {
+    throw new Error(FRIENDLY_ERRORS.service_coming_soon);
   }
 
   // Never trust a client-supplied amount for a fixed-price catalog item
@@ -89,11 +94,20 @@ export async function payService(input: PayServiceInput) {
     if (!check.ok) throw new Error(check.message);
   }
 
-  // Resolve fulfillment up front: the first active aggregator that covers
-  // this service (already confirmed to exist by the coverage check above).
-  // The transaction record must carry the real provider name — hardcoding
-  // "simulated" made live VitalPay attempts indistinguishable from demo runs.
-  const provider = getFulfillmentProvider(input.serviceId, (activeModules as ApiModuleSafe[]) ?? []);
+  // Resolve fulfillment up front: the dynamic selector picks the best
+  // working provider from service_provider_map (health → cheapest → best
+  // benefit to TopMe), falling back to legacy coverage routing when the
+  // service has no mapped rows. The transaction record must carry the real
+  // provider name — hardcoding "simulated" made live VitalPay attempts
+  // indistinguishable from demo runs.
+  const selection = await selectFulfillmentProvider({
+    serviceId: input.serviceId,
+    networkId: input.networkId,
+    activeModules: (activeModules as ApiModuleSafe[]) ?? [],
+    admin,
+    legacyResolve: getFulfillmentProvider,
+  });
+  const provider = selection.provider;
 
   const { data: txData, error } = await supabase.rpc("wallet_pay", {
     p_service_id: input.serviceId,
@@ -146,12 +160,15 @@ export async function payService(input: PayServiceInput) {
     extraValue: input.extraValue,
     networkId: input.networkId,
     amount: verifiedAmount,
+    // Selector-attached routing (BillPay biller/product codes) so fulfil()
+    // doesn't re-query service_provider_map.
+    ...selection.routing,
   };
   void logTransactionEvent(admin, {
     transactionId: tx.id,
     reference: tx.reference,
     eventType: "fulfillment_started",
-    message: `Calling ${provider.name} to fulfil this order.`,
+    message: `Calling ${provider.name} to fulfil this order (${selection.reason}).`,
   });
   let fulfillmentResult;
   try {
@@ -183,6 +200,21 @@ export async function payService(input: PayServiceInput) {
       ...(fulfillmentResult.extra ?? {}),
     },
   });
+
+  // BillPay UAT: ReceiptSmses must reach the customer's phone, one SMS per
+  // entry. Send to the account phone — the payment recipient isn't always
+  // a mobile number (meter, account, policy numbers).
+  const receiptSmses = (fulfillmentResult.extra?.receipt_smses as string[] | undefined) ?? [];
+  if (fulfillmentResult.status === "fulfilled" && receiptSmses.length) {
+    const { data: payerProfile } = await admin.from("profiles").select("phone").eq("id", user.id).single();
+    // Recipient fallback only when it's actually a ZW mobile (07…/263 7…)
+    // — meter/account/policy numbers must never be SMS targets.
+    const phone = payerProfile?.phone ?? (/^(?:\+?263|0)7\d{8}$/.test(input.recipient.replace(/\s/g, "")) ? input.recipient : null);
+    if (phone) {
+      const { sendBillPayReceiptSmses } = await import("@/lib/sms/txtzw");
+      void sendBillPayReceiptSmses({ admin, transactionId: tx.id, reference: tx.reference, phone, smses: receiptSmses });
+    }
+  }
 
   // The wallet is already debited. If fulfilment failed outright, put the
   // money back now — automatically for a small wallet failure, or into the

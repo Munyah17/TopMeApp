@@ -2,11 +2,12 @@ import Link from "next/link";
 import { Icon } from "@/components/icons";
 import type { Service } from "@/types/database";
 
-export function ProductCard({ service, categoryColor }: { service: Service; categoryColor: string }) {
+export function ProductCard({ service, categoryColor, comingSoon = false }: { service: Service; categoryColor: string; comingSoon?: boolean }) {
   const color = service.color || categoryColor;
   return (
     <Link href={`/pay/${service.id}`} className="tap prod-card">
       <div className="prod-media">
+        {comingSoon && <span className="prod-coming-soon">Coming soon</span>}
         {service.logo_url ? (
           // Tried next/image here (every logo_url is our own Supabase
           // Storage upload, not an arbitrary external host, so it's

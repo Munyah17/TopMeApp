@@ -3,7 +3,7 @@ import { NetworksManager } from "@/components/admin/networks-manager";
 import { ProductsClient } from "@/components/admin/products-client";
 import { getAllNetworks, getAllServices, getCategories } from "@/lib/data/queries";
 import { getMyPermissions } from "@/lib/auth/permissions";
-import { isExcludedProduct } from "@/lib/insurance/exclusions";
+import { isAgricultureInsuranceProduct } from "@/lib/insurance/availability";
 import { createClient } from "@/lib/supabase/server";
 import type { InsuranceProduct } from "@/lib/insurance/types";
 
@@ -29,10 +29,7 @@ export default async function ProductsPage() {
     supabase.from("insurance_products").select("*").order("sort_order"),
   ]);
   const allInsurance = (insuranceData as InsuranceProduct[]) ?? [];
-  // Agricultural covers are suspended everywhere except the Super Admin
-  // console — regular admins manage only the personal lines, the owner can
-  // still see (and re-enable) the suspended farming products.
-  const insuranceProducts = isSuperAdmin ? allInsurance : allInsurance.filter((p) => !isExcludedProduct(p));
+  const insuranceProducts = allInsurance.filter((product) => !isAgricultureInsuranceProduct(product));
 
   return (
     <div>

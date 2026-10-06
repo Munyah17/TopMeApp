@@ -118,5 +118,27 @@ export async function applyPaynowResult(reference: string, status: string, meta?
     return { kind: "insurance" as const, success, failed };
   }
 
+  // BillPay bill purchases via gateway — same routing rule.
+  const { data: billpayIntent } = await admin
+    .from("billpay_checkout_intents")
+    .select("reference")
+    .eq("reference", reference)
+    .eq("status", "pending")
+    .maybeSingle();
+
+  if (billpayIntent) {
+    const { finalizeBillPayCheckout, failBillPayCheckout } = await import("@/lib/actions/billpay");
+    if (success) {
+      const result = await finalizeBillPayCheckout(reference);
+      if (result.error) {
+        console.error(`[paynow] finalizeBillPayCheckout failed for ${reference}:`, result.error);
+        void logTransactionEvent(admin, { reference, eventType: "fulfillment_failed", message: `Paynow: finalizeBillPayCheckout failed — ${result.error}` });
+      }
+    } else if (failed) {
+      await failBillPayCheckout(reference, `Paynow reported ${status}.`);
+    }
+    return { kind: "billpay" as const, success, failed };
+  }
+
   return { kind: "none" as const, success, failed };
 }

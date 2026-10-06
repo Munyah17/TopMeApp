@@ -30,6 +30,13 @@ export async function updateSession(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      global: {
+        fetch: (input, init = {}) => {
+          const timeout = AbortSignal.timeout(8000);
+          const signal = init.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
+          return fetch(input, { ...init, signal });
+        },
+      },
       cookies: {
         getAll() {
           return request.cookies.getAll();
@@ -52,9 +59,14 @@ export async function updateSession(request: NextRequest) {
   // getRecentTransactions, …) started running unauthenticated — auth.uid()
   // came back NULL and the customer's own wallet row was filtered out,
   // showing a $0 balance while the DB held the real amount.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user = null;
+  try {
+    const result = await supabase.auth.getUser();
+    user = result.data.user;
+  } catch (error) {
+    console.error("Middleware auth check failed:", error instanceof Error ? error.message : "unknown error");
+    return supabaseResponse;
+  }
 
   const pathname = request.nextUrl.pathname;
 

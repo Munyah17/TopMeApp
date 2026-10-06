@@ -10,18 +10,24 @@ export interface ConversationWithCounterpart extends Conversation {
 export async function getConversations(userId: string): Promise<ConversationWithCounterpart[]> {
   const supabase = await createClient();
 
-  const { data: convos } = await supabase
+  const { data: convos, error: conversationsError } = await supabase
     .from("conversations")
     .select("*")
     .or(`user_a.eq.${userId},user_b.eq.${userId}`)
-    .order("last_message_at", { ascending: false });
+    .order("last_message_at", { ascending: false })
+    .limit(50)
+    .abortSignal(AbortSignal.timeout(8000));
+  if (conversationsError) {
+    console.error("getConversations failed:", conversationsError.message);
+    return [];
+  }
   const rows = (convos as Conversation[]) ?? [];
   if (rows.length === 0) return [];
 
   const counterpartIds = Array.from(new Set(rows.map((c) => (c.user_a === userId ? c.user_b : c.user_a))));
   const [{ data: profiles }, { data: reads }] = await Promise.all([
-    supabase.from("profiles").select("id, full_name, phone").in("id", counterpartIds),
-    supabase.from("conversation_reads").select("conversation_id, last_read_at").eq("user_id", userId),
+    supabase.from("profiles").select("id, full_name, phone").in("id", counterpartIds).abortSignal(AbortSignal.timeout(8000)),
+    supabase.from("conversation_reads").select("conversation_id, last_read_at").eq("user_id", userId).abortSignal(AbortSignal.timeout(8000)),
   ]);
   const profileById = new Map(((profiles as Pick<Profile, "id" | "full_name" | "phone">[]) ?? []).map((p) => [p.id, p]));
   const readAtByConvo = new Map(((reads as { conversation_id: string; last_read_at: string }[]) ?? []).map((r) => [r.conversation_id, r.last_read_at]));
@@ -44,10 +50,11 @@ export async function getConversations(userId: string): Promise<ConversationWith
 // navigation across the whole app, not just /chat.
 export async function getUnreadChatCount(userId: string): Promise<number> {
   const supabase = await createClient();
-  const [{ data: convos }, { data: reads }] = await Promise.all([
-    supabase.from("conversations").select("id, last_message_at").or(`user_a.eq.${userId},user_b.eq.${userId}`),
-    supabase.from("conversation_reads").select("conversation_id, last_read_at").eq("user_id", userId),
+  const [{ data: convos, error: convosError }, { data: reads, error: readsError }] = await Promise.all([
+    supabase.from("conversations").select("id, last_message_at").or(`user_a.eq.${userId},user_b.eq.${userId}`).limit(100).abortSignal(AbortSignal.timeout(6000)),
+    supabase.from("conversation_reads").select("conversation_id, last_read_at").eq("user_id", userId).limit(100).abortSignal(AbortSignal.timeout(6000)),
   ]);
+  if (convosError || readsError) return 0;
   const readAtByConvo = new Map(((reads as { conversation_id: string; last_read_at: string }[]) ?? []).map((r) => [r.conversation_id, r.last_read_at]));
   return ((convos as { id: string; last_message_at: string }[]) ?? []).filter((c) => {
     const readAt = readAtByConvo.get(c.id);
@@ -57,14 +64,15 @@ export async function getUnreadChatCount(userId: string): Promise<number> {
 
 export async function getConversation(conversationId: string, userId: string): Promise<ConversationWithCounterpart | null> {
   const supabase = await createClient();
-  const { data } = await supabase.from("conversations").select("*").eq("id", conversationId).single();
+  const { data, error } = await supabase.from("conversations").select("*").eq("id", conversationId).abortSignal(AbortSignal.timeout(8000)).single();
+  if (error) return null;
   const convo = data as Conversation | null;
   if (!convo || (convo.user_a !== userId && convo.user_b !== userId)) return null;
 
   const counterpartId = convo.user_a === userId ? convo.user_b : convo.user_a;
   const [{ data: profile }, { data: read }] = await Promise.all([
-    supabase.from("profiles").select("id, full_name, phone").eq("id", counterpartId).single(),
-    supabase.from("conversation_reads").select("last_read_at").eq("conversation_id", conversationId).eq("user_id", userId).maybeSingle(),
+    supabase.from("profiles").select("id, full_name, phone").eq("id", counterpartId).abortSignal(AbortSignal.timeout(8000)).single(),
+    supabase.from("conversation_reads").select("last_read_at").eq("conversation_id", conversationId).eq("user_id", userId).abortSignal(AbortSignal.timeout(8000)).maybeSingle(),
   ]);
   const readAt = (read as { last_read_at: string } | null)?.last_read_at;
 
@@ -88,17 +96,22 @@ export async function getMessages(conversationId: string, limit = 50): Promise<C
   // error in the money sheet even though the transfer had already succeeded.
   // Transfers are fetched in a second query and merged instead — same shape,
   // no fragile join.
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("messages")
     .select("*")
     .eq("conversation_id", conversationId)
     .order("created_at", { ascending: false })
-    .limit(limit);
+    .limit(limit)
+    .abortSignal(AbortSignal.timeout(8000));
+  if (error) {
+    console.error("getMessages failed:", error.message);
+    return [];
+  }
   const rows = (data as ChatMessage[]) ?? [];
 
   const transferIds = rows.map((m) => m.p2p_transfer_id).filter((id): id is string => Boolean(id));
   if (transferIds.length > 0) {
-    const { data: transfers } = await supabase.from("p2p_transfers").select("*").in("id", transferIds);
+    const { data: transfers } = await supabase.from("p2p_transfers").select("*").in("id", transferIds).abortSignal(AbortSignal.timeout(8000));
     const byId = new Map(((transfers as P2pTransfer[]) ?? []).map((t) => [t.id, t]));
     for (const m of rows) {
       m.p2p_transfer = m.p2p_transfer_id ? byId.get(m.p2p_transfer_id) ?? null : null;

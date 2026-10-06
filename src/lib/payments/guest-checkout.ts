@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { getFulfillmentProvider } from "@/lib/fulfillment";
+import { selectFulfillmentProvider } from "@/lib/fulfillment/select";
 import { sendEmail } from "@/lib/email/client";
 import { alertTransaction } from "@/lib/email/transaction-alerts";
 import { paymentReceiptEmail } from "@/lib/email/templates";
@@ -19,10 +20,17 @@ export async function finalizeGuestCheckout(reference: string): Promise<Transact
   // transaction carries the real provider name — hardcoding "simulated"
   // made live VitalPay attempts indistinguishable from demo runs.
   const [{ data: intent }, { data: apiModules }] = await Promise.all([
-    admin.from("guest_checkout_intents").select("service_id, provider").eq("reference", reference).single(),
+    admin.from("guest_checkout_intents").select("service_id, provider, network_id, guest_phone").eq("reference", reference).single(),
     admin.from("api_modules_safe").select("*").eq("status", "active"),
   ]);
-  const provider = getFulfillmentProvider(intent?.service_id ?? "", (apiModules as ApiModuleSafe[]) ?? []);
+  const selection = await selectFulfillmentProvider({
+    serviceId: intent?.service_id ?? "",
+    networkId: (intent as { network_id?: string } | null)?.network_id ?? null,
+    activeModules: (apiModules as ApiModuleSafe[]) ?? [],
+    admin,
+    legacyResolve: getFulfillmentProvider,
+  });
+  const provider = selection.provider;
 
   const { data: txData, error } = await admin.rpc("finalize_guest_payment", {
     p_reference: reference,
@@ -57,12 +65,13 @@ export async function finalizeGuestCheckout(reference: string): Promise<Transact
     extraValue: tx.extra_value,
     networkId: tx.network_id,
     amount: tx.amount,
+    ...selection.routing,
   };
   void logTransactionEvent(admin, {
     transactionId: tx.id,
     reference: tx.reference,
     eventType: "fulfillment_started",
-    message: `Calling ${provider.name} to fulfil this order.`,
+    message: `Calling ${provider.name} to fulfil this order (${selection.reason}).`,
   });
   let fulfillmentResult;
   try {
@@ -91,8 +100,22 @@ export async function finalizeGuestCheckout(reference: string): Promise<Transact
       provider: provider.name,
       providerRef: fulfillmentResult.providerRef ?? null,
       message: fulfillmentResult.message ?? null,
+      // Vouchers, receipt HTML, display data, BillPay refs — everything the
+      // customer-facing receipt needs lands on the transaction.
+      ...(fulfillmentResult.extra ?? {}),
     },
   });
+
+  // BillPay UAT: ReceiptSmses must reach the customer's phone, one per SMS.
+  const receiptSmses = (fulfillmentResult.extra?.receipt_smses as string[] | undefined) ?? [];
+  if (fulfillmentResult.status === "fulfilled" && receiptSmses.length) {
+    const guestPhone = (intent as { guest_phone?: string } | null)?.guest_phone
+      ?? (/^(?:\+?263|0)7\d{8}$/.test(tx.recipient_identifier.replace(/\s/g, "")) ? tx.recipient_identifier : null);
+    if (guestPhone) {
+      const { sendBillPayReceiptSmses } = await import("@/lib/sms/txtzw");
+      void sendBillPayReceiptSmses({ admin, transactionId: tx.id, reference: tx.reference, phone: guestPhone, smses: receiptSmses });
+    }
+  }
 
   // Gateway payment is captured. A failed fulfilment goes to the refund
   // queue (guest checkouts have no wallet, so these are always manual —

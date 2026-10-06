@@ -8,10 +8,11 @@ export default async function ChatThreadPage({ params }: { params: Promise<{ con
   const profile = await getCurrentProfile();
   if (!profile) redirect("/login");
 
-  const conversation = await getConversation(conversationId, profile.id);
+  const [conversation, messages] = await Promise.all([
+    getConversation(conversationId, profile.id),
+    getMessages(conversationId),
+  ]);
   if (!conversation) notFound();
-
-  const messages = await getMessages(conversationId);
   // Read-receipt is marked client-side by ChatThread's useEffect — calling
   // the server action here ran revalidatePath mid-render, which threw during
   // the post-send revalidation and surfaced as the masked production error.

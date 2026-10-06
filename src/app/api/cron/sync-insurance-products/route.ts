@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getProducts as getTariqifyProducts } from "@/lib/insurance/tariqify";
+import { isAgricultureInsuranceProduct } from "@/lib/insurance/availability";
 import { createAdminClient } from "@/lib/supabase/server";
 
 /**
@@ -29,8 +30,16 @@ export async function GET(request: Request) {
     // Fetch products from TariqifyIMS
     const tariqifyProducts = await getTariqifyProducts();
     
-    // Upsert each product into insurance_products
+    let excluded = 0;
     for (const product of tariqifyProducts) {
+      if (isAgricultureInsuranceProduct(product)) {
+        excluded++;
+        await admin
+          .from("insurance_products")
+          .update({ is_active: false, is_purchasable: false })
+          .eq("id", product.id);
+        continue;
+      }
       const { error } = await admin
         .from("insurance_products")
         .upsert(
@@ -59,8 +68,9 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       success: true,
-      synced: tariqifyProducts.length,
-      message: `Synced ${tariqifyProducts.length} insurance products from TariqifyIMS`,
+      synced: tariqifyProducts.length - excluded,
+      excluded,
+      message: `Synced ${tariqifyProducts.length - excluded} insurance products from TariqifyIMS`,
     });
   } catch (error) {
     console.error("Insurance product sync failed:", error);

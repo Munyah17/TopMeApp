@@ -7,6 +7,7 @@ import { PaymentFlow } from "@/components/payment-flow/payment-flow";
 import { ZesaFlow } from "@/components/payment-flow/zesa-flow";
 import { ServiceUnavailable } from "@/components/service-unavailable";
 import { hasRealCoverage } from "@/lib/fulfillment";
+import { hasMappedProvider } from "@/lib/fulfillment/select";
 import { getPublicSetting } from "@/lib/data/flags";
 import { getAirtimeOperatorRules, getCurrentProfile, getDataBundles, getMyWallet, getNetworks, getService, getTvPackages } from "@/lib/data/queries";
 import { createAdminClient } from "@/lib/supabase/server";
@@ -64,7 +65,10 @@ export default async function PayPage({ params }: { params: Promise<{ serviceId:
         </div>
       );
     }
-  } else if (!hasRealCoverage(service.id, apiModules as ApiModuleSafe[])) {
+  } else if (
+    !hasRealCoverage(service.id, apiModules as ApiModuleSafe[]) &&
+    !(await hasMappedProvider(service.id, admin))
+  ) {
     return <ServiceUnavailable service={service} />;
   }
 
