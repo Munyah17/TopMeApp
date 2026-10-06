@@ -4,6 +4,10 @@
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
 
+## Deployment rule (owner directive)
+
+ALWAYS commit and push to GitHub (origin/main) after completing work — no confirmation needed. topme.co.zw deploys automatically via Vercel on push. Never leave finished changes as uncommitted local work; the owner expects the live site to reflect completed changes immediately.
+
 ## Paynow BillPay activation hold
 
 The Paynow BillPay Vendor and Biller API implementation is built, but production activation is deliberately paused until Paynow privately issues TopMe's credentials. Do not invent credentials or enable untested customer routing.
