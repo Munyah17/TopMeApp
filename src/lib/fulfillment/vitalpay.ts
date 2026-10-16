@@ -138,6 +138,8 @@ const BILLERS: Record<string, { billerCode: string; billType: string }> = {
   // actually carries a biller for (confirmed 2026-08-01) — the rest stay on
   // the simulated provider until VitalPay (or another aggregator) adds them.
   bulawayo_city_council: { billerCode: "bulawayo_city_zw", billType: "municipal" },
+  // Tertiary institutions (confirmed 2026-10-16 after developer agreement signed)
+  schoolfees: { billerCode: "edu_msu_zw", billType: "education_university" }, // Default to MSU; actual biller selected via extra.institution
 };
 
 // True when VitalPay carries a biller for this service — i.e. the
@@ -171,6 +173,7 @@ const SERVICE_HANDLERS: Record<string, ServiceHandler> = {
 };
 
 for (const [serviceId, { billerCode, billType }] of Object.entries(BILLERS)) {
+  if (serviceId === "schoolfees") continue; // Custom handler below
   SERVICE_HANDLERS[serviceId] = async (input) => {
     const data = await vitalpayRequest<{ reference: string; status: string }>("/bills/pay", {
       method: "POST",
@@ -187,6 +190,35 @@ for (const [serviceId, { billerCode, billType }] of Object.entries(BILLERS)) {
     return toPendingOrFulfilled(data.status, data.reference);
   };
 }
+
+// School fees handler - supports multiple tertiary institutions via extraValue
+// Available institutions from VitalPay (confirmed 2026-10-16):
+// edu_cut_zw (Chinhoyi University of Technology)
+// edu_cuz_zw (Catholic University of Zimbabwe)
+// edu_zou_zw (Zimbabwe Open University)
+// edu_rcu_zw (Reformed Church University)
+// edu_msu_zw (Midlands State University)
+// edu_solusi_zw (Solusi University)
+// edu_lsu_zw (Lupane State University)
+// edu_sis_zw (Sunrise International School)
+// edu_ajs_zw (Acacia Junior School)
+// edu_cuza_zw (CUZ Applications)
+SERVICE_HANDLERS.schoolfees = async (input) => {
+  const institution = input.extraValue || "edu_msu_zw";
+  const data = await vitalpayRequest<{ reference: string; status: string }>("/bills/pay", {
+    method: "POST",
+    body: {
+      biller_code: institution,
+      account_number: input.recipient,
+      amount: input.amount,
+      currency: "USD",
+      country: "ZW",
+      reference: input.transactionId,
+      bill_type: "education_university",
+    },
+  });
+  return toPendingOrFulfilled(data.status, data.reference);
+};
 
 // Electricity is its own category (not /bills/pay): confirmed live to cover
 // ZW/ZESA (2026-08-01). Often resolves synchronously with the token in the
@@ -341,8 +373,8 @@ export type BillAccountCheck =
     }
   | { valid: false; reason: "invalid_account" | "unavailable"; message: string };
 
-export async function validateBillAccount(serviceId: string, accountNumber: string): Promise<BillAccountCheck> {
-  const biller = BILLERS[serviceId];
+export async function validateBillAccount(serviceId: string, accountNumber: string, billerCodeOverride?: string): Promise<BillAccountCheck> {
+  const biller = billerCodeOverride ? { billerCode: billerCodeOverride, billType: "education_university" } : BILLERS[serviceId];
   if (!biller) {
     return { valid: false, reason: "unavailable", message: "No biller mapping for this service." };
   }
@@ -442,7 +474,7 @@ export const VITALPAY_GAPS = {
   data: "GET /data/operators?country_iso=ZW returned zero operators — no Zimbabwean data bundle catalog yet, despite the endpoint existing generally.",
   telecel: "Not in GET /airtime/operators?country_iso=ZW (only econet_zw, netone_zw) — Telecel airtime unmapped.",
   council: "Of the 26 councils/municipalities/town councils in our catalog, only bulawayo_city_zw exists in GET /bills/billers (wired up as bulawayo_city_council) — the other 25 stay simulated until VitalPay adds more.",
-  schoolfees: "No education-type billers appear in GET /bills/billers despite the bills category description mentioning education generally — none of our 5 university services (msu/uz/nust/cut/hit) map to a real biller.",
+  // schoolfees: NOW SUPPORTED (2026-10-16) — 10 education billers available including MSU, CUT, Catholic University, Zimbabwe Open University, etc.
   netflix_spotify_vouchers: "GET /gift-cards/products?country=ZW only returns 3 generic 'Sandbox ...' placeholder SKUs, not real branded cards (no Netflix/Spotify) — needs VitalPay to confirm real ZW gift card SKUs, or another provider.",
   govfees: "No ZIMRA/national government biller in the catalog — outside VitalPay's bills/VAS scope.",
   fuel: "No fuel voucher product in airtime, bills, or gift-card catalogs.",
