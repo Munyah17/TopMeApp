@@ -49,10 +49,29 @@ async function vitalpayRequest<T>(path: string, init: { method: "GET" | "POST"; 
   } catch {
     throw new Error(`VitalPay returned a non-JSON response from ${path} (${res.status}): ${text.slice(0, 300)}`);
   }
-  if (!res.ok || !parsed.success) {
-    throw new Error(`VitalPay ${path} failed (${res.status}): ${parsed.error || parsed.message || text.slice(0, 300)}`);
+  if (!parsed.success) {
+    throw new Error(`VitalPay API error from ${path}: ${parsed.message || parsed.error || "Unknown error"}`);
   }
   return parsed.data;
+}
+
+/**
+ * Fetch live FX rate from VitalPay - used for GBP payments and FX spread calculation.
+ * Returns rate and spread info for currency conversion.
+ */
+export async function getFxRate(fromCurrency: string = "USD", toCurrency: string = "GBP"): Promise<{ rate: number; spread: number; totalRate: number } | null> {
+  try {
+    const data = await vitalpayRequest<{ rate: number; spread: number; total_rate: number }>(`/fx/rate?from=${fromCurrency}&to=${toCurrency}`);
+    return {
+      rate: data.rate,
+      spread: data.spread,
+      totalRate: data.total_rate,
+    };
+  } catch (error) {
+    // FX rate endpoint may not be available or may fail - return null to allow fallback
+    console.warn(`VitalPay FX rate fetch failed:`, error);
+    return null;
+  }
 }
 
 // Operator ids confirmed live via GET /airtime/operators?country_iso=ZW.
@@ -164,9 +183,23 @@ const SERVICE_HANDLERS: Record<string, ServiceHandler> = {
     if (!operatorId) {
       throw new Error(`VitalPay doesn't carry network "${input.networkId}" yet — falling back to simulated.`);
     }
+    const body: Record<string, unknown> = {
+      operator_id: operatorId,
+      phone: input.recipient,
+      amount: input.amount,
+      currency: "USD",
+      reference: input.transactionId,
+      type: "airtime",
+    };
+    // Optional FX spread - VitalPay can handle currency conversion with spread
+    const fxRate = await getFxRate();
+    if (fxRate) {
+      body.fx_rate = fxRate.totalRate;
+      body.fx_spread = fxRate.spread;
+    }
     const data = await vitalpayRequest<{ reference: string; status: string }>("/airtime/purchase", {
       method: "POST",
-      body: { operator_id: operatorId, phone: input.recipient, amount: input.amount, currency: "USD", reference: input.transactionId, type: "airtime" },
+      body,
     });
     return toPendingOrFulfilled(data.status, data.reference);
   },
@@ -175,17 +208,24 @@ const SERVICE_HANDLERS: Record<string, ServiceHandler> = {
 for (const [serviceId, { billerCode, billType }] of Object.entries(BILLERS)) {
   if (serviceId === "schoolfees") continue; // Custom handler below
   SERVICE_HANDLERS[serviceId] = async (input) => {
+    const body: Record<string, unknown> = {
+      biller_code: billerCode,
+      account_number: input.recipient,
+      amount: input.amount,
+      currency: "USD",
+      country: "ZW",
+      reference: input.transactionId,
+      bill_type: billType,
+    };
+    // Optional FX spread - VitalPay can handle currency conversion with spread
+    const fxRate = await getFxRate();
+    if (fxRate) {
+      body.fx_rate = fxRate.totalRate;
+      body.fx_spread = fxRate.spread;
+    }
     const data = await vitalpayRequest<{ reference: string; status: string }>("/bills/pay", {
       method: "POST",
-      body: {
-        biller_code: billerCode,
-        account_number: input.recipient,
-        amount: input.amount,
-        currency: "USD",
-        country: "ZW",
-        reference: input.transactionId,
-        bill_type: billType,
-      },
+      body,
     });
     return toPendingOrFulfilled(data.status, data.reference);
   };
@@ -205,17 +245,24 @@ for (const [serviceId, { billerCode, billType }] of Object.entries(BILLERS)) {
 // edu_cuza_zw (CUZ Applications)
 SERVICE_HANDLERS.schoolfees = async (input) => {
   const institution = input.extraValue || "edu_msu_zw";
+  const body: Record<string, unknown> = {
+    biller_code: institution,
+    account_number: input.recipient,
+    amount: input.amount,
+    currency: "USD",
+    country: "ZW",
+    reference: input.transactionId,
+    bill_type: "education_university",
+  };
+  // Optional FX spread - VitalPay can handle currency conversion with spread
+  const fxRate = await getFxRate();
+  if (fxRate) {
+    body.fx_rate = fxRate.totalRate;
+    body.fx_spread = fxRate.spread;
+  }
   const data = await vitalpayRequest<{ reference: string; status: string }>("/bills/pay", {
     method: "POST",
-    body: {
-      biller_code: institution,
-      account_number: input.recipient,
-      amount: input.amount,
-      currency: "USD",
-      country: "ZW",
-      reference: input.transactionId,
-      bill_type: "education_university",
-    },
+    body,
   });
   return toPendingOrFulfilled(data.status, data.reference);
 };
@@ -227,6 +274,19 @@ SERVICE_HANDLERS.schoolfees = async (input) => {
 // single `token` string (confirmed by an actual test call) — handle both
 // shapes rather than trust the docs' example literally.
 SERVICE_HANDLERS.zesa = async (input) => {
+  const body: Record<string, unknown> = {
+    meter_number: input.recipient,
+    amount: input.amount,
+    currency: "USD",
+    country: "ZW",
+    reference: input.transactionId,
+  };
+  // Optional FX spread - VitalPay can handle currency conversion with spread
+  const fxRate = await getFxRate();
+  if (fxRate) {
+    body.fx_rate = fxRate.totalRate;
+    body.fx_spread = fxRate.spread;
+  }
   const data = await vitalpayRequest<{
     reference: string;
     status: string;
@@ -236,7 +296,7 @@ SERVICE_HANDLERS.zesa = async (input) => {
     unit?: string;
   }>("/electricity/purchase", {
     method: "POST",
-    body: { meter_number: input.recipient, amount: input.amount, currency: "USD", country: "ZW", reference: input.transactionId },
+    body,
   });
   const result = toPendingOrFulfilled(data.status, data.reference);
   const tokenPieces = data.token_pieces?.length ? data.token_pieces : data.token ? [data.token] : [];
