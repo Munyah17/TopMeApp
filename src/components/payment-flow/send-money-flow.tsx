@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icons";
@@ -30,11 +30,11 @@ const THEME: Record<Kind, { accent: string; accentSoft: string; gradient: string
 };
 
 export function SendMoneyFlow({
-  walletBalance,
+  walletBalance: initialWalletBalance,
   initialPhone = "",
   initialKind = "transfer",
 }: {
-  walletBalance: number;
+  walletBalance: number | null;
   initialPhone?: string;
   initialKind?: Kind;
 }) {
@@ -48,6 +48,14 @@ export function SendMoneyFlow({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<P2pTransfer | null>(null);
+  const [walletBalance, setWalletBalance] = useState(initialWalletBalance ?? 0);
+
+  useEffect(() => {
+    fetch("/api/wallet/balance")
+      .then((r) => r.json())
+      .then((data) => setWalletBalance(data.balance ?? 0))
+      .catch(() => setWalletBalance(0));
+  }, []);
 
   const theme = THEME[kind];
   const amountNum = parseFloat(amount) || 0;

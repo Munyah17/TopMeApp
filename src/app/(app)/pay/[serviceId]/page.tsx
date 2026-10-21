@@ -42,12 +42,11 @@ export default async function PayPage({ params }: { params: Promise<{ serviceId:
   // an extra wait — worth it for collapsing a full sequential step off
   // every other service's checkout page load.
   const admin = createAdminClient();
-  const [apiModules, bundles, packages, networks, wallet, paymentBanners, airtimeRules] = await Promise.all([
+  const [apiModules, bundles, packages, networks, paymentBanners, airtimeRules] = await Promise.all([
     service.is_gift ? Promise.resolve([]) : admin.from("api_modules_safe").select("*").eq("status", "active").then((r) => r.data ?? []),
     service.amount_mode === "bundles" ? getDataBundles() : Promise.resolve([]),
     service.amount_mode === "packages" ? getTvPackages() : Promise.resolve([]),
     service.needs_network ? getNetworks() : Promise.resolve([]),
-    profile ? getMyWallet(profile.id) : Promise.resolve(null),
     getPublicSetting<Record<string, string>>("payment_method_banners"),
     service.id === "airtime" ? getAirtimeOperatorRules() : Promise.resolve({}),
   ]);
@@ -73,17 +72,16 @@ export default async function PayPage({ params }: { params: Promise<{ serviceId:
   }
 
   const isGuest = !profile;
-  const walletBalance = wallet?.balance ?? 0;
   const guestEmail = profile?.email ?? "";
   const guestPhone = profile?.phone ?? "";
   const banners = paymentBanners ?? {};
 
   if (AIRTIME_FLOW_SERVICES.has(service.id)) {
-    return <AirtimeFlow service={service} networks={networks} operatorRules={airtimeRules} walletBalance={walletBalance} isGuest={isGuest} guestEmail={guestEmail} guestPhone={guestPhone} banners={banners} />;
+    return <AirtimeFlow service={service} networks={networks} operatorRules={airtimeRules} walletBalance={null} isGuest={isGuest} guestEmail={guestEmail} guestPhone={guestPhone} banners={banners} />;
   }
 
   if (service.id === "zesa") {
-    return <ZesaFlow service={service} walletBalance={walletBalance} isGuest={isGuest} guestEmail={guestEmail} guestPhone={guestPhone} banners={banners} />;
+    return <ZesaFlow service={service} walletBalance={null} isGuest={isGuest} guestEmail={guestEmail} guestPhone={guestPhone} banners={banners} />;
   }
 
   // Councils share the same "account number -> arbitrary payment amount"
@@ -91,11 +89,11 @@ export default async function PayPage({ params }: { params: Promise<{ serviceId:
   // actually clears the coverage check above today — the other 25 stop at
   // ServiceUnavailable before ever reaching this branch.
   if (service.category_id === "government") {
-    return <CouncilFlow service={service} walletBalance={walletBalance} isGuest={isGuest} guestEmail={guestEmail} guestPhone={guestPhone} banners={banners} />;
+    return <CouncilFlow service={service} walletBalance={null} isGuest={isGuest} guestEmail={guestEmail} guestPhone={guestPhone} banners={banners} />;
   }
 
   if (BROADBAND_FLOW_SERVICES.has(service.id)) {
-    return <BroadbandFlow service={service} walletBalance={walletBalance} isGuest={isGuest} guestEmail={guestEmail} guestPhone={guestPhone} banners={banners} />;
+    return <BroadbandFlow service={service} walletBalance={null} isGuest={isGuest} guestEmail={guestEmail} guestPhone={guestPhone} banners={banners} />;
   }
 
   return (
@@ -104,7 +102,7 @@ export default async function PayPage({ params }: { params: Promise<{ serviceId:
       bundles={bundles}
       packages={packages}
       networks={networks}
-      walletBalance={walletBalance}
+      walletBalance={null}
       isGuest={isGuest}
       guestEmail={guestEmail}
       guestPhone={guestPhone}

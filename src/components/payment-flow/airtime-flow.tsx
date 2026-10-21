@@ -30,7 +30,7 @@ export function AirtimeFlow({
   service,
   networks,
   operatorRules = {},
-  walletBalance,
+  walletBalance: initialWalletBalance,
   isGuest = false,
   guestEmail: initialGuestEmail = "",
   guestPhone: initialGuestPhone = "",
@@ -39,7 +39,7 @@ export function AirtimeFlow({
   service: Service;
   networks: Network[];
   operatorRules?: Record<string, AirtimeOperatorRule>;
-  walletBalance: number;
+  walletBalance: number | null;
   isGuest?: boolean;
   guestEmail?: string;
   guestPhone?: string;
@@ -58,6 +58,7 @@ export function AirtimeFlow({
   const [guestEmail, setGuestEmail] = useState(initialGuestEmail);
   const [guestPhone, setGuestPhone] = useState(initialGuestPhone);
   const [method, setMethod] = useState<PaymentMethod | null>(null);
+  const [walletBalance, setWalletBalance] = useState(initialWalletBalance ?? 0);
   const qrRef = useRef<HTMLCanvasElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const watchRef = useRef<(() => void) | null>(null);
@@ -89,6 +90,15 @@ export function AirtimeFlow({
       QRCode.toCanvas(qrRef.current, `TOPME:${result.reference}`, { width: 132, margin: 1 }, () => {});
     }
   }, [step, result]);
+
+  useEffect(() => {
+    if (!isGuest) {
+      fetch("/api/wallet/balance")
+        .then((r) => r.json())
+        .then((data) => setWalletBalance(data.balance ?? 0))
+        .catch(() => setWalletBalance(0));
+    }
+  }, [isGuest]);
 
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); watchRef.current?.(); }, []);
 

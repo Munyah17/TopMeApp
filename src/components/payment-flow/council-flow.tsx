@@ -26,14 +26,14 @@ const PAY_VIA_LABEL: Record<PaymentMethod, string> = {
 
 export function CouncilFlow({
   service,
-  walletBalance,
+  walletBalance: initialWalletBalance,
   isGuest = false,
   guestEmail: initialGuestEmail = "",
   guestPhone: initialGuestPhone = "",
   banners,
 }: {
   service: Service;
-  walletBalance: number;
+  walletBalance: number | null;
   isGuest?: boolean;
   guestEmail?: string;
   guestPhone?: string;
@@ -48,6 +48,7 @@ export function CouncilFlow({
   const [result, setResult] = useState<Transaction | null>(null);
   const [guestEmail, setGuestEmail] = useState(initialGuestEmail);
   const [guestPhone, setGuestPhone] = useState(initialGuestPhone);
+  const [walletBalance, setWalletBalance] = useState(initialWalletBalance ?? 0);
   const [method, setMethod] = useState<PaymentMethod | null>(null);
   const qrRef = useRef<HTMLCanvasElement>(null);
   const watchRef = useRef<(() => void) | null>(null);
@@ -105,6 +106,15 @@ export function CouncilFlow({
       QRCode.toCanvas(qrRef.current, `TOPME:${result.reference}`, { width: 132, margin: 1 }, () => {});
     }
   }, [step, result]);
+
+  useEffect(() => {
+    if (!isGuest) {
+      fetch("/api/wallet/balance")
+        .then((r) => r.json())
+        .then((data) => setWalletBalance(data.balance ?? 0))
+        .catch(() => setWalletBalance(0));
+    }
+  }, [isGuest]);
 
   useEffect(() => () => { watchRef.current?.(); }, []);
 

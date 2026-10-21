@@ -26,14 +26,14 @@ const PAY_VIA_LABEL: Record<PaymentMethod, string> = {
 
 export function BroadbandFlow({
   service,
-  walletBalance,
+  walletBalance: initialWalletBalance,
   isGuest = false,
   guestEmail: initialGuestEmail = "",
   guestPhone: initialGuestPhone = "",
   banners,
 }: {
   service: Service;
-  walletBalance: number;
+  walletBalance: number | null;
   isGuest?: boolean;
   guestEmail?: string;
   guestPhone?: string;
@@ -45,6 +45,7 @@ export function BroadbandFlow({
 
   const [step, setStep] = useState<Step>("account");
   const [account, setAccount] = useState("");
+  const [walletBalance, setWalletBalance] = useState(initialWalletBalance ?? 0);
   // Registered account holder for `account`, fetched from the biller via
   // VitalPay before payment so the buyer can confirm the account is right.
   // `holder` null with a matching `checkedAccount` means the check ran but
@@ -115,6 +116,15 @@ export function BroadbandFlow({
       QRCode.toCanvas(qrRef.current, `TOPME:${result.reference}`, { width: 132, margin: 1 }, () => {});
     }
   }, [step, result]);
+
+  useEffect(() => {
+    if (!isGuest) {
+      fetch("/api/wallet/balance")
+        .then((r) => r.json())
+        .then((data) => setWalletBalance(data.balance ?? 0))
+        .catch(() => setWalletBalance(0));
+    }
+  }, [isGuest]);
 
   useEffect(() => () => { watchRef.current?.(); }, []);
 

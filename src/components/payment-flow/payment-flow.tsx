@@ -29,7 +29,7 @@ export function PaymentFlow({
   bundles,
   packages,
   networks,
-  walletBalance,
+  walletBalance: initialWalletBalance,
   isGuest = false,
   guestEmail: initialGuestEmail = "",
   guestPhone: initialGuestPhone = "",
@@ -39,7 +39,7 @@ export function PaymentFlow({
   bundles: DataBundle[];
   packages: TvPackage[];
   networks: Network[];
-  walletBalance: number;
+  walletBalance: number | null;
   isGuest?: boolean;
   guestEmail?: string;
   guestPhone?: string;
@@ -48,6 +48,7 @@ export function PaymentFlow({
   const router = useRouter();
   const [step, setStep] = useState<Step>("details");
   const [networkId, setNetworkId] = useState<string | null>(null);
+  const [walletBalance, setWalletBalance] = useState(initialWalletBalance ?? 0);
   const [identifier, setIdentifier] = useState("");
   const [extra, setExtra] = useState("");
   const [amount, setAmount] = useState<number | null>(null);
@@ -128,6 +129,15 @@ export function PaymentFlow({
       QRCode.toCanvas(qrRef.current, `TOPME:${result.reference}`, { width: 132, margin: 1 }, () => {});
     }
   }, [step, result]);
+
+  useEffect(() => {
+    if (!isGuest) {
+      fetch("/api/wallet/balance")
+        .then((r) => r.json())
+        .then((data) => setWalletBalance(data.balance ?? 0))
+        .catch(() => setWalletBalance(0));
+    }
+  }, [isGuest]);
 
   useEffect(() => {
     return () => {

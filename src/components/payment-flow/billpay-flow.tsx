@@ -63,14 +63,15 @@ interface ReceiptData {
 export function BillPayFlow({
   biller,
   product,
-  walletBalance,
+  walletBalance: initialWalletBalance,
 }: {
   biller: BillPayFlowBiller;
   product: BillPayFlowProduct;
-  walletBalance: number;
+  walletBalance: number | null;
 }) {
   const router = useRouter();
   const [step, setStep] = useState<Step>("details");
+  const [walletBalance, setWalletBalance] = useState(initialWalletBalance ?? 0);
   const [memberNumber, setMemberNumber] = useState("");
   const [amount, setAmount] = useState("");
   const [quantity, setQuantity] = useState("1");
@@ -85,6 +86,13 @@ export function BillPayFlow({
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    fetch("/api/wallet/balance")
+      .then((r) => r.json())
+      .then((data) => setWalletBalance(data.balance ?? 0))
+      .catch(() => setWalletBalance(0));
+  }, []);
 
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 

@@ -24,14 +24,14 @@ const PAY_VIA_LABEL: Record<PaymentMethod, string> = {
 
 export function ZesaFlow({
   service,
-  walletBalance,
+  walletBalance: initialWalletBalance,
   isGuest = false,
   guestEmail: initialGuestEmail = "",
   guestPhone: initialGuestPhone = "",
   banners,
 }: {
   service: Service;
-  walletBalance: number;
+  walletBalance: number | null;
   isGuest?: boolean;
   guestEmail?: string;
   guestPhone?: string;
@@ -40,6 +40,7 @@ export function ZesaFlow({
   const router = useRouter();
   const [step, setStep] = useState<Step>("meter");
   const [meter, setMeter] = useState("");
+  const [walletBalance, setWalletBalance] = useState(initialWalletBalance ?? 0);
   // Registered ZESA account holder for `owner.meter`, fetched from ZETDC via
   // VitalPay before payment so the buyer can confirm the meter is right.
   // `owner` null with a matching `checkedMeter` means the check ran but
@@ -59,6 +60,15 @@ export function ZesaFlow({
   const [method, setMethod] = useState<PaymentMethod | null>(null);
   const watchRef = useRef<(() => void) | null>(null);
   const [deliveryTimedOut, setDeliveryTimedOut] = useState(false);
+
+  useEffect(() => {
+    if (!isGuest) {
+      fetch("/api/wallet/balance")
+        .then((r) => r.json())
+        .then((data) => setWalletBalance(data.balance ?? 0))
+        .catch(() => setWalletBalance(0));
+    }
+  }, [isGuest]);
 
   useEffect(() => () => { watchRef.current?.(); }, []);
 
