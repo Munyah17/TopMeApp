@@ -191,12 +191,12 @@ const SERVICE_HANDLERS: Record<string, ServiceHandler> = {
       reference: input.transactionId,
       type: "airtime",
     };
-    // Optional FX spread - VitalPay can handle currency conversion with spread
-    const fxRate = await getFxRate();
-    if (fxRate) {
-      body.fx_rate = fxRate.totalRate;
-      body.fx_spread = fxRate.spread;
-    }
+    // FX spread temporarily disabled - endpoint may not be live yet
+    // const fxRate = await getFxRate();
+    // if (fxRate) {
+    //   body.fx_rate = fxRate.totalRate;
+    //   body.fx_spread = fxRate.spread;
+    // }
     const data = await vitalpayRequest<{ reference: string; status: string }>("/airtime/purchase", {
       method: "POST",
       body,
@@ -217,12 +217,12 @@ for (const [serviceId, { billerCode, billType }] of Object.entries(BILLERS)) {
       reference: input.transactionId,
       bill_type: billType,
     };
-    // Optional FX spread - VitalPay can handle currency conversion with spread
-    const fxRate = await getFxRate();
-    if (fxRate) {
-      body.fx_rate = fxRate.totalRate;
-      body.fx_spread = fxRate.spread;
-    }
+    // FX spread temporarily disabled - endpoint may not be live yet
+    // const fxRate = await getFxRate();
+    // if (fxRate) {
+    //   body.fx_rate = fxRate.totalRate;
+    //   body.fx_spread = fxRate.spread;
+    // }
     const data = await vitalpayRequest<{ reference: string; status: string }>("/bills/pay", {
       method: "POST",
       body,
@@ -254,12 +254,12 @@ SERVICE_HANDLERS.schoolfees = async (input) => {
     reference: input.transactionId,
     bill_type: "education_university",
   };
-  // Optional FX spread - VitalPay can handle currency conversion with spread
-  const fxRate = await getFxRate();
-  if (fxRate) {
-    body.fx_rate = fxRate.totalRate;
-    body.fx_spread = fxRate.spread;
-  }
+  // FX spread temporarily disabled - endpoint may not be live yet
+  // const fxRate = await getFxRate();
+  // if (fxRate) {
+  //   body.fx_rate = fxRate.totalRate;
+  //   body.fx_spread = fxRate.spread;
+  // }
   const data = await vitalpayRequest<{ reference: string; status: string }>("/bills/pay", {
     method: "POST",
     body,
@@ -281,12 +281,12 @@ SERVICE_HANDLERS.zesa = async (input) => {
     country: "ZW",
     reference: input.transactionId,
   };
-  // Optional FX spread - VitalPay can handle currency conversion with spread
-  const fxRate = await getFxRate();
-  if (fxRate) {
-    body.fx_rate = fxRate.totalRate;
-    body.fx_spread = fxRate.spread;
-  }
+  // FX spread temporarily disabled - endpoint may not be live yet
+  // const fxRate = await getFxRate();
+  // if (fxRate) {
+  //   body.fx_rate = fxRate.totalRate;
+  //   body.fx_spread = fxRate.spread;
+  // }
   const data = await vitalpayRequest<{
     reference: string;
     status: string;
