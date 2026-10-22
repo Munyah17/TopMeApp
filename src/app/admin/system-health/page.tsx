@@ -2,6 +2,7 @@ import { Icon } from "@/components/icons";
 import { createClient } from "@/lib/supabase/server";
 import { getMyPermissions } from "@/lib/auth/permissions";
 import type { IntegrationHealth } from "@/types/database";
+import { VitalPayHealthCard } from "./vitalpay-health-card";
 
 function timeAgo(iso: string | null) {
   if (!iso) return "Never";
@@ -30,6 +31,8 @@ export default async function SystemHealthPage() {
       <div className="muted mb-3">
         Last-known-good state from the actual webhook/poll traffic for each integration — not a synthetic heartbeat.
       </div>
+
+      <VitalPayHealthCard />
 
       <div className="card" style={{ overflow: "hidden" }}>
         {rows.length === 0 ? (

@@ -13,6 +13,7 @@ import { giftRedeemedEmail, giftSentEmail, moneyReceivedEmail, moneySentEmail, p
 import { logTransactionEvent } from "@/lib/transaction-events";
 import { resolveVerifiedAmount } from "@/lib/pricing";
 import { sendPushToUser } from "@/lib/push/send";
+import { logDebugError } from "@/lib/debug-errors";
 import type { ApiModuleSafe, FulfillmentStatus, P2pTransfer, Transaction } from "@/types/database";
 
 const FRIENDLY_ERRORS: Record<string, string> = {
@@ -119,6 +120,14 @@ export async function payService(input: PayServiceInput) {
   });
 
   if (error) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    void logDebugError(err, {
+      serviceId: input.serviceId,
+      userId: user.id,
+      requestMethod: "POST",
+      requestPath: "/api/payments/pay-service",
+      metadata: { input, walletDebitError: true },
+    });
     void alertTransaction(admin, {
       outcome: "failed",
       reference: `wallet_pay:${input.serviceId}`,
