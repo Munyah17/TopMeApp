@@ -9,7 +9,7 @@ import { hexA, mutedOn, textOn } from "@/lib/data/catalog-helpers";
 import { calculatePlatformFee, calculateGatewaySurcharge } from "@/lib/fees";
 import { payService, validateBillAccount } from "@/lib/actions/payments";
 import { watchFulfillment } from "@/lib/payments/fulfillment-watch";
-import { supportsBillAccountValidation } from "@/lib/fulfillment/vitalpay";
+import { supportsBillAccountValidation } from "@/lib/fulfillment/vitalpay-shared";
 import { startGuestCheckout, type GuestGateway } from "@/lib/actions/guest-payments";
 import { addGuestActivity } from "@/lib/guest-activity";
 import { EditableRow, PaymentMethodSection, ReviewRow, type PaymentBanners, type PaymentMethod } from "./flow-shared";

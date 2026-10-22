@@ -1,5 +1,9 @@
 import { readModuleSecret } from "./module-secret";
+import { BILLERS, type AirtimeOperatorRule } from "./vitalpay-shared";
 import type { FulfillmentInput, FulfillmentProvider, FulfillmentResult } from "./types";
+
+export type { AirtimeOperatorRule };
+export { supportsBillAccountValidation } from "./vitalpay-shared";
 
 /**
  * VitalPay (by Tayari / KMG Vital Links) — primary biller aggregator.
@@ -99,15 +103,6 @@ const AIRTIME_OPERATORS: Record<string, string> = {
  * BEFORE debiting the wallet — sending an unsupported amount got a 422
  * back from VitalPay after the customer had already been charged.
  */
-export interface AirtimeOperatorRule {
-  /** our network id (econet / netone) */
-  networkId: string;
-  min: number;
-  max: number;
-  /** Exact amounts the operator accepts, or null when any amount in [min,max] is fine. */
-  fixedAmounts: number[] | null;
-}
-
 const cents = (n: number) => Math.round(n * 100);
 
 export async function fetchAirtimeOperatorRules(): Promise<Record<string, AirtimeOperatorRule>> {
@@ -157,27 +152,6 @@ export function checkAirtimeAmount(
   if (amount < rule.min) return { ok: false, message: `The minimum top-up for this network is $${rule.min.toFixed(2)}.` };
   if (amount > rule.max) return { ok: false, message: `The maximum top-up for this network is $${rule.max.toFixed(2)}.` };
   return { ok: true };
-}
-
-// Biller ids confirmed live via GET /bills/billers?country=ZW.
-const BILLERS: Record<string, { billerCode: string; billType: string }> = {
-  dstv: { billerCode: "dstv_zw", billType: "tv" },
-  zol: { billerCode: "zol_zw", billType: "internet" },
-  telone: { billerCode: "telone_zw", billType: "telecom" },
-  // Bulawayo is the only one of the 26 councils in our catalog VitalPay
-  // actually carries a biller for (confirmed 2026-08-01) — the rest stay on
-  // the simulated provider until VitalPay (or another aggregator) adds them.
-  bulawayo_city_council: { billerCode: "bulawayo_city_zw", billType: "municipal" },
-  // Tertiary institutions (confirmed 2026-10-16 after developer agreement signed)
-  schoolfees: { billerCode: "edu_msu_zw", billType: "education_university" }, // Default to MSU; actual biller selected via extra.institution
-};
-
-// True when VitalPay carries a biller for this service — i.e. the
-// /bills/validate account-holder lookup can run. Flows gate their
-// owner-name check on this so phone-number services (bundles, gifts)
-// don't waste a round trip on a lookup that can't exist.
-export function supportsBillAccountValidation(serviceId: string): boolean {
-  return serviceId in BILLERS;
 }
 
 function toPendingOrFulfilled(status: string, reference: string): FulfillmentResult {

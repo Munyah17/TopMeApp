@@ -13,7 +13,7 @@ import { addGuestActivity } from "@/lib/guest-activity";
 import { watchFulfillment } from "@/lib/payments/fulfillment-watch";
 import { DenomTile, NetworkTile, PaymentMethodSection, ReviewRow, EditableRow, type PaymentBanners, type PaymentMethod } from "./flow-shared";
 import { useWalletBalance } from "./use-wallet-balance";
-import type { AirtimeOperatorRule } from "@/lib/fulfillment/vitalpay";
+import type { AirtimeOperatorRule } from "@/lib/fulfillment/vitalpay-shared";
 import type { Network, Service, Transaction } from "@/types/database";
 
 type Step = "operator" | "recipient" | "amount" | "review" | "processing" | "guest-ecocash" | "delivering" | "success" | "receipt" | "error";

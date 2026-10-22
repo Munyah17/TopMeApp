@@ -11,7 +11,7 @@ import { payService, sendGiftVoucher, validateBillAccount } from "@/lib/actions/
 import { startGuestCheckout, type GuestGateway } from "@/lib/actions/guest-payments";
 import { addGuestActivity } from "@/lib/guest-activity";
 import { watchFulfillment } from "@/lib/payments/fulfillment-watch";
-import { supportsBillAccountValidation } from "@/lib/fulfillment/vitalpay";
+import { supportsBillAccountValidation } from "@/lib/fulfillment/vitalpay-shared";
 import { PaymentMethodSection, type PaymentBanners, type PaymentMethod } from "./flow-shared";
 import { useWalletBalance } from "./use-wallet-balance";
 import type { DataBundle, Network, Service, Transaction, TvPackage } from "@/types/database";
