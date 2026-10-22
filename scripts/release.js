@@ -27,7 +27,7 @@ function readEnv(file) {
   const env = {};
   fs.readFileSync(path.join(root, file), "utf8").split("\n").forEach((line) => {
     const m = line.match(/^([^#=]+)=(.*)$/);
-    if (m) env[m[1].trim()] = m[2].trim();
+    if (m) env[m[1].trim()] = m[2].trim().replace(/^["']|["']$/g, "");
   });
   return env;
 }
