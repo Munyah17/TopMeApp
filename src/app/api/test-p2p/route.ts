@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { staffApiDenied } from "@/lib/auth/api-staff";
 import { createAdminClient } from "@/lib/supabase/server";
 
 // Diagnostic: verifies the DB objects the Send Money / Red Packet flow depends
@@ -6,6 +7,9 @@ import { createAdminClient } from "@/lib/supabase/server";
 // p2p_transfers table, and the p2p_send/p2p_receive ledger_type enum values.
 // Hit /api/test-p2p after deploying to confirm the migration was applied.
 export async function GET() {
+  const denied = await staffApiDenied(["reports.view", "apis.manage"]);
+  if (denied) return denied;
+
   const admin = createAdminClient();
   const checks: Record<string, unknown> = {};
 

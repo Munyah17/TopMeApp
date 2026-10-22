@@ -19,7 +19,7 @@ export async function createTopupCheckoutSession(opts: {
   customerEmail?: string;
 }) {
   const stripe = getStripe();
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.topme.co.zw";
 
   return stripe.checkout.sessions.create({
     mode: "payment",
@@ -51,7 +51,7 @@ export async function createGuestCheckoutSession(opts: {
   purpose?: string;
 }) {
   const stripe = getStripe();
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.topme.co.zw";
 
   return stripe.checkout.sessions.create({
     mode: "payment",

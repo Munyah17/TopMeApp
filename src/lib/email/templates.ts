@@ -13,7 +13,7 @@
 // horizontal scroll in a desktop preview pane, and it collapses cleanly on
 // mobile because every table is width:100% with a max-width cap.
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://topme.co.zw";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://www.topme.co.zw";
 
 const C = {
   navy: "#0F172A",

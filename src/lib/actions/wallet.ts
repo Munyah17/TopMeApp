@@ -42,7 +42,7 @@ export async function startPaynowTopup(amount: number) {
     reference,
     amount: amount + fee,
     authEmail: user.email || "",
-    returnUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/wallet?paynow_ref=${encodeURIComponent(reference)}`,
+    returnUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://www.topme.co.zw"}/wallet?paynow_ref=${encodeURIComponent(reference)}`,
   });
   if (!result.ok || !result.browserUrl) {
     await admin.from("topup_intents").update({ status: "failed" }).eq("reference", reference);
@@ -107,7 +107,7 @@ export async function startVitalPayTopup(amount: number) {
     email: user.email || "",
     reference,
     name: undefined,
-    callbackUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/wallet?vitalpay_ref=${encodeURIComponent(reference)}`,
+    callbackUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://www.topme.co.zw"}/wallet?vitalpay_ref=${encodeURIComponent(reference)}`,
     description: "TopMe wallet top up",
   });
 
@@ -115,7 +115,7 @@ export async function startVitalPayTopup(amount: number) {
     // Test-mode sandbox scenario resolves synchronously with no redirect —
     // apply it immediately instead of sending the customer to a blank page.
     await applyVitalPayGatewayResult(reference, "successful");
-    return { redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/wallet?vitalpay_ref=${encodeURIComponent(reference)}`, reference };
+    return { redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://www.topme.co.zw"}/wallet?vitalpay_ref=${encodeURIComponent(reference)}`, reference };
   }
   if (result.status === "failed") {
     await admin.from("topup_intents").update({ status: "failed" }).eq("reference", reference);

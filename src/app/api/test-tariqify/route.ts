@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { staffApiDenied } from "@/lib/auth/api-staff";
 import { getProducts } from "@/lib/insurance/tariqify";
 
 /**
@@ -6,6 +7,9 @@ import { getProducts } from "@/lib/insurance/tariqify";
  * Call this to check if the API is working and products can be fetched
  */
 export async function GET() {
+  const denied = await staffApiDenied(["reports.view", "apis.manage"]);
+  if (denied) return denied;
+
   try {
     const products = await getProducts();
     return NextResponse.json({

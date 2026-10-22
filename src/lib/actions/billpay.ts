@@ -494,7 +494,7 @@ export async function startBillPayCheckout(params: {
       return { error: "Couldn't start the checkout. Please try again." };
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.topme.co.zw";
     const confirmUrl = `${appUrl}/pay/guest/confirm?reference=${encodeURIComponent(reference)}`;
 
     if (params.gateway === "paynow") {

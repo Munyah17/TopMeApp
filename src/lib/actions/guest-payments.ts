@@ -147,7 +147,7 @@ export async function startGuestCheckout(input: StartGuestCheckoutInput) {
       amount: totalCharge,
       authEmail: input.guestEmail,
       additionalInfo: `TopMe: ${input.serviceName}`,
-      returnUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/pay/guest/confirm?reference=${encodeURIComponent(reference)}`,
+      returnUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://www.topme.co.zw"}/pay/guest/confirm?reference=${encodeURIComponent(reference)}`,
     });
     if (!result.ok || !result.browserUrl) {
       await failGuestCheckout(reference);

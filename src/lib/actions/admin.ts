@@ -126,9 +126,12 @@ export async function createApiModule(input: {
   const { user } = await requirePermission("apis.manage");
   const admin = createAdminClient();
 
+  const provider = input.provider.trim().toLowerCase();
+  if (!provider) throw new Error("Provider is required so checkout can route to this API.");
+
   await admin.from("api_modules").insert({
     name: input.name,
-    provider: input.provider,
+    provider,
     category: input.category || null,
     status: "active",
     key_encrypted: encryptSecret(input.key),

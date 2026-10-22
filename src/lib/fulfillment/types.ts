@@ -5,6 +5,12 @@ export interface FulfillmentInput {
   extraValue?: string | null;
   networkId?: string | null;
   amount: number;
+  /**
+   * Set by the provider map when VitalPay wins routing. productId is the
+   * biller code or operator id from service_provider_map. billType is the
+   * provider SKU (tv, internet, education_university, …).
+   */
+  vitalpay?: { productId?: string; billType?: string | null };
 }
 
 export interface FulfillmentResult {

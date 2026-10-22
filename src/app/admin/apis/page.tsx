@@ -1,11 +1,14 @@
+import { revalidatePath } from "next/cache";
 import { ApiModulesClient } from "@/components/admin/api-modules-client";
 import { ProviderMapClient, type ProviderMapRow } from "@/components/admin/provider-map-client";
 import { getProviderMap } from "@/lib/actions/admin";
+import { getMyPermissions, requirePermission } from "@/lib/auth/permissions";
+import { syncBillPayCatalog } from "@/lib/billpay/sync";
 import { getAllServices } from "@/lib/data/queries";
-import { getMyPermissions } from "@/lib/auth/permissions";
-import { createClient } from "@/lib/supabase/server";
+import { billpayConfigured } from "@/lib/fulfillment/billpay";
+import { syncInsuranceCatalog } from "@/lib/insurance/sync-catalog";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 import type { ApiModuleSafe } from "@/types/database";
-import { revalidatePath } from "next/cache";
 
 export default async function ApiManagementPage() {
   const permissions = await getMyPermissions();
@@ -23,36 +26,23 @@ export default async function ApiManagementPage() {
 
   async function syncInsuranceProducts() {
     "use server";
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/cron/sync-insurance-products`, {
-        method: "GET",
-        headers: {
-          "Authorization": `Bearer ${process.env.CRON_SECRET || ""}`,
-        },
-      });
-      const result = await response.json();
-      revalidatePath("/insurance");
-      return result;
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
-    }
+    await requirePermission("apis.manage");
+    const result = await syncInsuranceCatalog();
+    if (!result.success) throw new Error(result.error);
+    revalidatePath("/insurance");
+    revalidatePath("/admin/apis");
   }
 
-  async function syncBillPayCatalog() {
+  async function syncBillPayCatalogNow() {
     "use server";
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/cron/sync-billpay-catalog`, {
-        method: "GET",
-        headers: {
-          "Authorization": `Bearer ${process.env.CRON_SECRET || ""}`,
-        },
-      });
-      const result = await response.json();
-      revalidatePath("/bills");
-      return result;
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+    await requirePermission("apis.manage");
+    if (!billpayConfigured()) {
+      throw new Error("BillPay credentials are not configured. Add them before syncing the catalog.");
     }
+    const result = await syncBillPayCatalog(createAdminClient());
+    if (result.errors.length && result.billers === 0) throw new Error(result.errors.join("; "));
+    revalidatePath("/bills");
+    revalidatePath("/admin/apis");
   }
 
   return (
@@ -81,7 +71,7 @@ export default async function ApiManagementPage() {
               Pull latest billers &amp; products from Paynow BillPay (daily cron + config webhook also do this)
             </div>
           </div>
-          <form action={syncBillPayCatalog}>
+          <form action={syncBillPayCatalogNow}>
             <button type="submit" className="btn btn-primary" style={{ fontSize: 13, padding: "8px 16px" }}>
               Sync Now
             </button>

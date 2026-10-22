@@ -1,3 +1,4 @@
+import { readModuleSecret } from "./module-secret";
 import type { FulfillmentInput, FulfillmentProvider, FulfillmentResult } from "./types";
 
 /**
@@ -16,13 +17,19 @@ import type { FulfillmentInput, FulfillmentProvider, FulfillmentResult } from ".
  * That's why handlers below can return a "pending" FulfillmentResult.
  */
 
-function config() {
-  const baseUrl = process.env.VITALPAY_BASE_URL;
-  const secretKey = process.env.VITALPAY_SECRET_KEY;
+async function config() {
+  const baseUrl = process.env.VITALPAY_BASE_URL?.replace(/\/$/, "");
+  // Env key wins. The Admin → APIs module is the fallback so a provider
+  // saved in the dashboard still connects when the env var is empty.
+  const secretKey = process.env.VITALPAY_SECRET_KEY || (await readModuleSecret("vitalpay"));
   if (!baseUrl || !secretKey) {
-    throw new Error("VitalPay is not configured — set VITALPAY_BASE_URL and VITALPAY_SECRET_KEY.");
+    throw new Error("VitalPay is not configured — set VITALPAY_BASE_URL and VITALPAY_SECRET_KEY, or save an active vitalpay API module.");
   }
   return { baseUrl, secretKey };
+}
+
+export function vitalpayConfigured(): boolean {
+  return Boolean(process.env.VITALPAY_BASE_URL && (process.env.VITALPAY_SECRET_KEY || process.env.API_ENCRYPTION_KEY));
 }
 
 interface VitalPayEnvelope<T> {
@@ -32,8 +39,8 @@ interface VitalPayEnvelope<T> {
   data: T;
 }
 
-async function vitalpayRequest<T>(path: string, init: { method: "GET" | "POST"; body?: Record<string, unknown> } = { method: "GET" }): Promise<T> {
-  const { baseUrl, secretKey } = config();
+export async function vitalpayRequest<T>(path: string, init: { method: "GET" | "POST"; body?: Record<string, unknown> } = { method: "GET" }): Promise<T> {
+  const { baseUrl, secretKey } = await config();
   const res = await fetch(`${baseUrl}${path}`, {
     method: init.method,
     headers: {
@@ -58,6 +65,8 @@ async function vitalpayRequest<T>(path: string, init: { method: "GET" | "POST"; 
 /**
  * Fetch live FX rate from VitalPay - used for GBP payments and FX spread calculation.
  * Returns rate and spread info for currency conversion.
+ * Live check 2026-10-22: GET /fx/rate returns 404, so callers must not
+ * send fx_rate on purchases until VitalPay publishes this route.
  */
 export async function getFxRate(fromCurrency: string = "USD", toCurrency: string = "GBP"): Promise<{ rate: number; spread: number; totalRate: number } | null> {
   try {
@@ -102,8 +111,10 @@ export interface AirtimeOperatorRule {
 const cents = (n: number) => Math.round(n * 100);
 
 export async function fetchAirtimeOperatorRules(): Promise<Record<string, AirtimeOperatorRule>> {
-  const { baseUrl, secretKey } = config();
-  const res = await fetch(`${baseUrl}/airtime/operators?country=ZW`, {
+  const { baseUrl, secretKey } = await config();
+  // country=ZW is ignored and returns the global catalog (31 operators).
+  // country_iso=ZW is the filter that returns Zimbabwe only.
+  const res = await fetch(`${baseUrl}/airtime/operators?country_iso=ZW`, {
     headers: { Accept: "application/json", Authorization: `Bearer ${secretKey}` },
   });
   if (!res.ok) throw new Error(`VitalPay /airtime/operators failed (${res.status})`);
@@ -177,38 +188,20 @@ function toPendingOrFulfilled(status: string, reference: string): FulfillmentRes
 
 type ServiceHandler = (input: FulfillmentInput) => Promise<FulfillmentResult>;
 
-const SERVICE_HANDLERS: Record<string, ServiceHandler> = {
-  airtime: async (input) => {
-    const operatorId = input.networkId ? AIRTIME_OPERATORS[input.networkId] : undefined;
-    if (!operatorId) {
-      throw new Error(`VitalPay doesn't carry network "${input.networkId}" yet — falling back to simulated.`);
-    }
-    const body: Record<string, unknown> = {
-      operator_id: operatorId,
-      phone: input.recipient,
-      amount: input.amount,
-      currency: "USD",
-      reference: input.transactionId,
-      type: "airtime",
-    };
-    // FX spread temporarily disabled - endpoint may not be live yet
-    // const fxRate = await getFxRate();
-    // if (fxRate) {
-    //   body.fx_rate = fxRate.totalRate;
-    //   body.fx_spread = fxRate.spread;
-    // }
-    const data = await vitalpayRequest<{ reference: string; status: string }>("/airtime/purchase", {
-      method: "POST",
-      body,
-    });
-    return toPendingOrFulfilled(data.status, data.reference);
-  },
-};
+function operatorFor(input: FulfillmentInput): string | undefined {
+  const mapped = input.vitalpay?.productId?.trim();
+  // A stored VitalPay operator id (econet_zw) is used as-is. Our own
+  // network ids (econet, netone) still go through AIRTIME_OPERATORS.
+  if (mapped?.includes("_")) return mapped;
+  const networkId = input.networkId || mapped;
+  if (networkId && AIRTIME_OPERATORS[networkId]) return AIRTIME_OPERATORS[networkId];
+  return mapped || undefined;
+}
 
-for (const [serviceId, { billerCode, billType }] of Object.entries(BILLERS)) {
-  if (serviceId === "schoolfees") continue; // Custom handler below
-  SERVICE_HANDLERS[serviceId] = async (input) => {
-    const body: Record<string, unknown> = {
+async function payBill(input: FulfillmentInput, billerCode: string, billType: string): Promise<FulfillmentResult> {
+  const data = await vitalpayRequest<{ reference: string; status: string }>("/bills/pay", {
+    method: "POST",
+    body: {
       biller_code: billerCode,
       account_number: input.recipient,
       amount: input.amount,
@@ -216,18 +209,48 @@ for (const [serviceId, { billerCode, billType }] of Object.entries(BILLERS)) {
       country: "ZW",
       reference: input.transactionId,
       bill_type: billType,
-    };
-    // FX spread temporarily disabled - endpoint may not be live yet
-    // const fxRate = await getFxRate();
-    // if (fxRate) {
-    //   body.fx_rate = fxRate.totalRate;
-    //   body.fx_spread = fxRate.spread;
-    // }
-    const data = await vitalpayRequest<{ reference: string; status: string }>("/bills/pay", {
+    },
+  });
+  return toPendingOrFulfilled(data.status, data.reference);
+}
+
+function billerFor(input: FulfillmentInput, fallback: { billerCode: string; billType: string }) {
+  if (input.serviceId === "schoolfees" && input.extraValue?.trim()) {
+    return { billerCode: input.extraValue.trim(), billType: input.vitalpay?.billType?.trim() || fallback.billType };
+  }
+  const mapped = input.vitalpay?.productId?.trim();
+  return {
+    billerCode: mapped || fallback.billerCode,
+    billType: input.vitalpay?.billType?.trim() || fallback.billType,
+  };
+}
+
+const SERVICE_HANDLERS: Record<string, ServiceHandler> = {
+  airtime: async (input) => {
+    const operatorId = operatorFor(input);
+    if (!operatorId) {
+      throw new Error(`VitalPay doesn't carry network "${input.networkId ?? input.vitalpay?.productId ?? ""}" yet — falling back to simulated.`);
+    }
+    const data = await vitalpayRequest<{ reference: string; status: string }>("/airtime/purchase", {
       method: "POST",
-      body,
+      body: {
+        operator_id: operatorId,
+        phone: input.recipient,
+        amount: input.amount,
+        currency: "USD",
+        reference: input.transactionId,
+        type: "airtime",
+      },
     });
     return toPendingOrFulfilled(data.status, data.reference);
+  },
+};
+
+for (const [serviceId, fallback] of Object.entries(BILLERS)) {
+  if (serviceId === "schoolfees") continue; // Custom handler below
+  SERVICE_HANDLERS[serviceId] = async (input) => {
+    const { billerCode, billType } = billerFor(input, fallback);
+    return payBill(input, billerCode, billType);
   };
 }
 
@@ -244,27 +267,8 @@ for (const [serviceId, { billerCode, billType }] of Object.entries(BILLERS)) {
 // edu_ajs_zw (Acacia Junior School)
 // edu_cuza_zw (CUZ Applications)
 SERVICE_HANDLERS.schoolfees = async (input) => {
-  const institution = input.extraValue || "edu_msu_zw";
-  const body: Record<string, unknown> = {
-    biller_code: institution,
-    account_number: input.recipient,
-    amount: input.amount,
-    currency: "USD",
-    country: "ZW",
-    reference: input.transactionId,
-    bill_type: "education_university",
-  };
-  // FX spread temporarily disabled - endpoint may not be live yet
-  // const fxRate = await getFxRate();
-  // if (fxRate) {
-  //   body.fx_rate = fxRate.totalRate;
-  //   body.fx_spread = fxRate.spread;
-  // }
-  const data = await vitalpayRequest<{ reference: string; status: string }>("/bills/pay", {
-    method: "POST",
-    body,
-  });
-  return toPendingOrFulfilled(data.status, data.reference);
+  const { billerCode, billType } = billerFor(input, BILLERS.schoolfees);
+  return payBill(input, billerCode, billType);
 };
 
 // Electricity is its own category (not /bills/pay): confirmed live to cover
@@ -336,7 +340,7 @@ export type ElectricityMeterCheck =
   | { valid: false; reason: "invalid_meter" | "unavailable"; message: string };
 
 export async function validateElectricityMeter(meterNumber: string): Promise<ElectricityMeterCheck> {
-  const { baseUrl, secretKey } = config();
+  const { baseUrl, secretKey } = await config();
   const meter = meterNumber.trim();
 
   let res: Response;
@@ -438,7 +442,7 @@ export async function validateBillAccount(serviceId: string, accountNumber: stri
   if (!biller) {
     return { valid: false, reason: "unavailable", message: "No biller mapping for this service." };
   }
-  const { baseUrl, secretKey } = config();
+  const { baseUrl, secretKey } = await config();
   const account = accountNumber.trim();
 
   let res: Response;
@@ -516,10 +520,17 @@ export class VitalPayProvider implements FulfillmentProvider {
   readonly coverage = Object.keys(SERVICE_HANDLERS);
 
   async fulfil(input: FulfillmentInput): Promise<FulfillmentResult> {
-    config(); // throws early with a clear message if env vars are missing
+    await config();
     const handler = SERVICE_HANDLERS[input.serviceId];
-    if (!handler) return notMapped(input.serviceId);
-    return handler(input);
+    if (handler) return handler(input);
+    // A service that is not hardcoded can still be fulfilled when Admin →
+    // APIs maps it to a VitalPay biller code. That is how a new product
+    // connects without a code change.
+    const mappedCode = input.vitalpay?.productId?.trim();
+    if (mappedCode) {
+      return payBill(input, mappedCode, input.vitalpay?.billType?.trim() || "bill");
+    }
+    return notMapped(input.serviceId);
   }
 }
 

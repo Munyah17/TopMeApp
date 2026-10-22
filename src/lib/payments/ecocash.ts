@@ -9,17 +9,11 @@
  * alongside the intent for the status-lookup step.
  */
 
-const BASE_URL = process.env.ECOCASH_BASE_URL || "https://developers.ecocash.co.zw/sandbox/payment/v1";
-
-// EcoCash issues one fixed merchant identity per sandbox account — these are
-// the values from that account's sandbox docs, not guessed. Override via env
-// vars once EcoCash issues real production merchant credentials.
-const MERCHANT_CODE = process.env.ECOCASH_MERCHANT_CODE || "001535";
-const MERCHANT_PIN = process.env.ECOCASH_MERCHANT_PIN || "1234";
-const MERCHANT_NUMBER = process.env.ECOCASH_MERCHANT_NUMBER || "788732685";
-const TERMINAL_ID = process.env.ECOCASH_TERMINAL_ID || "UAT00003";
-const MERCHANT_NAME = process.env.ECOCASH_MERCHANT_NAME || "UAT STORE 3";
-const SUPER_MERCHANT_NAME = process.env.ECOCASH_SUPER_MERCHANT_NAME || "ECOCASH";
+function requiredEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) throw new Error(`EcoCash is not configured — set ${name}. Sandbox merchant defaults are not used.`);
+  return value;
+}
 
 function authHeaders() {
   const username = process.env.ECOCASH_USERNAME;
@@ -49,7 +43,7 @@ export interface EcocashInitiateResult {
 export async function initiateEcocashPush(opts: { phone: string; amount: number; reference: string; currency?: string }): Promise<EcocashInitiateResult> {
   const endUserId = normalizeMsisdn(opts.phone);
   try {
-    const res = await fetch(`${BASE_URL}/transactions/amount/`, {
+    const res = await fetch(`${requiredEnv("ECOCASH_BASE_URL")}/transactions/amount/`, {
       method: "POST",
       headers: authHeaders(),
       body: JSON.stringify({
@@ -68,14 +62,14 @@ export async function initiateEcocashPush(opts: { phone: string; amount: number;
           },
           chargeMetaData: { channel: "WEB" },
         },
-        merchantCode: MERCHANT_CODE,
-        merchantPin: MERCHANT_PIN,
-        merchantNumber: MERCHANT_NUMBER,
+        merchantCode: requiredEnv("ECOCASH_MERCHANT_CODE"),
+        merchantPin: requiredEnv("ECOCASH_MERCHANT_PIN"),
+        merchantNumber: requiredEnv("ECOCASH_MERCHANT_NUMBER"),
         countryCode: "ZW",
-        terminalID: TERMINAL_ID,
+        terminalID: requiredEnv("ECOCASH_TERMINAL_ID"),
         location: "Harare",
-        superMerchantName: SUPER_MERCHANT_NAME,
-        merchantName: MERCHANT_NAME,
+        superMerchantName: process.env.ECOCASH_SUPER_MERCHANT_NAME || "ECOCASH",
+        merchantName: requiredEnv("ECOCASH_MERCHANT_NAME"),
       }),
     });
     const data = await res.json().catch(() => ({}));
@@ -92,7 +86,7 @@ export type EcocashStatus = "pending" | "completed" | "failed" | "cancelled";
 
 export async function getEcocashStatus(endUserId: string, clientCorrelator: string): Promise<EcocashStatus> {
   try {
-    const res = await fetch(`${BASE_URL}/${encodeURIComponent(endUserId)}/transactions/amount/${encodeURIComponent(clientCorrelator)}`, {
+    const res = await fetch(`${requiredEnv("ECOCASH_BASE_URL")}/${encodeURIComponent(endUserId)}/transactions/amount/${encodeURIComponent(clientCorrelator)}`, {
       headers: authHeaders(),
     });
     if (!res.ok) return "pending";

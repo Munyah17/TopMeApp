@@ -3,6 +3,7 @@ import type { ApiModuleSafe } from "@/types/database";
 import type { FulfillmentProvider } from "./types";
 import { BillPayProvider, billpayConfigured, type BillPayRouting } from "./billpay";
 import { TxtZwAirtimeProvider, txtZwAirtimeConfigured } from "./txtzw";
+import { VitalPayProvider, vitalpayConfigured } from "./vitalpay";
 
 /**
  * Dynamic provider selection — the multi-aggregator router.
@@ -46,7 +47,7 @@ export interface ProviderSelection {
   provider: FulfillmentProvider;
   /** Provider-specific routing data (e.g. BillPay billerCode/productCode) —
    *  callers attach it to FulfillmentInput so fulfil() doesn't re-query. */
-  routing?: { billpay?: BillPayRouting };
+  routing?: { billpay?: BillPayRouting; vitalpay?: { productId: string; billType: string | null } };
   /** Why this provider won — logged on the transaction event trail. */
   reason: string;
   /** All working candidates considered, cheapest-first. */
@@ -64,6 +65,8 @@ function providerInstance(name: string): FulfillmentProvider | null {
       return new BillPayProvider();
     case "txtzw":
       return new TxtZwAirtimeProvider();
+    case "vitalpay":
+      return new VitalPayProvider();
     default:
       return null;
   }
@@ -87,6 +90,9 @@ function isProviderUsable(
   // Credentials gate — a provider without env keys can never work.
   if (provider === "billpay" && !billpayConfigured()) {
     return { ok: false, why: "BILLPAY credentials not set" };
+  }
+  if (provider === "vitalpay" && !vitalpayConfigured()) {
+    return { ok: false, why: "VitalPay credentials not set" };
   }
   if (provider === "txtzw" && !txtZwAirtimeConfigured()) {
     return { ok: false, why: "TXT DirectRecharge credentials/switch not set" };
@@ -223,6 +229,15 @@ export async function selectFulfillmentProvider(args: {
         productPrice: winner.cost_amount,
         requiresForex: (winner.meta?.requires_forex as boolean | null) ?? null,
         department: (winner.meta?.department as string | null) ?? null,
+      },
+    };
+  }
+
+  if (winner.provider === "vitalpay") {
+    selection.routing = {
+      vitalpay: {
+        productId: winner.provider_product_id,
+        billType: winner.provider_sku || null,
       },
     };
   }

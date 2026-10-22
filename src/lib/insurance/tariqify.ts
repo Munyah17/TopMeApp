@@ -1,3 +1,4 @@
+import { readModuleSecret } from "@/lib/fulfillment/module-secret";
 import type { InsuranceSignupField } from "./types";
 
 /**
@@ -39,11 +40,11 @@ function canonicalNationalId(raw: string): string {
   return raw.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
 }
 
-function config() {
-  const baseUrl = process.env.TARIQIFY_BASE_URL;
-  const apiKey = process.env.TARIQIFY_API_KEY;
-  if (!baseUrl || !apiKey) {
-    throw new Error("TariqifyIMS is not configured — set TARIQIFY_BASE_URL and TARIQIFY_API_KEY.");
+async function config() {
+  const baseUrl = (process.env.TARIQIFY_BASE_URL || "https://portal.motions.co.zw/api/v1").replace(/\/$/, "");
+  const apiKey = process.env.TARIQIFY_API_KEY || (await readModuleSecret("tariqify")) || (await readModuleSecret("insurance"));
+  if (!apiKey) {
+    throw new Error("TariqifyIMS is not configured — set TARIQIFY_API_KEY or save an active tariqify API module.");
   }
   return { baseUrl, apiKey };
 }
@@ -70,7 +71,7 @@ async function tariqifyRequest<T>(
   path: string,
   init: { method: "GET" | "POST"; body?: Record<string, unknown> } = { method: "GET" }
 ): Promise<T> {
-  const { baseUrl, apiKey } = config();
+  const { baseUrl, apiKey } = await config();
   const res = await fetch(`${baseUrl}${path}`, {
     method: init.method,
     headers: {

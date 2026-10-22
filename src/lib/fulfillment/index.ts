@@ -1,6 +1,6 @@
 import type { ApiModuleSafe } from "@/types/database";
 import { SimulatedProvider } from "./simulated";
-import { VitalPayProvider } from "./vitalpay";
+import { VitalPayProvider, vitalpayConfigured } from "./vitalpay";
 import { BillPayProvider, billpayConfigured } from "./billpay";
 import { InsuranceProvider } from "./insurance";
 import { TxtZwAirtimeProvider, txtZwAirtimeConfigured } from "./txtzw";
@@ -28,6 +28,7 @@ const PROVIDER_REGISTRY: Record<string, () => FulfillmentProvider> = {
 export function isProviderConfigured(name: string): boolean {
   if (name === "billpay") return billpayConfigured();
   if (name === "txtzw") return txtZwAirtimeConfigured();
+  if (name === "vitalpay") return vitalpayConfigured();
   return true;
 }
 

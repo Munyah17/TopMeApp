@@ -5,6 +5,7 @@ import { logAdminAction } from "@/lib/actions/audit";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/auth/permissions";
 import { getFulfillmentProvider } from "@/lib/fulfillment";
+import { selectFulfillmentProvider } from "@/lib/fulfillment/select";
 import { logTransactionEvent } from "@/lib/transaction-events";
 import type { Transaction } from "@/types/database";
 
@@ -74,7 +75,14 @@ export async function retryFulfillment(transactionId: string, note: string) {
   const transaction = tx as Transaction;
 
   const { data: apiModules } = await admin.from("api_modules_safe").select("*").eq("status", "active");
-  const provider = getFulfillmentProvider(transaction.service_id, apiModules ?? []);
+  const selection = await selectFulfillmentProvider({
+    serviceId: transaction.service_id,
+    networkId: transaction.network_id,
+    activeModules: apiModules ?? [],
+    admin,
+    legacyResolve: getFulfillmentProvider,
+  });
+  const provider = selection.provider;
 
   void logTransactionEvent(admin, {
     transactionId: transaction.id,
@@ -92,6 +100,7 @@ export async function retryFulfillment(transactionId: string, note: string) {
       extraValue: transaction.extra_value,
       networkId: transaction.network_id,
       amount: transaction.amount,
+      ...selection.routing,
     });
   } catch (e) {
     const message = e instanceof Error ? `${provider.name} error: ${e.message}` : `${provider.name} failed to fulfil this order.`;

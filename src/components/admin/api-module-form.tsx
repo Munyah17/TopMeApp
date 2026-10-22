@@ -44,7 +44,7 @@ export function ApiModuleForm({ onDone }: { onDone: () => void }) {
       )}
       <button
         className="btn btn-primary btn-block"
-        disabled={!name || !key || pending}
+        disabled={!name || !provider.trim() || !key || pending}
         onClick={() => {
           setError(null);
           startTransition(async () => {
