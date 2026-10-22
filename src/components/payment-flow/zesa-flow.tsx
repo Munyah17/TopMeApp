@@ -11,6 +11,7 @@ import { startGuestCheckout, type GuestGateway } from "@/lib/actions/guest-payme
 import { addGuestActivity } from "@/lib/guest-activity";
 import { watchFulfillment } from "@/lib/payments/fulfillment-watch";
 import { DenomTile, EditableRow, PaymentMethodSection, ReviewRow, type PaymentBanners, type PaymentMethod } from "./flow-shared";
+import { useWalletBalance } from "./use-wallet-balance";
 import type { Service, Transaction } from "@/types/database";
 
 type Step = "meter" | "amount" | "review" | "processing" | "guest-ecocash" | "delivering" | "success" | "error";
@@ -40,7 +41,7 @@ export function ZesaFlow({
   const router = useRouter();
   const [step, setStep] = useState<Step>("meter");
   const [meter, setMeter] = useState("");
-  const [walletBalance, setWalletBalance] = useState(initialWalletBalance ?? 0);
+  const walletBalance = useWalletBalance(initialWalletBalance, !isGuest);
   // Registered ZESA account holder for `owner.meter`, fetched from ZETDC via
   // VitalPay before payment so the buyer can confirm the meter is right.
   // `owner` null with a matching `checkedMeter` means the check ran but
@@ -60,15 +61,6 @@ export function ZesaFlow({
   const [method, setMethod] = useState<PaymentMethod | null>(null);
   const watchRef = useRef<(() => void) | null>(null);
   const [deliveryTimedOut, setDeliveryTimedOut] = useState(false);
-
-  useEffect(() => {
-    if (!isGuest) {
-      fetch("/api/wallet/balance")
-        .then((r) => r.json())
-        .then((data) => setWalletBalance(data.balance ?? 0))
-        .catch(() => setWalletBalance(0));
-    }
-  }, [isGuest]);
 
   useEffect(() => () => { watchRef.current?.(); }, []);
 
@@ -221,7 +213,7 @@ export function ZesaFlow({
   const showTop = !["processing", "guest-ecocash", "delivering", "success"].includes(step);
   const fee = calculatePlatformFee(service.id, amount) + calculateGatewaySurcharge(method, amount);
   const total = amount + fee;
-  const insufficient = method === "wallet" && total > walletBalance;
+  const insufficient = method === "wallet" && walletBalance !== null && total > walletBalance;
   const noMethodChosen = method === null;
   const guestMissingInfo = method !== null && method !== "wallet" && (!guestEmail.trim() || (method === "ecocash" && !guestPhone.trim()));
   const tokenPieces = Array.isArray(result?.receipt?.token_pieces) ? (result.receipt.token_pieces as string[]) : [];
@@ -372,7 +364,7 @@ export function ZesaFlow({
                 {ownerName && <ReviewRow label="Account holder" value={ownerName} />}
                 <ReviewRow label="Amount" value={`$${amount.toFixed(2)}`} />
                 <ReviewRow label="Processing fee" value={`$${fee.toFixed(2)}`} />
-                {method === "wallet" && <ReviewRow label="Wallet balance" value={`$${walletBalance.toFixed(2)}`} />}
+                {method === "wallet" && walletBalance !== null && <ReviewRow label="Wallet balance" value={`$${walletBalance.toFixed(2)}`} />}
               </div>
             </div>
 

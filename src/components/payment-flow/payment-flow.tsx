@@ -13,6 +13,7 @@ import { addGuestActivity } from "@/lib/guest-activity";
 import { watchFulfillment } from "@/lib/payments/fulfillment-watch";
 import { supportsBillAccountValidation } from "@/lib/fulfillment/vitalpay";
 import { PaymentMethodSection, type PaymentBanners, type PaymentMethod } from "./flow-shared";
+import { useWalletBalance } from "./use-wallet-balance";
 import type { DataBundle, Network, Service, Transaction, TvPackage } from "@/types/database";
 
 type Step = "details" | "amount" | "review" | "processing" | "guest-ecocash" | "delivering" | "success" | "receipt" | "error";
@@ -48,7 +49,7 @@ export function PaymentFlow({
   const router = useRouter();
   const [step, setStep] = useState<Step>("details");
   const [networkId, setNetworkId] = useState<string | null>(null);
-  const [walletBalance, setWalletBalance] = useState(initialWalletBalance ?? 0);
+  const walletBalance = useWalletBalance(initialWalletBalance, !isGuest);
   const [identifier, setIdentifier] = useState("");
   const [extra, setExtra] = useState("");
   const [amount, setAmount] = useState<number | null>(null);
@@ -129,15 +130,6 @@ export function PaymentFlow({
       QRCode.toCanvas(qrRef.current, `TOPME:${result.reference}`, { width: 132, margin: 1 }, () => {});
     }
   }, [step, result]);
-
-  useEffect(() => {
-    if (!isGuest) {
-      fetch("/api/wallet/balance")
-        .then((r) => r.json())
-        .then((data) => setWalletBalance(data.balance ?? 0))
-        .catch(() => setWalletBalance(0));
-    }
-  }, [isGuest]);
 
   useEffect(() => {
     return () => {
@@ -788,7 +780,7 @@ function ReviewStep({
   identifier: string;
   extra: string;
   amount: number;
-  walletBalance: number;
+  walletBalance: number | null;
   saveBeneficiary: boolean;
   setSaveBeneficiary: (v: boolean) => void;
   busy: boolean;
@@ -814,7 +806,7 @@ function ReviewStep({
   }
   const fee = service.is_gift ? 0 : calculatePlatformFee(service.id, amount) + calculateGatewaySurcharge(method, amount);
   const total = amount + fee;
-  const insufficient = method === "wallet" && total > walletBalance;
+  const insufficient = method === "wallet" && walletBalance !== null && total > walletBalance;
   const noMethodChosen = method === null;
   const guestMissingInfo = method !== null && method !== "wallet" && (!guestEmail.trim() || (method === "ecocash" && !guestPhone.trim()));
 
@@ -837,7 +829,7 @@ function ReviewStep({
           {service.is_gift ? (
             <ReviewRow label="Payment method" value="TopMe Wallet" />
           ) : (
-            method === "wallet" && <ReviewRow label="Wallet balance" value={`$${walletBalance.toFixed(2)}`} />
+            method === "wallet" && walletBalance !== null && <ReviewRow label="Wallet balance" value={`$${walletBalance.toFixed(2)}`} />
           )}
         </div>
       </div>

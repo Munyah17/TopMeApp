@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { SimpleAirtimeFlow } from "@/components/payment-flow/simple-airtime-flow";
+import { AirtimeFlow } from "@/components/payment-flow/airtime-flow";
 import { AuthRequired } from "@/components/auth-required";
 import { BroadbandFlow } from "@/components/payment-flow/broadband-flow";
 import { CouncilFlow } from "@/components/payment-flow/council-flow";
@@ -77,7 +77,18 @@ export default async function PayPage({ params }: { params: Promise<{ serviceId:
   const banners = paymentBanners ?? {};
 
   if (AIRTIME_FLOW_SERVICES.has(service.id)) {
-    return <SimpleAirtimeFlow service={service} networks={networks} />;
+    return (
+      <AirtimeFlow
+        service={service}
+        networks={networks}
+        operatorRules={airtimeRules}
+        walletBalance={null}
+        isGuest={isGuest}
+        guestEmail={guestEmail}
+        guestPhone={guestPhone}
+        banners={banners}
+      />
+    );
   }
 
   if (service.id === "zesa") {

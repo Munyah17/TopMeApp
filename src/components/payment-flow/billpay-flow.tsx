@@ -7,6 +7,7 @@ import { Icon } from "@/components/icons";
 import { calculatePlatformFee, calculateGatewaySurcharge } from "@/lib/fees";
 import { authBillPayProduct, payBillPayProduct, startBillPayCheckout, checkBillPayPaymentNow, getBillPayCheckoutStatus, type BillPayAuthPreview } from "@/lib/actions/billpay";
 import { PaymentMethodSection, type PaymentMethod } from "./flow-shared";
+import { useWalletBalance } from "./use-wallet-balance";
 
 /**
  * Generic BillPay purchase flow — the topup.co.zw shape driven entirely by
@@ -71,7 +72,7 @@ export function BillPayFlow({
 }) {
   const router = useRouter();
   const [step, setStep] = useState<Step>("details");
-  const [walletBalance, setWalletBalance] = useState(initialWalletBalance ?? 0);
+  const walletBalance = useWalletBalance(initialWalletBalance);
   const [memberNumber, setMemberNumber] = useState("");
   const [amount, setAmount] = useState("");
   const [quantity, setQuantity] = useState("1");
@@ -86,13 +87,6 @@ export function BillPayFlow({
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    fetch("/api/wallet/balance")
-      .then((r) => r.json())
-      .then((data) => setWalletBalance(data.balance ?? 0))
-      .catch(() => setWalletBalance(0));
-  }, []);
 
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 
@@ -111,7 +105,7 @@ export function BillPayFlow({
   // fee — the customer sees the real total before picking a method.
   const surcharge = method && method !== "wallet" ? calculateGatewaySurcharge(method, (preview?.price ?? 0) + fee) : 0;
   const total = (preview?.price ?? 0) + fee + surcharge;
-  const insufficient = method === "wallet" && preview?.price != null && walletBalance < total;
+  const insufficient = method === "wallet" && preview?.price != null && walletBalance !== null && walletBalance < total;
   const gatewayReady = !method || method === "wallet" || contactEmail.includes("@");
 
   async function runAuth() {

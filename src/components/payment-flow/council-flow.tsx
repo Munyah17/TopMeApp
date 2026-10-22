@@ -13,6 +13,7 @@ import { supportsBillAccountValidation } from "@/lib/fulfillment/vitalpay";
 import { startGuestCheckout, type GuestGateway } from "@/lib/actions/guest-payments";
 import { addGuestActivity } from "@/lib/guest-activity";
 import { EditableRow, PaymentMethodSection, ReviewRow, type PaymentBanners, type PaymentMethod } from "./flow-shared";
+import { useWalletBalance } from "./use-wallet-balance";
 import type { Service, Transaction } from "@/types/database";
 
 type Step = "account" | "amount" | "review" | "processing" | "guest-ecocash" | "delivering" | "success" | "receipt" | "error";
@@ -48,7 +49,7 @@ export function CouncilFlow({
   const [result, setResult] = useState<Transaction | null>(null);
   const [guestEmail, setGuestEmail] = useState(initialGuestEmail);
   const [guestPhone, setGuestPhone] = useState(initialGuestPhone);
-  const [walletBalance, setWalletBalance] = useState(initialWalletBalance ?? 0);
+  const walletBalance = useWalletBalance(initialWalletBalance, !isGuest);
   const [method, setMethod] = useState<PaymentMethod | null>(null);
   const qrRef = useRef<HTMLCanvasElement>(null);
   const watchRef = useRef<(() => void) | null>(null);
@@ -106,15 +107,6 @@ export function CouncilFlow({
       QRCode.toCanvas(qrRef.current, `TOPME:${result.reference}`, { width: 132, margin: 1 }, () => {});
     }
   }, [step, result]);
-
-  useEffect(() => {
-    if (!isGuest) {
-      fetch("/api/wallet/balance")
-        .then((r) => r.json())
-        .then((data) => setWalletBalance(data.balance ?? 0))
-        .catch(() => setWalletBalance(0));
-    }
-  }, [isGuest]);
 
   useEffect(() => () => { watchRef.current?.(); }, []);
 
@@ -233,7 +225,7 @@ export function CouncilFlow({
   const showTop = !["processing", "guest-ecocash", "delivering", "success"].includes(step);
   const fee = calculatePlatformFee(service.id, amount) + calculateGatewaySurcharge(method, amount);
   const total = amount + fee;
-  const insufficient = method === "wallet" && total > walletBalance;
+  const insufficient = method === "wallet" && walletBalance !== null && total > walletBalance;
   const noMethodChosen = method === null;
   const guestMissingInfo = method !== null && method !== "wallet" && (!guestEmail.trim() || (method === "ecocash" && !guestPhone.trim()));
 
@@ -349,7 +341,7 @@ export function CouncilFlow({
                 {holderName && <ReviewRow label="Account holder" value={holderName} />}
                 <ReviewRow label="Amount" value={`$${amount.toFixed(2)}`} />
                 <ReviewRow label="Processing fee" value={`$${fee.toFixed(2)}`} />
-                {method === "wallet" && <ReviewRow label="Wallet balance" value={`$${walletBalance.toFixed(2)}`} />}
+                {method === "wallet" && walletBalance !== null && <ReviewRow label="Wallet balance" value={`$${walletBalance.toFixed(2)}`} />}
               </div>
             </div>
 

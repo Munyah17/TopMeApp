@@ -214,7 +214,7 @@ export function PaymentMethodSection({
   setGuestPhone,
 }: {
   showWallet: boolean;
-  walletBalance?: number;
+  walletBalance?: number | null;
   banners?: PaymentBanners;
   method: PaymentMethod | null;
   setMethod: (v: PaymentMethod) => void;

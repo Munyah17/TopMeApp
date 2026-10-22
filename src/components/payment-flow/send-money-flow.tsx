@@ -1,10 +1,11 @@
 ﻿"use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icons";
 import { lookupRecipient, sendMoney } from "@/lib/actions/payments";
+import { useWalletBalance } from "./use-wallet-balance";
 import type { P2pTransfer, ProfileLookup } from "@/types/database";
 
 type Kind = "transfer" | "red_packet";
@@ -48,19 +49,11 @@ export function SendMoneyFlow({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<P2pTransfer | null>(null);
-  const [walletBalance, setWalletBalance] = useState(initialWalletBalance ?? 0);
-
-  useEffect(() => {
-    fetch("/api/wallet/balance")
-      .then((r) => r.json())
-      .then((data) => setWalletBalance(data.balance ?? 0))
-      .catch(() => setWalletBalance(0));
-  }, []);
+  const walletBalance = useWalletBalance(initialWalletBalance);
 
   const theme = THEME[kind];
   const amountNum = parseFloat(amount) || 0;
-  const balanceNum = Number(walletBalance) || 0;
-  const insufficient = amountNum > balanceNum;
+  const insufficient = walletBalance !== null && amountNum > walletBalance;
 
   async function submitDetails() {
     setStep("looking-up");
@@ -255,7 +248,7 @@ export function SendMoneyFlow({
                 </div>
                 <div className="row between" style={{ padding: "12px 0" }}>
                   <span className="muted">Wallet balance</span>
-                  <span style={{ fontWeight: 700, fontSize: 13.5 }}>${balanceNum.toFixed(2)}</span>
+                  <span style={{ fontWeight: 700, fontSize: 13.5 }}>{walletBalance === null ? "…" : `$${walletBalance.toFixed(2)}`}</span>
                 </div>
               </div>
             </div>
