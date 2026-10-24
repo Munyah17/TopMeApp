@@ -41,7 +41,7 @@ function fixture(options = {}) {
   };
   const admin = {
     from: (table) => {
-      const response = { data: table === "services" ? { id: "airtime", amount_mode: "chips" } : [], error: null };
+      const response = { data: table === "services" ? { id: options.serviceId ?? "airtime", amount_mode: "chips" } : [], error: null };
       const query = {
         select: () => query, eq: () => query,
         single: async () => response,
@@ -59,7 +59,7 @@ function fixture(options = {}) {
     name: "vitalpay",
     fulfil: async (request) => {
       calls.deliveries++;
-      assert.equal(request.recipient, "+263770000000");
+      assert.equal(request.recipient, options.expectedRecipient ?? "+263770000000");
       if (options.providerThrows) throw new Error("private provider rejection");
       return { status: options.deliveryStatus ?? "pending" };
     },
@@ -243,7 +243,7 @@ test("VitalPay airtime sends E.164 and the exact mapped operator to the document
   });
   const { VitalPayProvider } = loadVitalPay();
   const result = await new VitalPayProvider().fulfil({
-    transactionId: "transaction-test", serviceId: "airtime", recipient: "077 123 4567", networkId: "econet", amount: 2,
+    transactionId: "00000000-0000-4000-8000-000000000001", serviceId: "airtime", recipient: "077 123 4567", networkId: "econet", amount: 2,
     vitalpay: { productId: "econet_zw" },
   });
   assert.equal(result.status, "pending");
@@ -251,7 +251,7 @@ test("VitalPay airtime sends E.164 and the exact mapped operator to the document
   assert.equal(requests[0].url, "https://kmgvitallinks.co.uk/api/v1/airtime/purchase");
   assert.equal(requests[0].body.phone, "+263771234567");
   assert.equal(requests[0].body.operator_id, "econet_zw");
-  assert.equal(requests[0].body.reference, "transaction-test");
+  assert.equal(requests[0].body.reference, "00000000-0000-4000-8000-000000000001");
   assert.equal("calculation_mode" in requests[0].body, false);
 });
 
@@ -268,4 +268,128 @@ test("operator rules accept the new operator_id field and the legacy id field", 
   assert.equal(rules.econet.min, 1);
   assert.equal(rules.econet.max, 50);
   assert.deepEqual(rules.netone.fixedAmounts, [1, 2, 5]);
+});
+
+for (const serviceId of ["airtime", "dstv", "zesa", "cut"]) {
+  test(`${serviceId} rejects a prefixed fulfillment reference before any provider call`, async (t) => {
+    mockVitalPayKey(t);
+    const fetchMock = t.mock.method(globalThis, "fetch", async () => { throw new Error("Provider must not be called"); });
+    const { VitalPayProvider } = loadVitalPay();
+    await assert.rejects(new VitalPayProvider().fulfil({
+      transactionId: "topme-test-00000000-0000-4000-8000-000000000001",
+      serviceId, recipient: "0771234567", amount: 2,
+    }), /transaction UUID/);
+    assert.equal(fetchMock.mock.callCount(), 0);
+  });
+}
+
+test("bill and electricity requests preserve the same UUID on retries and keep account identifiers unchanged", async (t) => {
+  mockVitalPayKey(t);
+  const requests = [];
+  t.mock.method(globalThis, "fetch", async (url, init) => {
+    const body = JSON.parse(init.body);
+    requests.push({ url, body });
+    return new Response(JSON.stringify({ success: true, data: { reference: body.reference, status: "processing" } }));
+  });
+  const { VitalPayProvider } = loadVitalPay();
+  const provider = new VitalPayProvider();
+  const transactionId = "00000000-0000-4000-8000-000000000002";
+  for (const serviceId of ["dstv", "zesa"]) {
+    const input = { transactionId, serviceId, recipient: "04123456789", amount: 5 };
+    await provider.fulfil(input);
+    await provider.fulfil(input);
+  }
+  assert.equal(requests.length, 4);
+  for (const { body } of requests) {
+    assert.equal(body.reference, transactionId);
+    assert.equal(body.account_number ?? body.meter_number, "04123456789");
+  }
+});
+
+for (const serviceId of ["zesa", "telone", "bulawayo_city_council", "dstv"]) {
+  test(`${serviceId} wallet result preserves non-phone account identifiers`, async () => {
+    const f = fixture({ serviceId, expectedRecipient: "04123456789" });
+    const result = await f.payServiceResult({ ...input, serviceId, recipient: "04123456789" });
+    assert.equal(result.ok, true);
+    assert.equal(f.calls.recipient, "04123456789");
+    assert.equal(f.calls.debits, 1);
+  });
+}
+
+function guestFixture(options = {}) {
+  const calls = { inserted: [], errors: [], gatewayCalls: 0 };
+  const session = {
+    auth: { getUser: async () => ({ data: { user: null } }) },
+    from: () => ({ insert: async (intent) => { calls.inserted.push(intent); return { error: null }; } }),
+  };
+  const admin = {
+    from: (table) => {
+      const response = { data: table === "services" ? { id: options.serviceId ?? "airtime", amount_mode: "chips" } : [], error: null };
+      const query = {
+        select: () => query, eq: () => query, update: () => query,
+        single: async () => response,
+        then: (resolve) => Promise.resolve(response).then(resolve),
+      };
+      return query;
+    },
+  };
+  const dependencies = {
+    crypto: { randomUUID: () => "00000000-0000-4000-8000-000000000001" },
+    "@/lib/supabase/server": { createClient: async () => session, createAdminClient: () => admin },
+    "@/lib/payments/paynow": {
+      initiatePaynowPayment: async () => {
+        calls.gatewayCalls++;
+        if (options.gatewayError) throw new Error("private upstream secret test-only-not-real");
+        return { ok: true, browserUrl: "https://example.com/test-checkout" };
+      },
+    },
+    "@/lib/payments/paynow-result": {},
+    "@/lib/payments/stripe": { createGuestCheckoutSession: async () => ({ url: "https://example.com/test-checkout" }) },
+    "@/lib/payments/ecocash": { initiateEcocashPush: async () => ({ ok: true, endUserId: "test" }) },
+    "@/lib/payments/guest-checkout": { failGuestCheckout: async () => {} },
+    "@/lib/fulfillment": { hasRealCoverage: () => true },
+    "@/lib/fulfillment/select": { hasMappedProvider: async () => true },
+    "@/lib/fees": { calculatePlatformFee: () => 0.04, calculateTopupFee: () => 0.10 },
+    "@/lib/pricing": { resolveVerifiedAmount: async () => 2 },
+    "@/lib/rate-limit": { getClientIp: async () => "test", assertRateLimit: async () => {} },
+    "@/lib/phone-numbers": { normalizeZimbabweMobile },
+    "@/lib/payments/payment-error": { PaymentError },
+    "@/lib/debug-errors": { logDebugError: async (error) => { calls.errors.push(error); } },
+    "@/lib/data/queries": { getAirtimeOperatorRules: async () => ({}) },
+    "@/lib/fulfillment/vitalpay": { checkAirtimeAmount: () => ({ ok: true }) },
+  };
+  return { ...loadSource("src/lib/actions/guest-payments.ts", dependencies), calls };
+}
+
+const guestInput = { ...input, guestEmail: "test@example.com", gateway: "paynow" };
+
+test("guest airtime returns a safe validation message before recording an intent or charging", async () => {
+  const f = guestFixture();
+  const result = await f.startGuestCheckoutResult({ ...guestInput, recipient: "123" });
+  assert.equal(result.ok, false);
+  assert.match(result.error, /valid Zimbabwe mobile number/);
+  assert.equal(f.calls.inserted.length, 0);
+  assert.equal(f.calls.gatewayCalls, 0);
+});
+
+for (const gateway of ["paynow", "stripe", "ecocash"]) {
+  test(`${gateway} guest checkout preserves gateway details and records normalized airtime numbers`, async () => {
+    const f = guestFixture();
+    const result = await f.startGuestCheckoutResult({ ...guestInput, gateway, guestPhone: "0770000000" });
+    assert.equal(result.ok, true);
+    assert.equal(result.checkout.gateway, gateway);
+    assert.equal(result.checkout.reference, "GST-00000000");
+    assert.equal(f.calls.inserted[0].recipient_identifier, "+263770000000");
+    if (gateway !== "ecocash") assert.equal(result.checkout.redirectUrl, "https://example.com/test-checkout");
+  });
+}
+
+test("unexpected guest gateway exceptions remain private", async () => {
+  const f = guestFixture({ gatewayError: true });
+  const result = await f.startGuestCheckoutResult(guestInput);
+  assert.equal(result.ok, false);
+  assert.match(result.error, /Check your transaction history/);
+  assert.doesNotMatch(JSON.stringify(result), /private|secret|upstream|stack/);
+  assert.equal(f.calls.errors.length, 1);
+  assert.equal(f.calls.gatewayCalls, 1);
 });

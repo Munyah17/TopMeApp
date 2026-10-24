@@ -13,6 +13,8 @@ import { calculatePlatformFee, calculateTopupFee } from "@/lib/fees";
 import { resolveVerifiedAmount } from "@/lib/pricing";
 import { assertRateLimit, getClientIp } from "@/lib/rate-limit";
 import { normalizeZimbabweMobile } from "@/lib/phone-numbers";
+import { PaymentError } from "@/lib/payments/payment-error";
+import { logDebugError } from "@/lib/debug-errors";
 import type { ApiModuleSafe } from "@/types/database";
 
 const FRIENDLY_ERRORS: Record<string, string> = {
@@ -52,12 +54,12 @@ export interface StartGuestCheckoutInput {
 export async function startGuestCheckout(input: StartGuestCheckoutInput) {
   if (input.serviceId === "airtime") {
     const recipient = normalizeZimbabweMobile(input.recipient);
-    if (!recipient) throw new Error("Enter a valid Zimbabwe mobile number, for example 077 123 4567.");
+    if (!recipient) throw new PaymentError("Enter a valid Zimbabwe mobile number, for example 077 123 4567.");
     input = { ...input, recipient };
   }
-  if (!input.guestEmail?.trim()) throw new Error("Enter your email so we can send your receipt.");
+  if (!input.guestEmail?.trim()) throw new PaymentError("Enter your email so we can send your receipt.");
   if (input.gateway === "ecocash" && !input.guestPhone?.trim()) {
-    throw new Error("Enter your EcoCash number.");
+    throw new PaymentError("Enter your EcoCash number.");
   }
 
   // The one unauthenticated, money-moving entry point in the app — no
@@ -76,12 +78,12 @@ export async function startGuestCheckout(input: StartGuestCheckoutInput) {
     admin.from("api_modules_safe").select("*").eq("status", "active"),
     admin.from("services").select("id, amount_mode, outstanding").eq("id", input.serviceId).single(),
   ]);
-  if (!service) throw new Error(FRIENDLY_ERRORS.service_unavailable);
+  if (!service) throw new PaymentError(FRIENDLY_ERRORS.service_unavailable);
   if (
     !hasRealCoverage(input.serviceId, (activeModules as ApiModuleSafe[]) ?? []) &&
     !(await hasMappedProvider(input.serviceId, admin, input.networkId))
   ) {
-    throw new Error(FRIENDLY_ERRORS.service_coming_soon);
+    throw new PaymentError(FRIENDLY_ERRORS.service_coming_soon);
   }
 
   // Never trust a client-supplied amount for a fixed-price catalog item —
@@ -95,6 +97,11 @@ export async function startGuestCheckout(input: StartGuestCheckoutInput) {
     packageIndex: input.packageIndex,
     payFullBalance: input.payFullBalance,
     clientAmount: input.amount,
+  }).catch((error: unknown) => {
+    if (error instanceof Error && error.message === "invalid_amount") {
+      throw new PaymentError(FRIENDLY_ERRORS.invalid_amount);
+    }
+    throw error;
   });
 
   // Airtime: enforce the network operator's amount rules before taking any
@@ -104,7 +111,7 @@ export async function startGuestCheckout(input: StartGuestCheckoutInput) {
     const { checkAirtimeAmount } = await import("@/lib/fulfillment/vitalpay");
     const rules = await getAirtimeOperatorRules();
     const check = checkAirtimeAmount(rules[input.networkId], verifiedAmount);
-    if (!check.ok) throw new Error(check.message);
+    if (!check.ok) throw new PaymentError(check.message);
   }
 
   const supabase = await createClient();
@@ -145,7 +152,15 @@ export async function startGuestCheckout(input: StartGuestCheckoutInput) {
     guest_phone: input.guestPhone ?? null,
     provider: input.gateway,
   });
-  if (insertError) throw new Error(friendlyError(insertError.message));
+  if (insertError) {
+    await logDebugError(new Error(insertError.message), {
+      serviceId: input.serviceId,
+      requestMethod: "POST",
+      requestPath: "/api/payments/guest-checkout",
+      metadata: { code: insertError.code },
+    });
+    throw new PaymentError(friendlyError(insertError.message));
+  }
 
   if (input.gateway === "paynow") {
     const result = await initiatePaynowPayment({
@@ -195,6 +210,24 @@ export async function startGuestCheckout(input: StartGuestCheckoutInput) {
     .update({ meta: { endUserId: result.endUserId } })
     .eq("reference", reference);
   return { gateway: "ecocash" as const, reference };
+}
+
+export type GuestCheckoutResult =
+  | { ok: true; checkout: Awaited<ReturnType<typeof startGuestCheckout>> }
+  | { ok: false; error: string };
+
+export async function startGuestCheckoutResult(input: StartGuestCheckoutInput): Promise<GuestCheckoutResult> {
+  try {
+    return { ok: true, checkout: await startGuestCheckout(input) };
+  } catch (error) {
+    if (error instanceof PaymentError) return { ok: false, error: error.message };
+    await logDebugError(error instanceof Error ? error : new Error("Unexpected checkout failure"), {
+      serviceId: input.serviceId,
+      requestMethod: "POST",
+      requestPath: "/api/payments/guest-checkout",
+    });
+    return { ok: false, error: "We couldn't confirm your payment. Check your transaction history before trying again." };
+  }
 }
 
 // Forces an immediate Paynow status check instead of waiting for their

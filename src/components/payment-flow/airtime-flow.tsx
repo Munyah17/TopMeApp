@@ -8,7 +8,7 @@ import { Icon } from "@/components/icons";
 import { hexA, mutedOn, textOn } from "@/lib/data/catalog-helpers";
 import { calculatePlatformFee, calculateGatewaySurcharge } from "@/lib/fees";
 import { payServiceResult } from "@/lib/actions/payments";
-import { startGuestCheckout, type GuestGateway } from "@/lib/actions/guest-payments";
+import { startGuestCheckoutResult, type GuestGateway } from "@/lib/actions/guest-payments";
 import { addGuestActivity } from "@/lib/guest-activity";
 import { watchFulfillment } from "@/lib/payments/fulfillment-watch";
 import { normalizeZimbabweMobile } from "@/lib/phone-numbers";
@@ -99,7 +99,7 @@ export function AirtimeFlow({
     setBusy(true);
     setErrorMsg(null);
     try {
-      const res = await startGuestCheckout({
+      const checkout = await startGuestCheckoutResult({
         serviceId: service.id,
         serviceName: service.name,
         amount,
@@ -109,6 +109,12 @@ export function AirtimeFlow({
         guestPhone: guestPhone || undefined,
         gateway: method as GuestGateway,
       });
+      if (!checkout.ok) {
+        setErrorMsg(checkout.error);
+        setStep("error");
+        return;
+      }
+      const res = checkout.checkout;
       if (res.gateway === "ecocash") {
         setStep("guest-ecocash");
         const pollStarted = Date.now();

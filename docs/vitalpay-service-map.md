@@ -83,3 +83,16 @@ Two owner-authorized NetOne direct-API recharges, USD 5 and USD 2, were confirme
 ## Airtime request correction
 
 TopMe accepts local numbers such as `077 123 4567`; provider requests require E.164. Wallet and guest checkout now normalize Zimbabwe mobile numbers before charging, and the provider normalizes defensively. Invalid numbers fail before wallet debit. This corrects a documented request mismatch; it does not prove that this was the only cause of the reported live failure.
+
+## Shared purchase behavior
+
+All five purchase screens (airtime, ZESA, broadband, council bills and general payments)
+use structured results for wallet and gateway checkout. Only explicitly customer-safe
+validation/payment messages cross the Server Action boundary; unexpected exceptions
+remain in private diagnostics. Meter, smartcard and account identifiers are preserved.
+
+The shared VitalPay adapter rejects non-UUID fulfillment references before making a
+provider request. Wallet payments, guest-payment finalization and staff retries use
+the existing transaction UUID, so retrying does not generate a new provider reference.
+Reconciliation preserves that transaction identity and does not generate a new purchase.
+No additional paid test purchases are part of these regression checks.

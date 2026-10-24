@@ -7,8 +7,8 @@ import QRCode from "qrcode";
 import { Icon } from "@/components/icons";
 import { hexA, mutedOn, textOn } from "@/lib/data/catalog-helpers";
 import { calculatePlatformFee, calculateGatewaySurcharge } from "@/lib/fees";
-import { payService, validateBillAccount } from "@/lib/actions/payments";
-import { startGuestCheckout, type GuestGateway } from "@/lib/actions/guest-payments";
+import { payServiceResult, validateBillAccount } from "@/lib/actions/payments";
+import { startGuestCheckoutResult, type GuestGateway } from "@/lib/actions/guest-payments";
 import { addGuestActivity } from "@/lib/guest-activity";
 import { watchFulfillment } from "@/lib/payments/fulfillment-watch";
 import { EditableRow, PaymentMethodSection, ReviewRow, type PaymentBanners, type PaymentMethod } from "./flow-shared";
@@ -124,7 +124,7 @@ export function BroadbandFlow({
     setBusy(true);
     setErrorMsg(null);
     try {
-      const res = await startGuestCheckout({
+      const checkout = await startGuestCheckoutResult({
         serviceId: service.id,
         serviceName: service.name,
         amount,
@@ -135,6 +135,12 @@ export function BroadbandFlow({
         guestPhone: guestPhone || undefined,
         gateway: method as GuestGateway,
       });
+      if (!checkout.ok) {
+        setErrorMsg(checkout.error);
+        setStep("error");
+        return;
+      }
+      const res = checkout.checkout;
       if (res.gateway === "ecocash") {
         setStep("guest-ecocash");
         const pollStarted = Date.now();
@@ -184,8 +190,8 @@ export function BroadbandFlow({
         return;
       }
       window.location.assign(res.redirectUrl);
-    } catch (e) {
-      setErrorMsg(e instanceof Error ? e.message : "Payment failed.");
+    } catch {
+      setErrorMsg("Your payment could not be confirmed. Check your wallet and transaction history before trying again.");
       setStep("error");
     } finally {
       setBusy(false);
@@ -198,7 +204,7 @@ export function BroadbandFlow({
     setBusy(true);
     setErrorMsg(null);
     try {
-      const tx = await payService({
+      const payment = await payServiceResult({
         serviceId: service.id,
         serviceName: service.name,
         amount,
@@ -207,6 +213,12 @@ export function BroadbandFlow({
         recipient: account,
         beneficiaryLabel: account,
       });
+      if (!payment.ok) {
+        setErrorMsg(payment.error);
+        setStep("error");
+        return;
+      }
+      const tx = payment.transaction;
       setResult(tx);
       if (tx.fulfillment_status === "pending") {
         // Async provider delivery — wait for the webhook verdict instead of
@@ -225,8 +237,8 @@ export function BroadbandFlow({
       } else {
         setStep("success");
       }
-    } catch (e) {
-      setErrorMsg(e instanceof Error ? e.message : "Payment failed.");
+    } catch {
+      setErrorMsg("Your payment could not be confirmed. Check your wallet and transaction history before trying again.");
       setStep("error");
     } finally {
       setBusy(false);

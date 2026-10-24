@@ -497,6 +497,12 @@ export class VitalPayProvider implements FulfillmentProvider {
   readonly coverage = Object.keys(SERVICE_HANDLERS);
 
   async fulfil(input: FulfillmentInput): Promise<FulfillmentResult> {
+    // All entry points (wallet, gateway callbacks and staff retries) must use
+    // the same transaction UUID. Prefixes can be rejected as external_id, and
+    // generating a new reference on retry would lose provider idempotency.
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.transactionId)) {
+      throw new Error("VitalPay fulfillment requires the transaction UUID as its reference.");
+    }
     await config();
     const handler = SERVICE_HANDLERS[input.serviceId];
     if (handler) return handler(input);
