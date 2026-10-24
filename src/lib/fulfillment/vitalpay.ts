@@ -1,4 +1,5 @@
 import { readModuleSecret } from "./module-secret";
+import { normalizeZimbabweMobile } from "@/lib/phone-numbers";
 import { BILLERS, type AirtimeOperatorRule } from "./vitalpay-shared";
 import type { FulfillmentInput, FulfillmentProvider, FulfillmentResult } from "./types";
 
@@ -22,7 +23,7 @@ export { supportsBillAccountValidation } from "./vitalpay-shared";
  */
 
 async function config() {
-  const baseUrl = process.env.VITALPAY_BASE_URL?.replace(/\/$/, "");
+  const baseUrl = (process.env.VITALPAY_BASE_URL || "https://kmgvitallinks.co.uk/api/v1").replace(/\/$/, "");
   // Env key wins. The Admin → APIs module is the fallback so a provider
   // saved in the dashboard still connects when the env var is empty.
   const secretKey = process.env.VITALPAY_SECRET_KEY || (await readModuleSecret("vitalpay"));
@@ -33,7 +34,7 @@ async function config() {
 }
 
 export function vitalpayConfigured(): boolean {
-  return Boolean(process.env.VITALPAY_BASE_URL && (process.env.VITALPAY_SECRET_KEY || process.env.API_ENCRYPTION_KEY));
+  return Boolean(process.env.VITALPAY_SECRET_KEY || process.env.API_ENCRYPTION_KEY);
 }
 
 interface VitalPayEnvelope<T> {
@@ -114,7 +115,7 @@ export async function fetchAirtimeOperatorRules(): Promise<Record<string, Airtim
   });
   if (!res.ok) throw new Error(`VitalPay /airtime/operators failed (${res.status})`);
   const json = (await res.json()) as { data?: { operators?: Array<Record<string, unknown>> } };
-  const byVpId = new Map((json.data?.operators ?? []).map((o) => [String(o.id), o]));
+  const byVpId = new Map((json.data?.operators ?? []).map((o) => [String(o.operator_id ?? o.id), o]));
 
   const rules: Record<string, AirtimeOperatorRule> = {};
   for (const [networkId, vpId] of Object.entries(AIRTIME_OPERATORS)) {
@@ -201,6 +202,8 @@ function billerFor(input: FulfillmentInput, fallback: { billerCode: string; bill
 
 const SERVICE_HANDLERS: Record<string, ServiceHandler> = {
   airtime: async (input) => {
+    const phone = normalizeZimbabweMobile(input.recipient);
+    if (!phone) throw new Error("A valid Zimbabwe mobile number is required for airtime.");
     const operatorId = operatorFor(input);
     if (!operatorId) {
       throw new Error(`VitalPay doesn't carry network "${input.networkId ?? input.vitalpay?.productId ?? ""}" yet — falling back to simulated.`);
@@ -209,7 +212,7 @@ const SERVICE_HANDLERS: Record<string, ServiceHandler> = {
       method: "POST",
       body: {
         operator_id: operatorId,
-        phone: input.recipient,
+        phone,
         amount: input.amount,
         currency: "USD",
         reference: input.transactionId,

@@ -15,6 +15,7 @@ import { resolveVerifiedAmount } from "@/lib/pricing";
 import { sendPushToUser } from "@/lib/push/send";
 import { logDebugError } from "@/lib/debug-errors";
 import { PaymentError } from "@/lib/payments/payment-error";
+import { normalizeZimbabweMobile } from "@/lib/phone-numbers";
 import type { ApiModuleSafe, FulfillmentStatus, P2pTransfer, Transaction } from "@/types/database";
 
 const FRIENDLY_ERRORS: Record<string, string> = {
@@ -55,6 +56,12 @@ export async function payService(input: PayServiceInput) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new PaymentError(FRIENDLY_ERRORS.not_authenticated);
+
+  if (input.serviceId === "airtime") {
+    const recipient = normalizeZimbabweMobile(input.recipient);
+    if (!recipient) throw new PaymentError("Enter a valid Zimbabwe mobile number, for example 077 123 4567.");
+    input = { ...input, recipient };
+  }
 
   // Never debit a wallet for a service with no real provider behind it —
   // this must run before wallet_pay, not after (see /pay/[serviceId]/page.tsx

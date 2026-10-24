@@ -12,6 +12,7 @@ import { hasMappedProvider } from "@/lib/fulfillment/select";
 import { calculatePlatformFee, calculateTopupFee } from "@/lib/fees";
 import { resolveVerifiedAmount } from "@/lib/pricing";
 import { assertRateLimit, getClientIp } from "@/lib/rate-limit";
+import { normalizeZimbabweMobile } from "@/lib/phone-numbers";
 import type { ApiModuleSafe } from "@/types/database";
 
 const FRIENDLY_ERRORS: Record<string, string> = {
@@ -49,6 +50,11 @@ export interface StartGuestCheckoutInput {
 }
 
 export async function startGuestCheckout(input: StartGuestCheckoutInput) {
+  if (input.serviceId === "airtime") {
+    const recipient = normalizeZimbabweMobile(input.recipient);
+    if (!recipient) throw new Error("Enter a valid Zimbabwe mobile number, for example 077 123 4567.");
+    input = { ...input, recipient };
+  }
   if (!input.guestEmail?.trim()) throw new Error("Enter your email so we can send your receipt.");
   if (input.gateway === "ecocash" && !input.guestPhone?.trim()) {
     throw new Error("Enter your EcoCash number.");

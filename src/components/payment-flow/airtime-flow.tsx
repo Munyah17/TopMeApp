@@ -11,6 +11,7 @@ import { payServiceResult } from "@/lib/actions/payments";
 import { startGuestCheckout, type GuestGateway } from "@/lib/actions/guest-payments";
 import { addGuestActivity } from "@/lib/guest-activity";
 import { watchFulfillment } from "@/lib/payments/fulfillment-watch";
+import { normalizeZimbabweMobile } from "@/lib/phone-numbers";
 import { DenomTile, NetworkTile, PaymentMethodSection, ReviewRow, EditableRow, type PaymentBanners, type PaymentMethod } from "./flow-shared";
 import { useWalletBalance } from "./use-wallet-balance";
 import type { AirtimeOperatorRule } from "@/lib/fulfillment/vitalpay-shared";
@@ -271,8 +272,11 @@ export function AirtimeFlow({
             <h2 style={{ fontSize: 20, marginTop: 6 }}>Who&apos;s this for?</h2>
             <div className="muted mb-3">Enter the phone number to top up</div>
             <label className="field-label">Phone Number</label>
-            <input className="field" placeholder="077 123 4567" value={phone} onChange={(e) => setPhone(e.target.value)} />
-            <button className="btn btn-primary btn-block mt-4" disabled={phone.trim().length < 3} onClick={() => setStep("amount")}>
+            <input className="field" type="tel" autoComplete="tel" placeholder="077 123 4567" value={phone} onChange={(e) => setPhone(e.target.value)} />
+            <button className="btn btn-primary btn-block mt-4" disabled={!normalizeZimbabweMobile(phone)} onClick={() => {
+              setPhone(normalizeZimbabweMobile(phone)!);
+              setStep("amount");
+            }}>
               Continue
             </button>
           </>

@@ -24,6 +24,7 @@ function loadSource(relativePath, dependencies = {}) {
 }
 
 const { PaymentError } = loadSource("src/lib/payments/payment-error.ts");
+const { normalizeZimbabweMobile } = loadSource("src/lib/phone-numbers.ts");
 const input = { serviceId: "airtime", serviceName: "Airtime", amount: 2, recipient: "0770000000", networkId: "econet" };
 
 function fixture(options = {}) {
@@ -31,9 +32,10 @@ function fixture(options = {}) {
   const tx = { id: "transaction", reference: "TPM-test", amount: 2, fee: 0.04, fulfillment_status: "pending", created_at: "2026-10-24T00:00:00Z" };
   const session = {
     auth: { getUser: async () => ({ data: { user: options.noUser ? null : { id: "customer" } } }) },
-    rpc: async (name) => {
+    rpc: async (name, args) => {
       assert.equal(name, "wallet_pay");
       calls.debits++;
+      calls.recipient = args.p_recipient;
       return { data: options.debitError ? null : tx, error: options.debitError ?? null };
     },
   };
@@ -55,8 +57,9 @@ function fixture(options = {}) {
   };
   const provider = {
     name: "vitalpay",
-    fulfil: async () => {
+    fulfil: async (request) => {
       calls.deliveries++;
+      assert.equal(request.recipient, "+263770000000");
       if (options.providerThrows) throw new Error("private provider rejection");
       return { status: options.deliveryStatus ?? "pending" };
     },
@@ -88,6 +91,7 @@ function fixture(options = {}) {
     "@/lib/push/send": {},
     "@/lib/debug-errors": { logDebugError: async (error, context) => { calls.errors.push({ error, context }); } },
     "@/lib/payments/payment-error": { PaymentError },
+    "@/lib/phone-numbers": { normalizeZimbabweMobile },
     "@/lib/payments/refunds": {
       recordFailedFulfilmentRefund: async () => { calls.refunds++; return options.refund ?? null; },
     },
@@ -185,7 +189,83 @@ for (const deliveryStatus of ["pending", "fulfilled"]) {
     assert.equal(result.transaction.fulfillment_status, deliveryStatus);
     assert.equal(result.transaction.reference, "TPM-test");
     assert.equal(f.calls.debits, 1);
+    assert.equal(f.calls.recipient, "+263770000000");
     assert.equal(f.calls.deliveries, 1);
     assert.equal(f.calls.refunds, 0);
   });
 }
+
+test("invalid airtime numbers are rejected before a wallet debit", async () => {
+  const f = fixture();
+  const result = await f.payServiceResult({ ...input, recipient: "123" });
+  assert.equal(result.ok, false);
+  assert.match(result.error, /valid Zimbabwe mobile number/);
+  assert.equal(f.calls.debits, 0);
+  assert.equal(f.calls.deliveries, 0);
+});
+
+test("local and international Zimbabwe mobile formats normalize consistently", () => {
+  for (const number of ["077 123 4567", "+263771234567", "263771234567", "00263771234567", "(077) 123-4567"]) {
+    assert.equal(normalizeZimbabweMobile(number), "+263771234567");
+  }
+  for (const number of ["", "123", "077123456789", "+27771234567", "077abc4567", "+263471234567"]) {
+    assert.equal(normalizeZimbabweMobile(number), null);
+  }
+});
+
+function loadVitalPay() {
+  return loadSource("src/lib/fulfillment/vitalpay.ts", {
+    "./module-secret": { readModuleSecret: async () => null },
+    "@/lib/phone-numbers": { normalizeZimbabweMobile },
+    "./vitalpay-shared": loadSource("src/lib/fulfillment/vitalpay-shared.ts"),
+  });
+}
+
+function mockVitalPayKey(t) {
+  const originalKey = process.env.VITALPAY_SECRET_KEY;
+  const originalBase = process.env.VITALPAY_BASE_URL;
+  process.env.VITALPAY_SECRET_KEY = "test-only-not-a-real-key";
+  delete process.env.VITALPAY_BASE_URL;
+  t.after(() => {
+    if (originalKey === undefined) delete process.env.VITALPAY_SECRET_KEY;
+    else process.env.VITALPAY_SECRET_KEY = originalKey;
+    if (originalBase === undefined) delete process.env.VITALPAY_BASE_URL;
+    else process.env.VITALPAY_BASE_URL = originalBase;
+  });
+}
+
+test("VitalPay airtime sends E.164 and the exact mapped operator to the documented base URL", async (t) => {
+  mockVitalPayKey(t);
+  const requests = [];
+  t.mock.method(globalThis, "fetch", async (url, init) => {
+    requests.push({ url, body: JSON.parse(init.body) });
+    return new Response(JSON.stringify({ success: true, data: { reference: "provider-test", status: "processing" } }));
+  });
+  const { VitalPayProvider } = loadVitalPay();
+  const result = await new VitalPayProvider().fulfil({
+    transactionId: "transaction-test", serviceId: "airtime", recipient: "077 123 4567", networkId: "econet", amount: 2,
+    vitalpay: { productId: "econet_zw" },
+  });
+  assert.equal(result.status, "pending");
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].url, "https://kmgvitallinks.co.uk/api/v1/airtime/purchase");
+  assert.equal(requests[0].body.phone, "+263771234567");
+  assert.equal(requests[0].body.operator_id, "econet_zw");
+  assert.equal(requests[0].body.reference, "transaction-test");
+  assert.equal("calculation_mode" in requests[0].body, false);
+});
+
+test("operator rules accept the new operator_id field and the legacy id field", async (t) => {
+  mockVitalPayKey(t);
+  t.mock.method(globalThis, "fetch", async () => new Response(JSON.stringify({
+    data: { operators: [
+      { operator_id: "econet_zw", min: 1, max: 50 },
+      { id: "netone_zw", fixed_amounts: [5, 1, 2], min: 1, max: 5 },
+    ] },
+  })));
+  const { fetchAirtimeOperatorRules } = loadVitalPay();
+  const rules = await fetchAirtimeOperatorRules();
+  assert.equal(rules.econet.min, 1);
+  assert.equal(rules.econet.max, 50);
+  assert.deepEqual(rules.netone.fixedAmounts, [1, 2, 5]);
+});

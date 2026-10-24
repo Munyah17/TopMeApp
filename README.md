@@ -62,8 +62,11 @@ from VitalPay's payments/VAS catalog, so it has its own registry slot
 side-by-side with VitalPay. Adding a third provider later — another airtime aggregator,
 a fallback if VitalPay changes — is the same pattern: a class + an `api_modules` row.
 
-**VitalPay** (`src/lib/fulfillment/vitalpay.ts`) is live for: airtime (Econet, NetOne — not
-Telecel yet), DStv, ZOL, TelOne. Airtime/bills are async on VitalPay's side (they return
+**VitalPay** (`src/lib/fulfillment/vitalpay.ts`) currently has configured routes for airtime
+(Econet and NetOne), DStv, ZOL, TelOne, Bulawayo Council, MSU through the school-fees
+mapping, and ZESA electricity. These existing routes do not establish current account
+entitlements or product availability. See [the complete service mapping audit](docs/vitalpay-service-map.md)
+and refresh the account's read-only catalog before adding routes. Airtime/bills are async on VitalPay's side (they return
 `processing`, then POST a `service.completed`/`service.failed` webhook) — that webhook is
 received at `src/app/api/vitalpay/webhook/route.ts`. To activate it in production:
 1. Once deployed, register the webhook: `POST /webhooks` with
@@ -71,12 +74,11 @@ received at `src/app/api/vitalpay/webhook/route.ts`. To activate it in productio
    (see VitalPay docs) — this can't be done against `localhost`.
 2. Copy the one-time `secret` it returns into `VITALPAY_WEBHOOK_SECRET`.
 
-Everything else in the catalog (ZESA, data bundles, insurance, connectivity ISPs besides
-ZOL/TelOne, gadgets, school fees, government fees, fuel, branded gift cards) is **not**
-covered by VitalPay today — confirmed by querying the live sandbox catalog, not guessed.
-The reasons are documented in `VITALPAY_GAPS` at the bottom of `vitalpay.ts`; those services
-stay on the simulated provider until either VitalPay adds coverage or another aggregator is
-wired in for them.
+Data bundles, additional institutions/councils/ISPs, and branded gift cards require exact
+account-catalog matches and working fulfillment handlers before activation. Generic API
+documentation and historical sandbox gaps are not evidence of current product availability.
+Insurance and physical goods need their own fulfillment workflows. Products without a real
+configured provider must remain unavailable for live purchases.
 
 ## Email notifications
 
