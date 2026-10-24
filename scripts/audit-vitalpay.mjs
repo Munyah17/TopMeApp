@@ -8,6 +8,7 @@ const BILLER_ALIASES = {
   zol: ["zol_zw"],
   telone: ["telone_zw"],
   bulawayo_city_council: ["bulawayo_city_zw"],
+  norton_town: ["norton_council_zw"],
   msu: ["edu_msu_zw"],
   cut: ["edu_cut_zw"],
   hit: ["edu_hit_zw"],

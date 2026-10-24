@@ -66,7 +66,19 @@ NODE_USE_ENV_PROXY=1 node scripts/audit-vitalpay.mjs
 
 The audit uses GET requests only, emits selected public catalog fields and exact USD candidate matches, and never modifies mappings, activates services, reads balances, or purchases products. Candidate rows are suggestions for review. It rejects missing currency evidence and will not default generic schools/councils to a specific institution.
 
-The authenticated VitalPay refresh remains **unrun**: no secure key binding is injected in this machine. The keys pasted in chat were not copied into source, scripts, tool arguments, or repository files. The configuration draft declares the required key and destination; it does not store the pasted value.
+The authenticated refresh completed on 2026-10-24 after the key was securely supplied. Keys were not copied into source, scripts, tool arguments, or repository files.
+
+## Authenticated catalog findings
+
+- Enabled categories: payments, airtime, bills, electricity, gift_cards, virtual_cards, wallet, webhooks. White-label and analytics are disabled.
+- Zimbabwe airtime: Econet (`econet_zw`) and NetOne (`netone_zw`). Telecel was not returned. NetOne accepts USD 0.50, 1, 2, 5, 10, 20 and 50.
+- Zimbabwe data: zero operators returned; do not enable data bundles from category access alone.
+- Bills: 17 billers returned. Existing DStv, ZOL, TelOne, Bulawayo and MSU codes are present.
+- Additional exact matches for existing TopMe services: Norton Town Council (`norton_council_zw` → `norton_town`), CUT (`edu_cut_zw` → `cut`), HIT (`edu_hit_zw` → `hit`), and MSU (`edu_msu_zw` → `msu`). These matches have not been activated by the audit and bill fulfillment has not been purchased as a test.
+- Other available billers without dedicated TopMe entries: Highlands Residents Association, Catholic University, Zimbabwe Open University, Reformed Church University, Solusi University, Lupane State University, Sunrise International School, Acacia Junior School and CUZ Applications. An explicit institution/account workflow is required; never route these to the MSU default.
+- Gift-card discovery returned 17 products spanning Zimbabwe and US entries even with `country=ZW`. Country filtering must be enforced locally. Netflix and Spotify were not returned. Generic vouchers, eSIMs, crypto products and foreign-region cards are not enabled by this audit.
+
+Two owner-authorized NetOne direct-API recharges, USD 5 and USD 2, were confirmed completed in provider history. This verifies live NetOne fulfillment, not the authenticated TopMe wallet checkout. A prefixed test reference was rejected with `external_id is invalid`; retrying the confirmed-failed order using the bare UUID format already used by the app succeeded. Keep fulfillment references in the app's UUID format, and reconcile uncertain responses before retrying. No customer phone numbers or order references are included in this report.
 
 ## Airtime request correction
 
