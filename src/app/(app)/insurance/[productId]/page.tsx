@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { Icon } from "@/components/icons";
 import { createClient } from "@/lib/supabase/server";
 import { getInsuranceProducts } from "@/lib/actions/insurance";
@@ -60,9 +61,12 @@ export default async function InsuranceProductPage({ params }: { params: Promise
       </div>
       <div className="px content-wrap">
         {image && (
-          <img
+          <Image
             src={image}
             alt={name}
+            width={1000}
+            height={200}
+            unoptimized
             style={{
               width: "100%",
               height: 200,

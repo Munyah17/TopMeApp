@@ -3,6 +3,7 @@ import { Inter, Space_Grotesk } from "next/font/google";
 import localFont from "next/font/local";
 import { themeInitScript } from "@/lib/theme-script";
 import "./globals.css";
+import "../../public/vendor/fontawesome/css/all.min.css";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -51,9 +52,6 @@ export default function RootLayout({
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} ${poppins.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
-        {/* Font Awesome 7 (bundled from the CoolAdmin template) — the Icon
-            component renders these glyphs; self-hosted, no CDN dependency. */}
-        <link rel="stylesheet" href="/vendor/fontawesome/css/all.min.css" />
       </head>
       <body>{children}</body>
     </html>

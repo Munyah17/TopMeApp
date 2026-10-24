@@ -1,10 +1,32 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { Icon } from "@/components/icons";
 import { subscribeToPush } from "@/lib/actions/push";
 
 const DISMISS_KEY = "topme-push-dismissed";
+
+function getPushEligibility() {
+  if (typeof window === "undefined" || !("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return false;
+  if (Notification.permission !== "default") return false;
+  try {
+    return localStorage.getItem(DISMISS_KEY) !== "1";
+  } catch {
+    // Private browsing or storage blocked — treat as not dismissed.
+    return true;
+  }
+}
+
+function subscribePushEligibility(onChange: () => void) {
+  window.addEventListener("storage", onChange);
+  window.addEventListener("focus", onChange);
+  return () => {
+    window.removeEventListener("storage", onChange);
+    window.removeEventListener("focus", onChange);
+  };
+}
+
+const getServerPushEligibility = () => false;
 
 function urlBase64ToUint8Array(base64String: string) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -18,22 +40,10 @@ function urlBase64ToUint8Array(base64String: string) {
 // only when the browser actually supports it and permission hasn't
 // already been decided one way or the other.
 export function PushSubscribeButton() {
-  const [visible, setVisible] = useState(false);
+  const eligible = useSyncExternalStore(subscribePushEligibility, getPushEligibility, getServerPushEligibility);
+  const [hidden, setHidden] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const supported = typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
-    if (!supported) return;
-    if (Notification.permission !== "default") return;
-    let dismissed = false;
-    try {
-      dismissed = localStorage.getItem(DISMISS_KEY) === "1";
-    } catch {
-      // Private browsing or storage blocked — treat as not dismissed.
-    }
-    if (!dismissed) setVisible(true);
-  }, []);
 
   async function enable() {
     setBusy(true);
@@ -44,7 +54,7 @@ export function PushSubscribeButton() {
 
       const permission = await Notification.requestPermission();
       if (permission !== "granted") {
-        setVisible(false);
+        setHidden(true);
         return;
       }
 
@@ -64,7 +74,7 @@ export function PushSubscribeButton() {
 
       const json = subscription.toJSON();
       await subscribeToPush({ endpoint: json.endpoint!, keys: { p256dh: json.keys!.p256dh, auth: json.keys!.auth } });
-      setVisible(false);
+      setHidden(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't turn on notifications.");
     } finally {
@@ -73,7 +83,7 @@ export function PushSubscribeButton() {
   }
 
   function dismiss() {
-    setVisible(false);
+    setHidden(true);
     try {
       localStorage.setItem(DISMISS_KEY, "1");
     } catch {
@@ -81,7 +91,7 @@ export function PushSubscribeButton() {
     }
   }
 
-  if (!visible) return null;
+  if (!eligible || hidden) return null;
 
   return (
     <div className="card card-pad mb-2" style={{ display: "flex", alignItems: "center", gap: 10 }}>

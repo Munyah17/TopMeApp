@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { Icon } from "@/components/icons";
 import { PromoteSuperadminForm } from "@/components/admin/promote-superadmin-form";
 import { UserDeleteButton } from "@/components/admin/user-delete-button";
@@ -45,7 +46,7 @@ export async function UserDetailBody({ id, basePath }: { id: string; basePath: s
       <div className="card card-pad mb-3">
         <div className="row gap-2">
           {target.avatar_url ? (
-            <img src={target.avatar_url} alt="" style={{ width: 46, height: 46, borderRadius: 14, objectFit: "cover" }} />
+            <Image src={target.avatar_url} alt="" width={46} height={46} unoptimized style={{ width: 46, height: 46, borderRadius: 14, objectFit: "cover" }} />
           ) : (
             <div className="ibadge round" style={{ width: 46, height: 46, background: "var(--muted)", color: "var(--text-soft)", fontWeight: 700 }}>
               {(target.full_name || target.phone || target.email || "?").slice(0, 2).toUpperCase()}

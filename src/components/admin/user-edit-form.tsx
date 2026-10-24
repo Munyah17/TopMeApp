@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { Icon } from "@/components/icons";
 import { sendCustomerPasswordReset, setCustomerPassword, setUserAvatar, updateCustomerProfile, uploadUserAvatar } from "@/lib/actions/admin";
 
@@ -125,7 +126,7 @@ export function UserEditForm({
 
       <div className="row gap-2 mt-3" style={{ alignItems: "center" }}>
         {avatar ? (
-          <img src={avatar} alt="" style={{ width: 52, height: 52, borderRadius: 14, objectFit: "cover" }} />
+          <Image src={avatar} alt="" width={52} height={52} unoptimized style={{ width: 52, height: 52, borderRadius: 14, objectFit: "cover" }} />
         ) : (
           <div className="ibadge round" style={{ width: 52, height: 52, background: "var(--muted)", color: "var(--text-soft)", fontWeight: 700 }}>
             {(name || "?").slice(0, 2).toUpperCase()}

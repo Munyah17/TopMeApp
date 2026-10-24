@@ -14,6 +14,7 @@ import { logTransactionEvent } from "@/lib/transaction-events";
 import { resolveVerifiedAmount } from "@/lib/pricing";
 import { sendPushToUser } from "@/lib/push/send";
 import { logDebugError } from "@/lib/debug-errors";
+import { PaymentError } from "@/lib/payments/payment-error";
 import type { ApiModuleSafe, FulfillmentStatus, P2pTransfer, Transaction } from "@/types/database";
 
 const FRIENDLY_ERRORS: Record<string, string> = {
@@ -53,7 +54,7 @@ export async function payService(input: PayServiceInput) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error(FRIENDLY_ERRORS.not_authenticated);
+  if (!user) throw new PaymentError(FRIENDLY_ERRORS.not_authenticated);
 
   // Never debit a wallet for a service with no real provider behind it —
   // this must run before wallet_pay, not after (see /pay/[serviceId]/page.tsx
@@ -63,12 +64,12 @@ export async function payService(input: PayServiceInput) {
     admin.from("api_modules_safe").select("*").eq("status", "active"),
     admin.from("services").select("id, amount_mode, outstanding").eq("id", input.serviceId).single(),
   ]);
-  if (!service) throw new Error(FRIENDLY_ERRORS.service_unavailable);
+  if (!service) throw new PaymentError(FRIENDLY_ERRORS.service_unavailable);
   if (
     !hasRealCoverage(input.serviceId, (activeModules as ApiModuleSafe[]) ?? []) &&
     !(await hasMappedProvider(input.serviceId, admin, input.networkId))
   ) {
-    throw new Error(FRIENDLY_ERRORS.service_coming_soon);
+    throw new PaymentError(FRIENDLY_ERRORS.service_coming_soon);
   }
 
   // Never trust a client-supplied amount for a fixed-price catalog item
@@ -81,6 +82,11 @@ export async function payService(input: PayServiceInput) {
     packageIndex: input.packageIndex,
     payFullBalance: input.payFullBalance,
     clientAmount: input.amount,
+  }).catch((error: unknown) => {
+    if (error instanceof Error && error.message === "invalid_amount") {
+      throw new PaymentError(FRIENDLY_ERRORS.invalid_amount);
+    }
+    throw error;
   });
 
   // Airtime: honour the network operator's own amount rules (NetOne only
@@ -92,7 +98,7 @@ export async function payService(input: PayServiceInput) {
     const { checkAirtimeAmount } = await import("@/lib/fulfillment/vitalpay");
     const rules = await getAirtimeOperatorRules();
     const check = checkAirtimeAmount(rules[input.networkId], verifiedAmount);
-    if (!check.ok) throw new Error(check.message);
+    if (!check.ok) throw new PaymentError(check.message);
   }
 
   // Resolve fulfillment up front: the dynamic selector picks the best
@@ -120,13 +126,13 @@ export async function payService(input: PayServiceInput) {
   });
 
   if (error) {
-    const err = error instanceof Error ? error : new Error(String(error));
-    void logDebugError(err, {
+    const err = new Error(error.message);
+    await logDebugError(err, {
       serviceId: input.serviceId,
       userId: user.id,
       requestMethod: "POST",
       requestPath: "/api/payments/pay-service",
-      metadata: { input, walletDebitError: true },
+      metadata: { walletDebitError: true, code: error.code, details: error.details, hint: error.hint },
     });
     void alertTransaction(admin, {
       outcome: "failed",
@@ -138,7 +144,7 @@ export async function payService(input: PayServiceInput) {
       customer: user.email ?? user.id,
       detail: error.message,
     });
-    throw new Error(friendlyError(error.message));
+    throw new PaymentError(friendlyError(error.message));
   }
 
   const tx = txData as Transaction;
@@ -253,10 +259,12 @@ export async function payService(input: PayServiceInput) {
     // The debit was already reversed (or queued for staff) — surface the real
     // outcome. Returning the tx here let every flow render "successful" for a
     // payment that had just failed and refunded (the 2026-09-17 airtime bug).
-    throw new Error(
+    throw new PaymentError(
       refund?.status === "paid"
         ? `${input.serviceName} delivery failed — $${refund.amount.toFixed(2)} has been refunded to your wallet.`
-        : `${input.serviceName} delivery failed — your refund is being processed.`
+        : refund
+          ? `${input.serviceName} delivery failed — your refund is being processed.`
+          : `${input.serviceName} delivery failed — we could not confirm your refund. Check your transaction history and contact support before trying again.`
     );
   }
 
@@ -288,6 +296,29 @@ export async function payService(input: PayServiceInput) {
   }
 
   return finalTx;
+}
+
+export type PayServiceResult =
+  | { ok: true; transaction: Transaction }
+  | { ok: false; error: string };
+
+// Next.js redacts thrown Server Action messages in production. Return expected
+// wallet/validation/refund failures as data; never expose raw exceptions.
+export async function payServiceResult(input: PayServiceInput): Promise<PayServiceResult> {
+  try {
+    return { ok: true, transaction: await payService(input) };
+  } catch (error) {
+    if (error instanceof PaymentError) return { ok: false, error: error.message };
+    await logDebugError(error instanceof Error ? error : new Error("Unexpected wallet payment failure"), {
+      serviceId: input.serviceId,
+      requestMethod: "POST",
+      requestPath: "/api/payments/pay-service",
+    });
+    return {
+      ok: false,
+      error: "Your payment could not be confirmed. Check your wallet and transaction history before trying again.",
+    };
+  }
 }
 
 export async function sendGiftVoucher(receiverPhone: string, amount: number, senderPhone?: string) {

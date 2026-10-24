@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Icon } from "@/components/icons";
 
 type VitalPayHealthStatus = {
@@ -12,34 +12,41 @@ type VitalPayHealthStatus = {
   billerCount?: number;
 };
 
+async function fetchHealth(): Promise<VitalPayHealthStatus> {
+  try {
+    const res = await fetch("/api/health/vitalpay");
+    if (!res.ok) throw new Error("Health request failed");
+    return await res.json();
+  } catch {
+    return {
+      status: "error",
+      healthy: false,
+      message: "Failed to fetch health status",
+      responseTime: 0,
+      timestamp: new Date().toISOString(),
+    };
+  }
+}
+
 export function VitalPayHealthCard() {
   const [health, setHealth] = useState<VitalPayHealthStatus | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const checkHealth = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/health/vitalpay");
-      const data = await res.json();
+  const checkHealth = useCallback(() => {
+    return fetchHealth().then((data) => {
       setHealth(data);
-    } catch {
-      setHealth({
-        status: "error",
-        healthy: false,
-        message: "Failed to fetch health status",
-        responseTime: 0,
-        timestamp: new Date().toISOString(),
-      });
-    } finally {
       setLoading(false);
-    }
-  };
+    });
+  }, []);
 
   useEffect(() => {
-    checkHealth();
-    const interval = setInterval(checkHealth, 60000); // Check every minute
+    void checkHealth();
+    const interval = setInterval(() => {
+      setLoading(true);
+      void checkHealth();
+    }, 60000); // Check every minute
     return () => clearInterval(interval);
-  }, []);
+  }, [checkHealth]);
 
   const color = health?.healthy ? "var(--success)" : "var(--error)";
   const statusText = loading ? "Checking..." : health?.healthy ? "Healthy" : "Down";
@@ -59,7 +66,10 @@ export function VitalPayHealthCard() {
           </div>
           <span style={{ fontSize: 11, fontWeight: 800, color }}>{statusText}</span>
           <button
-            onClick={checkHealth}
+            onClick={() => {
+              setLoading(true);
+              void checkHealth();
+            }}
             disabled={loading}
             style={{ background: "none", border: "none", cursor: loading ? "not-allowed" : "pointer", padding: 4 }}
           >

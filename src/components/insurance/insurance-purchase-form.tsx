@@ -239,7 +239,7 @@ export default function InsurancePurchaseForm({ product, allProducts, walletBala
           return;
         }
         if (result.redirectUrl) {
-          window.location.href = result.redirectUrl;
+          window.location.assign(result.redirectUrl);
           return;
         }
         // ecocash — wait for the phone approval on this screen.
@@ -474,7 +474,7 @@ export default function InsurancePurchaseForm({ product, allProducts, walletBala
         <div>
           <label style={labelStyle}>Which cover would you like? *</label>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {lines.map(({ selection, product: p, namedDependants, perHead, headCount, base }, index) => (
+            {lines.map(({ selection, product: p, namedDependants, perHead, base }, index) => (
               <div
                 key={index}
                 style={{

@@ -2,7 +2,6 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Icon } from "@/components/icons";
 import { fmt } from "@/lib/data/catalog-helpers";
 import { cancelWithdrawal, requestWithdrawal, RAIL_LABEL, WITHDRAWAL_RAILS, type WithdrawalRail } from "@/lib/actions/withdrawals";
 import type { Withdrawal } from "@/types/database";

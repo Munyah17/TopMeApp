@@ -9,7 +9,7 @@ import { ServiceUnavailable } from "@/components/service-unavailable";
 import { hasRealCoverage } from "@/lib/fulfillment";
 import { hasMappedProvider } from "@/lib/fulfillment/select";
 import { getPublicSetting } from "@/lib/data/flags";
-import { getAirtimeOperatorRules, getCurrentProfile, getDataBundles, getMyWallet, getNetworks, getService, getTvPackages } from "@/lib/data/queries";
+import { getAirtimeOperatorRules, getCurrentProfile, getDataBundles, getNetworks, getService, getTvPackages } from "@/lib/data/queries";
 import { createAdminClient } from "@/lib/supabase/server";
 import type { ApiModuleSafe } from "@/types/database";
 

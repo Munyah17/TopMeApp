@@ -3,7 +3,6 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Icon } from "@/components/icons";
 import { fmt } from "@/lib/data/catalog-helpers";
 import { decideRefundRequest, markRefundSettled } from "@/lib/actions/rectification";
 import type { RefundRequestView } from "@/lib/data/admin-queries";
