@@ -149,9 +149,7 @@ export function TopupPanel({ userPhone, vitalPayEnabled }: { userPhone?: string 
         <div className="mt-3" style={{ fontSize: 13 }}>
           <div className="row between"><span className="muted">Added to wallet</span><span>${amt.toFixed(2)}</span></div>
           <div className="row between mt-1">
-            <span className="muted">
-              {gateway === "paynow" ? "Paynow" : gateway === "stripe" ? "Card" : gateway === "vitalpay" ? "VitalPay" : "EcoCash"} processing fee
-            </span>
+            <span className="muted">Processing Fee</span>
             <span>${fee.toFixed(2)}</span>
           </div>
           <div className="row between mt-1" style={{ fontWeight: 700, paddingTop: 6, borderTop: "1px solid var(--border)" }}>
@@ -173,9 +171,6 @@ export function TopupPanel({ userPhone, vitalPayEnabled }: { userPhone?: string 
       >
         {busy ? "Starting…" : `Pay $${total > 0 ? total.toFixed(2) : "0.00"}`}
       </button>
-      <div className="muted mt-2" style={{ fontSize: 11.5, display: "flex", alignItems: "center", gap: 6 }}>
-        <Icon name="lock" size={13} stroke={2} /> Secured by {gateway === "paynow" ? "Paynow Zimbabwe" : gateway === "stripe" ? "Stripe" : gateway === "vitalpay" ? "VitalPay" : "EcoCash"}
-      </div>
     </div>
   );
 }
