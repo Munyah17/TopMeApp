@@ -1507,16 +1507,17 @@ a.side-user:hover {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
+  transition: border-color var(--transition-normal), box-shadow var(--transition-normal), transform var(--transition-normal);
   overflow: hidden;
   display: flex;
   flex-direction: column;
   min-width: 0;
-  transition: border-color var(--transition-normal), box-shadow var(--transition-normal);
   text-decoration: none;
 }
 .prod-card:hover {
   border-color: var(--text-tertiary);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-3px);
 }
 /* Product artwork is uploaded square (every current image is 600×600), so
    the media box carries the same 1:1 ratio and the image fills the card
@@ -1600,6 +1601,19 @@ a.side-user:hover {
   width: 100%;
   height: 100%;
 }
+.cat-widget-tile {
+  transition: transform var(--transition-normal), box-shadow var(--transition-normal);
+}
+.cat-widget-tile:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+}
+.cat-widget-tile .cat-widget-img {
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.cat-widget-tile:hover .cat-widget-img {
+  transform: scale(1.03);
+}
 @media (min-width: 820px) {
   .cat-section-row {
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1676,11 +1690,13 @@ a.side-user:hover {
   font-size: var(--font-sm);
   letter-spacing: var(--tracking-tight);
   text-decoration: none;
-  transition: border-color var(--transition-normal), background var(--transition-normal);
+  transition: border-color var(--transition-normal), background var(--transition-normal), transform var(--transition-normal), box-shadow var(--transition-normal);
 }
 .browse-category-btn:hover {
   border-color: var(--text-tertiary);
   background: var(--muted);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
 }
 /* Small colour-carrying icon container — the only place a category's
    colour shows, at low opacity, instead of a full saturated tile. */
@@ -1692,6 +1708,17 @@ a.side-user:hover {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+}
+
+/* Quick Pay favourite tiles — the icon chip lifts while the label stays
+   planted, which reads as a gentle "press me" affordance without moving
+   the tap target. */
+.tx-quickgrid a .ibadge {
+  transition: transform var(--transition-normal), box-shadow var(--transition-normal);
+}
+.tx-quickgrid a:hover .ibadge {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-sm);
 }
 
 /* ---------- Empty states ---------- */
@@ -1862,6 +1889,12 @@ a.side-user:hover {
     opacity: 1;
     transform: translateY(0);
   }
+}
+/* Hover background must transition — without it the row colour snaps
+   instantly while every other interactive tile eases, which reads as
+   jarring next to them. */
+.item-row-anim {
+  transition: background var(--transition-fast);
 }
 .item-row-anim:hover {
   background: var(--muted);
