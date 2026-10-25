@@ -74,6 +74,7 @@ export async function POST(request: NextRequest) {
     .from("transactions")
     .select("id, service_id, fulfillment_status, receipt, amount, fee, recipient_identifier, user_id, guest_email")
     .eq("reference", reference)
+    .eq("fulfillment_provider", "vitalpay")
     .maybeSingle();
   if (!tx) return NextResponse.json({ ok: true });
 
