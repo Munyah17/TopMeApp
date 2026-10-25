@@ -15,6 +15,7 @@ import {
   getCategories,
   getCurrentProfile,
   getFavoriteServiceIds,
+  getMyWallet,
   getGridWidgetBanners,
   getRecentTransactions,
 } from "@/lib/data/queries";
@@ -24,11 +25,12 @@ const CAT_ROW_DESKTOP_COLUMNS = 4;
 export default async function HomePage() {
   const profile = await getCurrentProfile();
 
-  const [categories, services, favoriteIds, recent, beneficiaries, promoBanner, gridWidgets, insuranceProducts] = await Promise.all([
+  const [categories, services, favoriteIds, recent, wallet, beneficiaries, promoBanner, gridWidgets, insuranceProducts] = await Promise.all([
     getCategories(),
     getAllServices(),
     profile ? getFavoriteServiceIds(profile.id) : Promise.resolve(new Set<string>()),
     profile ? getRecentTransactions(profile.id, 3) : Promise.resolve([]),
+    profile ? getMyWallet(profile.id) : Promise.resolve(null),
     profile ? getBeneficiaries(profile.id) : Promise.resolve([]),
     getActivePromoBanner(),
     profile ? getGridWidgetBanners() : Promise.resolve([]),
@@ -70,66 +72,135 @@ export default async function HomePage() {
             >
               <div style={{ position: "absolute", right: -40, top: -40, width: 120, height: 120, borderRadius: "50%", background: "rgba(167,243,208,0.10)" }} />
               <div style={{ position: "absolute", right: 40, bottom: -30, width: 80, height: 80, borderRadius: "50%", background: "rgba(167,243,208,0.07)" }} />
-              <div className="eyebrow" style={{ color: "#a7f3d0", position: "relative" }}>
-                New
-              </div>
-              <div style={{ color: "#fff", fontWeight: 700, fontSize: 20, marginTop: 4, position: "relative" }}>
-                Send a Gift Voucher
-              </div>
-              <div className="muted" style={{ color: "rgba(255,255,255,0.7)", marginTop: 8, fontSize: 13, position: "relative", maxWidth: 440, lineHeight: 1.5 }}>
-                Send money straight to your family and friends&apos; TopMe wallets in seconds.
-                Perfect for birthdays, school fees, or just helping someone out.
-              </div>
-              <div className="row mt-4" style={{ position: "relative", gap: 8 }}>
-                <Link
-                  href={profile ? "/wallet" : "/login"}
-                  className="btn btn-primary tap"
-                  style={{ flex: "30 1 0", height: 44, fontSize: 13, padding: "0 10px", gap: 6, textDecoration: "none", minWidth: 0, whiteSpace: "nowrap" }}
-                >
-                  <Icon name="wallet" size={16} stroke={2} />
-                  <span>Top Up</span>
-                </Link>
-                <Link
-                  href={profile ? "/pay/gift" : "/login"}
-                  className="btn tap"
-                  style={{
-                    flex: "30 1 0",
-                    height: 44,
-                    fontSize: 13,
-                    padding: "0 10px",
-                    gap: 6,
-                    textDecoration: "none",
-                    background: "rgba(255,255,255,0.12)",
-                    color: "#fff",
-                    border: "1px solid rgba(255,255,255,0.2)",
-                    minWidth: 0,
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  <Icon name="gift" size={16} stroke={2} />
-                  <span>Gift</span>
-                </Link>
-                <Link
-                  href={profile ? "/pay/send?kind=red_packet" : "/login"}
-                  className="btn tap gift-packet-btn"
-                  style={{
-                    flex: "40 1 0",
-                    height: 44,
-                    fontSize: 13,
-                    padding: "0 10px",
-                    gap: 6,
-                    textDecoration: "none",
-                    background: "rgba(255,255,255,0.12)",
-                    color: "#fff",
-                    border: "1px solid rgba(255,255,255,0.2)",
-                    minWidth: 0,
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  <Icon name="packet" size={16} stroke={2} />
-                  <span>Red Packet</span>
-                </Link>
-              </div>
+              {profile ? (
+                <>
+                  {/* Wallet hero (dashboard mockup): greeting + live balance +
+                      the three primary money actions. Same gradient shell the
+                      gift banner used, so the row layout is unchanged. */}
+                  <div className="eyebrow" style={{ color: "#a7f3d0", position: "relative" }}>
+                    Hello{profile.full_name ? `, ${profile.full_name.trim().split(/\s+/)[0]}` : ""}
+                  </div>
+                  <div className="muted" style={{ color: "rgba(255,255,255,0.7)", marginTop: 8, fontSize: 13, position: "relative" }}>
+                    Wallet Balance
+                  </div>
+                  <div style={{ color: "#fff", fontWeight: 800, fontSize: 34, marginTop: 2, position: "relative", letterSpacing: "-0.02em", lineHeight: 1.1 }}>
+                    {fmt(wallet?.balance ?? 0)}
+                  </div>
+                  <div className="row mt-4" style={{ position: "relative", gap: 8 }}>
+                    <Link
+                      href="/wallet"
+                      className="btn btn-primary tap"
+                      style={{ flex: "1 1 0", height: 44, fontSize: 13, padding: "0 10px", gap: 6, textDecoration: "none", minWidth: 0, whiteSpace: "nowrap" }}
+                    >
+                      <Icon name="plus" size={16} stroke={2} />
+                      <span>Top Up</span>
+                    </Link>
+                    <Link
+                      href="/pay/send"
+                      className="btn tap"
+                      style={{
+                        flex: "1 1 0",
+                        height: 44,
+                        fontSize: 13,
+                        padding: "0 10px",
+                        gap: 6,
+                        textDecoration: "none",
+                        background: "rgba(255,255,255,0.12)",
+                        color: "#fff",
+                        border: "1px solid rgba(255,255,255,0.2)",
+                        minWidth: 0,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      <Icon name="send" size={16} stroke={2} />
+                      <span>Send</span>
+                    </Link>
+                    <Link
+                      href="/pay/gift"
+                      className="btn tap"
+                      style={{
+                        flex: "1 1 0",
+                        height: 44,
+                        fontSize: 13,
+                        padding: "0 10px",
+                        gap: 6,
+                        textDecoration: "none",
+                        background: "rgba(255,255,255,0.12)",
+                        color: "#fff",
+                        border: "1px solid rgba(255,255,255,0.2)",
+                        minWidth: 0,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      <Icon name="gift" size={16} stroke={2} />
+                      <span>Gift</span>
+                    </Link>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="eyebrow" style={{ color: "#a7f3d0", position: "relative" }}>
+                    New
+                  </div>
+                  <div style={{ color: "#fff", fontWeight: 700, fontSize: 20, marginTop: 4, position: "relative" }}>
+                    Send a Gift Voucher
+                  </div>
+                  <div className="muted" style={{ color: "rgba(255,255,255,0.7)", marginTop: 8, fontSize: 13, position: "relative", maxWidth: 440, lineHeight: 1.5 }}>
+                    Send money straight to your family and friends&apos; TopMe wallets in seconds.
+                    Perfect for birthdays, school fees, or just helping someone out.
+                  </div>
+                  <div className="row mt-4" style={{ position: "relative", gap: 8 }}>
+                    <Link
+                      href="/login"
+                      className="btn btn-primary tap"
+                      style={{ flex: "30 1 0", height: 44, fontSize: 13, padding: "0 10px", gap: 6, textDecoration: "none", minWidth: 0, whiteSpace: "nowrap" }}
+                    >
+                      <Icon name="wallet" size={16} stroke={2} />
+                      <span>Top Up</span>
+                    </Link>
+                    <Link
+                      href="/login"
+                      className="btn tap"
+                      style={{
+                        flex: "30 1 0",
+                        height: 44,
+                        fontSize: 13,
+                        padding: "0 10px",
+                        gap: 6,
+                        textDecoration: "none",
+                        background: "rgba(255,255,255,0.12)",
+                        color: "#fff",
+                        border: "1px solid rgba(255,255,255,0.2)",
+                        minWidth: 0,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      <Icon name="gift" size={16} stroke={2} />
+                      <span>Gift</span>
+                    </Link>
+                    <Link
+                      href="/login"
+                      className="btn tap gift-packet-btn"
+                      style={{
+                        flex: "40 1 0",
+                        height: 44,
+                        fontSize: 13,
+                        padding: "0 10px",
+                        gap: 6,
+                        textDecoration: "none",
+                        background: "rgba(255,255,255,0.12)",
+                        color: "#fff",
+                        border: "1px solid rgba(255,255,255,0.2)",
+                        minWidth: 0,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      <Icon name="packet" size={16} stroke={2} />
+                      <span>Red Packet</span>
+                    </Link>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="card card-pad quickpay-card">
