@@ -72,10 +72,25 @@ export async function POST(request: NextRequest) {
 
   const { data: tx } = await admin
     .from("transactions")
-    .select("id, service_id, fulfillment_status, amount, fee, recipient_identifier, user_id, guest_email")
+    .select("id, service_id, fulfillment_status, receipt, amount, fee, recipient_identifier, user_id, guest_email")
     .eq("reference", reference)
     .maybeSingle();
   if (!tx) return NextResponse.json({ ok: true });
+
+  const failed = payload.event === "service.failed";
+  const target = failed ? "failed" : "fulfilled";
+
+  const { data: claimed } = await admin
+    .from("transactions")
+    .update({
+      fulfillment_status: target,
+      receipt: { ...((tx.receipt as Record<string, unknown> | null) ?? {}), provider: "vitalpay", event: payload.event },
+    })
+    .eq("id", tx.id)
+    .neq("fulfillment_status", target)
+    .select("id")
+    .maybeSingle();
+  if (!claimed) return NextResponse.json({ ok: true, duplicate: true });
 
   void logTransactionEvent(admin, {
     transactionId: tx.id,
@@ -85,12 +100,6 @@ export async function POST(request: NextRequest) {
     meta: { event: payload.event },
   });
 
-  const failed = payload.event === "service.failed";
-  await admin.rpc("set_fulfillment_result", {
-    p_transaction_id: tx.id,
-    p_status: failed ? "failed" : "fulfilled",
-    p_receipt: { provider: "vitalpay", event: payload.event },
-  });
   void logTransactionEvent(admin, {
     transactionId: tx.id,
     reference,
