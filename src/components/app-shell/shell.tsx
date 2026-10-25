@@ -10,7 +10,7 @@ import { BrandMark, Wordmark } from "@/components/logo";
 import { Footer } from "@/components/app-shell/footer";
 import { NAV as STAFF_NAV, portalHref } from "@/components/admin/nav";
 import type { PermissionKey } from "@/lib/auth/permission-keys";
-import type { Profile } from "@/types/database";
+import type { Profile, ServiceCategory } from "@/types/database";
 
 const NAVTABS = [
   { id: "home", href: "/home", label: "Home", icon: "home" },
@@ -50,6 +50,7 @@ export function AppShell({
   profile,
   unreadChatCount = 0,
   chatEnabled = true,
+  categories = [],
   staffConsole,
   announcements,
   children,
@@ -57,6 +58,7 @@ export function AppShell({
   profile: Profile | null;
   unreadChatCount?: number;
   chatEnabled?: boolean;
+  categories?: ServiceCategory[];
   staffConsole?: { basePath: "/admin" | "/super-admin"; permissions: PermissionKey[] };
   announcements?: React.ReactNode;
   children: React.ReactNode;
@@ -102,6 +104,30 @@ export function AppShell({
         {t.id === "chat" && unreadChatCount > 0 && <span className="side-nav-dot" />}
       </Link>
     ));
+
+  // Category shortcuts under the main nav — the reference dashboard's
+  // "QUICK SERVICES" rail. Customer view only; staff see their console
+  // groups instead. Links land on the same category routes the Services
+  // page uses, so no new routing surface.
+  const quickServiceLinks = (onNavigate?: () => void) =>
+    categories.length > 0 && (
+      <div className="side-qcs">
+        <div className="side-qcs-label">Quick Services</div>
+        {categories.map((c) => (
+          <Link
+            key={c.id}
+            href={c.id === "insurance" ? "/insurance" : `/services/${c.id}`}
+            onClick={onNavigate}
+            className="side-qc-item"
+          >
+            <span className="side-qc-icon" style={{ background: c.bg, color: c.color }}>
+              <Icon name={c.icon} size={15} stroke={2} />
+            </span>
+            <span>{c.name}</span>
+          </Link>
+        ))}
+      </div>
+    );
 
   const staffNavLinks = (onNavigate?: () => void) =>
     staffGroups.map((g) => (
@@ -179,7 +205,12 @@ export function AppShell({
           <Wordmark size={16} />
         </Link>
         <nav className="side-nav">
-          {staffConsole ? staffNavLinks() : navLinks()}
+          {staffConsole ? staffNavLinks() : (
+            <>
+              {navLinks()}
+              {quickServiceLinks()}
+            </>
+          )}
         </nav>
         <div className="side-footer">{userCard}</div>
       </aside>
@@ -196,7 +227,14 @@ export function AppShell({
             <Icon name="x" size={18} stroke={2} />
           </button>
         </div>
-        <nav className="side-nav">{staffConsole ? staffNavLinks(() => setDrawerOpen(false)) : navLinks(() => setDrawerOpen(false))}</nav>
+        <nav className="side-nav">
+          {staffConsole ? staffNavLinks(() => setDrawerOpen(false)) : (
+            <>
+              {navLinks(() => setDrawerOpen(false))}
+              {quickServiceLinks(() => setDrawerOpen(false))}
+            </>
+          )}
+        </nav>
         <div className="side-footer">{userCard}</div>
       </aside>
 

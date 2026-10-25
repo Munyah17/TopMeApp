@@ -892,6 +892,46 @@ h4 {
   border-radius: 50%;
   background: #f87171;
 }
+/* Quick Services rail (dashboard mockup) — category shortcuts under the
+   main nav, each carrying its own pastel icon chip on the emerald rail. */
+.side-qcs {
+  margin-top: 14px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(236, 253, 245, 0.1);
+}
+.side-qcs-label {
+  padding: 8px 12px 4px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(236, 253, 245, 0.45);
+}
+.side-qc-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  border-radius: 10px;
+  color: rgba(236, 253, 245, 0.85);
+  font-size: var(--font-sm);
+  font-weight: 500;
+  text-decoration: none;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.side-qc-item:hover {
+  background: rgba(236, 253, 245, 0.08);
+  color: #fff;
+}
+.side-qc-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
 .side-footer {
   padding: 12px;
   border-top: 1px solid rgba(236, 253, 245, 0.12);
