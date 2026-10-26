@@ -695,6 +695,25 @@ export async function failBillPayCheckout(reference: string, detail?: string): P
   const admin = createAdminClient();
   await admin.rpc("fail_billpay_checkout", { p_reference: reference });
   void logTransactionEvent(admin, { reference, eventType: "payment_failed", message: detail ?? "BillPay payment did not go through." });
+  // Same ops alert the other two checkout families send on failure — the
+  // gap here meant BillPay declines reached nobody's mailbox.
+  const { data: intent } = await admin
+    .from("billpay_checkout_intents")
+    .select("provider, amount, fee, application")
+    .eq("reference", reference)
+    .maybeSingle();
+  const row = intent as { provider?: string; amount?: number; fee?: number; application?: { billerCode?: string; billerName?: string; productName?: string; memberNumber?: string; email?: string } } | null;
+  void alertTransaction(admin, {
+    outcome: "failed",
+    reference,
+    service: `BillPay ${row?.application?.billerName ?? ""} ${row?.application?.productName ?? ""}`.trim() || "BillPay",
+    amount: row?.amount ?? 0,
+    fee: row?.fee ?? null,
+    recipient: row?.application?.memberNumber ?? null,
+    method: row?.provider ?? "gateway",
+    customer: row?.application?.email ?? null,
+    detail: detail ?? "Payment declined or cancelled at the gateway.",
+  });
 }
 
 /** Payer's own status poll � reference-gated, same trust model as guests. */

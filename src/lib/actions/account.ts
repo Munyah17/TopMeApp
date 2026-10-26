@@ -75,6 +75,35 @@ export async function sendWelcomeEmail() {
   await sendEmail({ sender: "noreply", to: user.email, subject, html, replyTo: "help@topme.co.zw" });
 }
 
+/**
+ * Owner alert for registration outcomes — new signups (including ones
+ * waiting on email confirmation) and failed attempts. Deliberately
+ * unauthenticated: a FAILED signup has no session to authenticate with.
+ * The payload only ever goes to the fixed ops mailbox (admin-notify.ts),
+ * never to a caller-chosen address, so it can't be abused to mail anyone
+ * else — worst case is a forged "new registration" alert. Fields are
+ * capped to keep that abuse lane small and the mail readable.
+ * sendEmail swallows its own errors, so an SMTP outage can't break signup.
+ */
+export async function notifySignupOutcome(input: {
+  email: string;
+  fullName?: string | null;
+  phone?: string | null;
+  status: "new" | "pending_confirmation" | "failed";
+  reason?: string | null;
+}) {
+  if (!input.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email)) return;
+  const { adminSignupAlert } = await import("@/lib/email/admin-notify");
+  const cap = (s: string | null | undefined, n = 120) => (s ? s.slice(0, n) : null);
+  await adminSignupAlert({
+    email: cap(input.email, 254)!,
+    fullName: cap(input.fullName),
+    phone: cap(input.phone, 40),
+    status: input.status,
+    reason: cap(input.reason, 300),
+  });
+}
+
 // Self-service profile picture. Same public "product-images" bucket and
 // avatars/ path prefix as the admin uploadUserAvatar, but scoped to the
 // caller's own profile (resolved from the session) rather than gated behind

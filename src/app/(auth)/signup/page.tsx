@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { sendWelcomeEmail } from "@/lib/actions/account";
+import { sendWelcomeEmail, notifySignupOutcome } from "@/lib/actions/account";
 
 export default function SignupPage() {
   const [fullName, setFullName] = useState("");
@@ -27,9 +27,11 @@ export default function SignupPage() {
     setLoading(false);
     if (error) {
       setError(error.message);
+      void notifySignupOutcome({ email, fullName, phone, status: "failed", reason: error.message });
       return;
     }
     if (!data.session) {
+      void notifySignupOutcome({ email, fullName, phone, status: "pending_confirmation" });
       setCheckEmail(true);
       return;
     }
@@ -37,6 +39,7 @@ export default function SignupPage() {
     // navigating away. Awaited so the request isn't cut short by the hard
     // navigation below; it can't throw or block for long, since sendEmail
     // swallows its own failures.
+    void notifySignupOutcome({ email, fullName, phone, status: "new" });
     await sendWelcomeEmail();
     // Hard navigation so the proxy middleware sees the just-set auth cookie
     // on the next request (see login/page.tsx for why push+refresh races).

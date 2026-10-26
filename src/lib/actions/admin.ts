@@ -6,6 +6,8 @@ import { revalidateAdminPath } from "@/lib/actions/admin-cache";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { encryptSecret } from "@/lib/crypto";
 import { logAdminAction } from "@/lib/actions/audit";
+import { alertTransaction } from "@/lib/email/transaction-alerts";
+import { adminTopupAlert } from "@/lib/email/admin-notify";
 import { requirePermission } from "@/lib/auth/permissions";
 
 // Reserved for the handful of actions that must stay locked to the owner
@@ -608,6 +610,14 @@ export async function adminMarkPendingFailed(kind: "topup" | "guest", reference:
   const { data: updated, error } = await admin.from(table).update({ status: "failed" }).eq("reference", reference).eq("status", "pending").select().maybeSingle();
   if (error) throw new Error(error.message);
   if (!updated) throw new Error("This was already resolved — nothing to change.");
+  // Manual expiry is still a failed payment for the owner feed — same
+  // alert the gateway-driven failure paths send.
+  const row = updated as { amount?: number; provider?: string; user_id?: string; service_id?: string };
+  if (kind === "topup") {
+    void adminTopupAlert({ amount: row.amount ?? 0, provider: row.provider ?? "gateway", reference, success: false, customer: row.user_id ?? null, detail: "Marked failed manually in Admin → Operations." });
+  } else {
+    void alertTransaction(admin, { outcome: "failed", reference, service: row.service_id ?? "guest checkout", amount: row.amount ?? 0, method: row.provider ?? "gateway", detail: "Marked failed manually in Admin → Operations." });
+  }
   await logAdminAction(admin, { actorId: actingUser.id, action: `operations.mark_${kind}_failed`, targetTable: table, targetId: reference });
   revalidateAdminPath("/operations");
 }

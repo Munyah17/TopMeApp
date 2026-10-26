@@ -21,6 +21,9 @@ import nodemailer from "nodemailer";
 //   - admin           internal system/ops notifications to staff.
 //   - sheq            safety/health/environment/quality — provisioned, no
 //                     application code triggers it today.
+//   - notifications   internal owner-alert mailbox (new registrations,
+//                     top-ups, failed transactions) — its own SMTP password
+//                     (EMAIL_SMTP_PASS_NOTIFICATIONS), not the shared one.
 export const SENDER_ADDRESSES = {
   noreply: "noreply@topme.co.zw",
   accounts: "accounts@topme.co.zw",
@@ -32,6 +35,7 @@ export const SENDER_ADDRESSES = {
   recruitment: "recruitment@topme.co.zw",
   admin: "admin@topme.co.zw",
   sheq: "sheq@topme.co.zw",
+  notifications: "notifications@topme.co.zw",
 } as const;
 
 export type EmailSender = keyof typeof SENDER_ADDRESSES;
@@ -40,9 +44,11 @@ const transporters = new Map<EmailSender, nodemailer.Transporter>();
 
 function getTransporter(sender: EmailSender) {
   const host = process.env.EMAIL_SMTP_HOST;
-  const pass = process.env.EMAIL_SMTP_PASS;
+  // Per-mailbox password override (EMAIL_SMTP_PASS_<SENDER-UPPERCASE>)
+  // beats the shared password — notifications@ has its own credentials.
+  const pass = process.env[`EMAIL_SMTP_PASS_${sender.toUpperCase()}`] ?? process.env.EMAIL_SMTP_PASS;
   if (!host || !pass) {
-    throw new Error("Email is not configured — set EMAIL_SMTP_HOST and EMAIL_SMTP_PASS.");
+    throw new Error(`Email is not configured — set EMAIL_SMTP_HOST and EMAIL_SMTP_PASS (or EMAIL_SMTP_PASS_${sender.toUpperCase()}).`);
   }
   let t = transporters.get(sender);
   if (!t) {

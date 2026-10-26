@@ -128,12 +128,24 @@ export async function POST(request: NextRequest) {
       // settled by the branch above long before it can reach this.
       if (now - new Date(intent.created_at).getTime() > STALE_AFTER_MS - 60_000) {
         const table = kind === "topup" ? "topup_intents" : "guest_checkout_intents";
-        await admin.from(table).update({ status: "failed" }).eq("reference", intent.reference).eq("status", "pending");
+        const { data: expired } = await admin.from(table).update({ status: "failed" }).eq("reference", intent.reference).eq("status", "pending").select("reference, amount").maybeSingle();
         void logTransactionEvent(admin, {
           reference: intent.reference,
           eventType: "payment_failed",
           message: `Reconciler: expired after 7 days — Paynow still reported "${before}", so it was never paid.`,
         });
+        // Owner alert for the expiry — a customer whose money never settled
+        // shouldn't die silently in a cron log. One mail per reference;
+        // the sweep is rare enough that volume isn't a concern.
+        if (expired) {
+          const { adminTopupAlert, alertTransaction } = await import(kind === "topup" ? "@/lib/email/admin-notify" : "@/lib/email/transaction-alerts");
+          const amount = (expired as { amount?: number }).amount ?? 0;
+          if (kind === "topup") {
+            void adminTopupAlert({ amount, provider: "paynow", reference: intent.reference, success: false, detail: `Reconciler expired after 7 days — Paynow still reported "${before}".` });
+          } else {
+            void alertTransaction(admin, { outcome: "failed", reference: intent.reference, service: "guest checkout", amount, method: "paynow", detail: `Reconciler expired after 7 days — Paynow still reported "${before}".` });
+          }
+        }
       }
     }
   }

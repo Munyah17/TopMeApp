@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { sendEmail } from "./client";
+import { adminTopupAlert } from "./admin-notify";
 import { topupConfirmationEmail, topupFailedEmail } from "./templates";
 
 const PROVIDER_LABEL: Record<string, string> = { paynow: "Paynow", stripe: "Card (Stripe)", ecocash: "EcoCash" };
@@ -12,6 +13,17 @@ export async function notifyTopupResult(
 ) {
   const { data: profile } = await admin.from("profiles").select("email").eq("id", opts.userId).single();
   const email = profile?.email as string | undefined;
+
+  // Owner alert goes out for every top-up outcome, even when the customer
+  // has no profile email — the alert carries the user id in that case.
+  void adminTopupAlert({
+    amount: opts.amount,
+    provider: opts.provider,
+    reference: opts.reference,
+    success: opts.success,
+    customer: email ?? opts.userId,
+  });
+
   if (!email) return;
 
   const providerLabel = PROVIDER_LABEL[opts.provider] ?? opts.provider;

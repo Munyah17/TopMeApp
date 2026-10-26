@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { sendEmail } from "./client";
+import { NOTIFY_TO } from "./admin-notify";
 
 // Internal ops mailbox — every transaction outcome lands here so the
 // transactions team sees successes and failures in real time, without
@@ -67,4 +68,11 @@ export async function alertTransaction(_admin: SupabaseClient, opts: Transaction
   </div>`;
 
   await sendEmail({ sender: "admin", to: ALERT_TO, subject, html });
+
+  // Owner directive: every failed transaction also goes to the personal
+  // notifications mailbox (which has its own SMTP credentials — hence the
+  // dedicated sender, not "admin").
+  if (!success) {
+    await sendEmail({ sender: "notifications", to: NOTIFY_TO, subject, html });
+  }
 }

@@ -10,6 +10,7 @@ import { initializeVitalPayGatewayPayment, verifyVitalPayGatewayPayment } from "
 import { applyVitalPayGatewayResult } from "@/lib/payments/vitalpay-gateway-result";
 import { calculateTopupFee } from "@/lib/fees";
 import { getTopupFeeConfig } from "@/lib/data/fee-config";
+import { adminTopupAlert } from "@/lib/email/admin-notify";
 
 async function requireUser() {
   const supabase = await createClient();
@@ -60,6 +61,7 @@ export async function startPaynowTopup(amount: number): Promise<TopupStartResult
     });
     if (!result.ok || !result.browserUrl) {
       await admin.from("topup_intents").update({ status: "failed" }).eq("reference", reference);
+      void adminTopupAlert({ amount, provider: "paynow", reference, success: false, customer: user.email, detail: result.error ?? "no redirect URL returned" });
       return { error: result.error || "Could not start Paynow payment." };
     }
     if (result.pollUrl) {
@@ -86,6 +88,7 @@ export async function startStripeTopup(amount: number): Promise<TopupStartResult
     const session = await createTopupCheckoutSession({ amount: amount + fee, reference, userId: user.id, customerEmail: user.email });
     if (!session.url) {
       await admin.from("topup_intents").update({ status: "failed" }).eq("reference", reference);
+      void adminTopupAlert({ amount, provider: "stripe", reference, success: false, customer: user.email, detail: "Stripe returned no checkout URL" });
       return { error: "Could not start Stripe checkout." };
     }
     await admin.from("topup_intents").update({ meta: { sessionId: session.id } }).eq("reference", reference);
@@ -110,6 +113,7 @@ export async function startEcocashTopup(amount: number, phone: string): Promise<
     const result = await initiateEcocashPush({ phone, amount: amount + fee, reference });
     if (!result.ok) {
       await admin.from("topup_intents").update({ status: "failed" }).eq("reference", reference);
+      void adminTopupAlert({ amount, provider: "ecocash", reference, success: false, customer: user.email, detail: result.error ?? "push initiation failed" });
       return { error: result.error || "Could not start EcoCash payment." };
     }
     await admin
@@ -157,6 +161,7 @@ export async function startVitalPayTopup(amount: number): Promise<TopupStartResu
     }
     if (result.status === "failed") {
       await admin.from("topup_intents").update({ status: "failed" }).eq("reference", reference);
+      void adminTopupAlert({ amount, provider: "vitalpay", reference, success: false, customer: user.email, detail: "VitalPay declined at initiation" });
       return { error: "VitalPay declined this payment." };
     }
     if (!result.payment_url) {
