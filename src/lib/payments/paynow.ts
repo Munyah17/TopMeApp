@@ -50,12 +50,17 @@ export async function initiatePaynowPayment(opts: {
   };
   const body = new URLSearchParams({ ...fields, hash: hash(fields, key) });
 
-  const res = await fetch(PAYNOW_INITIATE_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: body.toString(),
-  });
-  const parsed = parseKeyValues(await res.text());
+  let parsed: Record<string, string>;
+  try {
+    const res = await fetch(PAYNOW_INITIATE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: body.toString(),
+    });
+    parsed = parseKeyValues(await res.text());
+  } catch (e) {
+    return { ok: false, error: `Could not reach Paynow — ${e instanceof Error ? e.message : "network error"}` };
+  }
 
   if (parsed.status?.toLowerCase() !== "ok") {
     return { ok: false, error: parsed.error || "Paynow rejected the request." };

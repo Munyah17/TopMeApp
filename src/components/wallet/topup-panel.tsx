@@ -13,7 +13,9 @@ const AMOUNT_CHIPS = [5, 10, 20, 50, 100];
 // vitalPayEnabled is passed from the server (wallet/page.tsx), computed
 // from whether VITALPAY_GATEWAY_SECRET_KEY actually exists — the button
 // only ever appears once that key is real, so this never shows a rail
-// that's guaranteed to error out.
+// that's guaranteed to error out. Gateway start actions return { error }
+// (not thrown) so the real reason surfaces in `error` below — a thrown
+// action error would only ever show the redacted production digest text.
 export function TopupPanel({ userPhone, vitalPayEnabled }: { userPhone?: string | null; vitalPayEnabled?: boolean }) {
   const router = useRouter();
   const [gateway, setGateway] = useState<Gateway>("paynow");
@@ -34,22 +36,39 @@ export function TopupPanel({ userPhone, vitalPayEnabled }: { userPhone?: string 
     setError(null);
     try {
       if (gateway === "paynow") {
-        const { redirectUrl } = await startPaynowTopup(amt);
-        window.location.href = redirectUrl;
+        const res = await startPaynowTopup(amt);
+        if (res.error || !res.redirectUrl) {
+          setError(res.error || "Could not start Paynow payment.");
+          return;
+        }
+        window.location.href = res.redirectUrl;
         return;
       }
       if (gateway === "stripe") {
-        const { redirectUrl } = await startStripeTopup(amt);
-        window.location.href = redirectUrl;
+        const res = await startStripeTopup(amt);
+        if (res.error || !res.redirectUrl) {
+          setError(res.error || "Could not start Stripe checkout.");
+          return;
+        }
+        window.location.href = res.redirectUrl;
         return;
       }
       if (gateway === "vitalpay") {
-        const { redirectUrl } = await startVitalPayTopup(amt);
-        window.location.href = redirectUrl;
+        const res = await startVitalPayTopup(amt);
+        if (res.error || !res.redirectUrl) {
+          setError(res.error || "Could not start VitalPay payment.");
+          return;
+        }
+        window.location.href = res.redirectUrl;
         return;
       }
       if (gateway === "ecocash") {
-        const { reference } = await startEcocashTopup(amt, phone);
+        const res = await startEcocashTopup(amt, phone);
+        if (res.error || !res.reference) {
+          setError(res.error || "Could not start EcoCash payment.");
+          return;
+        }
+        const { reference } = res;
         setEcocashPolling(true);
         pollRef.current = setInterval(async () => {
           const res = await fetch("/api/wallet/topup/ecocash/poll", {
