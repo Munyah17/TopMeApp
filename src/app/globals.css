@@ -1761,6 +1761,47 @@ a.side-user:hover {
   box-shadow: var(--shadow-sm);
 }
 
+/* History header stat tiles — pastel mini-cards inside the green header
+   card (transaction-history mockup). Fixed pastel bg + slate text stays
+   legible in both themes because the header is always dark green. */
+.hist-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 14px;
+  position: relative;
+}
+@media (min-width: 640px) {
+  .hist-stats {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+.hist-stat {
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.hist-stat-ic {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.55);
+}
+.hist-stat-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(15, 23, 42, 0.6);
+  margin-top: 8px;
+}
+.hist-stat-value {
+  font-weight: 800;
+  font-size: 15px;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+}
+
 /* ---------- Empty states ---------- */
 .empty-state {
   display: flex;

@@ -53,9 +53,61 @@ export default async function HistoryPage({
     groups.set(key, arr);
   }
 
+  // Header stat tiles (mockup) — every figure is summed from the same
+  // transaction set that renders below, so the tiles can never disagree
+  // with the list. Labels describe what we actually track.
+  const now = new Date();
+  const successTx = transactions.filter((t) => t.status === "success");
+  const totalSpent = successTx.reduce((s, t) => s + t.amount, 0);
+  const billsPaid = successTx.filter((t) => t.service_id.startsWith("billpay-")).reduce((s, t) => s + t.amount, 0);
+  const pendingAmt = transactions.filter((t) => t.status === "pending").reduce((s, t) => s + t.amount, 0);
+  const monthSpent = successTx
+    .filter((t) => {
+      const d = new Date(t.created_at);
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    })
+    .reduce((s, t) => s + t.amount, 0);
+  const stats = [
+    { label: "Total Spent", value: totalSpent, icon: "arrowUpR", bg: "#d1fae5", fg: "#047857" },
+    { label: "Bills Paid", value: billsPaid, icon: "building", bg: "#ffe4e6", fg: "#be123c" },
+    { label: "Pending", value: pendingAmt, icon: "clock", bg: "#dbeafe", fg: "#1d4ed8" },
+    { label: "This Month", value: monthSpent, icon: "zap", bg: "#ede9fe", fg: "#6d28d9" },
+  ];
+
   return (
     <div className="px content-wrap" style={{ paddingTop: 6 }}>
-      <h2 style={{ fontSize: 22, letterSpacing: "-0.02em" }}>History</h2>
+      {/* Green header card with pastel stat tiles — matches the reference
+          history mockup. Decorative circles reuse the wallet-hero motif. */}
+      <div
+        style={{
+          background: "linear-gradient(135deg, var(--green-800) 0%, var(--green-950) 100%)",
+          borderRadius: 16,
+          padding: "20px 20px 16px",
+          position: "relative",
+          overflow: "hidden",
+          marginBottom: 4,
+        }}
+      >
+        <div style={{ position: "absolute", right: -40, top: -40, width: 120, height: 120, borderRadius: "50%", background: "rgba(167,243,208,0.10)" }} />
+        <div style={{ position: "absolute", right: 40, bottom: -30, width: 80, height: 80, borderRadius: "50%", background: "rgba(167,243,208,0.07)" }} />
+        <div style={{ color: "#fff", fontWeight: 800, fontSize: 22, letterSpacing: "-0.02em", position: "relative" }}>
+          Transaction History
+        </div>
+        <div className="muted" style={{ color: "rgba(255,255,255,0.7)", fontSize: 13, marginTop: 4, position: "relative" }}>
+          Track all your payments, top ups, gifts and more.
+        </div>
+        <div className="hist-stats">
+          {stats.map((s) => (
+            <div key={s.label} className="hist-stat" style={{ background: s.bg }}>
+              <span className="hist-stat-ic" style={{ color: s.fg }}>
+                <Icon name={s.icon} size={14} stroke={2} />
+              </span>
+              <div className="hist-stat-label">{s.label}</div>
+              <div className="hist-stat-value">{fmt(s.value)}</div>
+            </div>
+          ))}
+        </div>
+      </div>
 
       <form method="get" className="row gap-2 mt-3 mb-2">
         <div className="header-search" style={{ flex: 1, maxWidth: "none", cursor: "text" }}>
@@ -110,8 +162,11 @@ export default async function HistoryPage({
       ) : (
         Array.from(groups.entries()).map(([date, list]) => (
           <div key={date}>
-            <div className="eyebrow mt-2 mb-1" style={{ paddingLeft: 2 }}>
-              {date}
+            <div className="row between mt-2 mb-1" style={{ paddingLeft: 2, paddingRight: 2 }}>
+              <span className="eyebrow">{date}</span>
+              <span className="muted" style={{ fontSize: 12, fontWeight: 700 }}>
+                -{fmt(list.filter((t) => t.status === "success").reduce((s, t) => s + t.amount, 0))}
+              </span>
             </div>
             <div className="card" style={{ overflow: "hidden", marginBottom: 14 }}>
               {list.map((t, i) => {
