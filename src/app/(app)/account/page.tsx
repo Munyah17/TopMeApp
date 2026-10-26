@@ -40,19 +40,23 @@ export default async function AccountPage() {
       {/* Wallet card (account mockup): live balance + the two wallet
           actions. Both link to /wallet, which owns the top-up and
           withdraw panels — no duplicated payment UI here. */}
-      <div className="card card-pad mt-3">
-        <div className="row between" style={{ alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+      <div
+        className="card card-pad mt-3"
+        style={{ background: "linear-gradient(135deg, var(--green-800) 0%, var(--green-950) 100%)", border: "none", position: "relative", overflow: "hidden" }}
+      >
+        <div style={{ position: "absolute", right: -50, top: -50, width: 140, height: 140, borderRadius: "50%", background: "rgba(167,243,208,0.08)", pointerEvents: "none" }} />
+        <div className="row between" style={{ alignItems: "center", flexWrap: "wrap", gap: 12, position: "relative" }}>
           <div>
-            <div className="muted">Wallet Balance</div>
-            <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-0.02em", marginTop: 4 }}>
+            <div className="muted" style={{ color: "rgba(236,253,245,0.6)" }}>Wallet Balance</div>
+            <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-0.02em", marginTop: 4, color: "#fff" }}>
               {fmt(wallet?.balance ?? 0)}
             </div>
           </div>
           <div className="row gap-2">
-            <Link href="/wallet" className="btn btn-primary tap" style={{ height: 38, padding: "0 14px", fontSize: 12.5, textDecoration: "none", gap: 5 }}>
+            <Link href="/wallet" className="btn tap" style={{ height: 38, padding: "0 14px", fontSize: 12.5, textDecoration: "none", gap: 5, background: "#fff", color: "var(--green-800)", fontWeight: 700 }}>
               <Icon name="plus" size={13} stroke={2.2} /> Top Up
             </Link>
-            <Link href="/wallet" className="btn btn-secondary tap" style={{ height: 38, padding: "0 14px", fontSize: 12.5, textDecoration: "none", gap: 5 }}>
+            <Link href="/wallet" className="btn tap" style={{ height: 38, padding: "0 14px", fontSize: 12.5, textDecoration: "none", gap: 5, background: "rgba(255,255,255,0.14)", color: "#fff", border: "1px solid rgba(255,255,255,0.25)" }}>
               <Icon name="arrowDnL" size={13} stroke={2.2} /> Withdraw
             </Link>
           </div>
