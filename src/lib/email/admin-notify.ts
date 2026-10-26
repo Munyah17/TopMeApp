@@ -1,11 +1,14 @@
 import "server-only";
 import { sendEmail } from "./client";
+import { getNotificationRecipients, DEFAULT_NOTIFICATION_RECIPIENTS } from "@/lib/data/notification-recipients";
 
 // Owner alert stream — new/failed registrations, every wallet top-up, and
 // every failed transaction land at this address. Kept separate from the
 // transactions@topme.co.zw ops feed (see transaction-alerts.ts): this is a
-// personal-notification mailbox, not the team's ledger.
-export const NOTIFY_TO = "notifications@topme.co.zw";
+// personal-notification mailbox, not the team's ledger. The managed
+// recipient list lives in app_settings.notification_recipients — this
+// constant stays as the fallback default.
+export const NOTIFY_TO = DEFAULT_NOTIFICATION_RECIPIENTS.emails[0];
 
 function row(label: string, value: string | null | undefined) {
   if (!value) return "";
@@ -39,7 +42,35 @@ function shell(badge: string, kicker: string, headline: string, body: string) {
  * triggered it. Always call sites: `void notifyAdmin(...)`.
  */
 export async function notifyAdmin(opts: { subject: string; html: string }): Promise<void> {
-  await sendEmail({ sender: "notifications", to: NOTIFY_TO, subject: opts.subject, html: opts.html });
+  const { emails } = await getNotificationRecipients();
+  for (const to of emails) {
+    await sendEmail({ sender: "notifications", to, subject: opts.subject, html: opts.html });
+  }
+}
+
+/**
+ * Short-text version of the same alerts for the managed SMS/WhatsApp lists.
+ * SMS goes through txt.co.zw (only when TXTZW_* creds exist — smsConfigured
+ * guards it). WhatsApp has no provider wired yet: numbers are managed in
+ * Super Admin so they're ready the moment one is, and each skipped send is
+ * logged once rather than silently dropped.
+ */
+export async function notifyAdminText(opts: { subject: string; text: string }): Promise<void> {
+  const { sms, whatsapp } = await getNotificationRecipients();
+  if (sms.length) {
+    try {
+      const { smsConfigured, sendMessage, normalizeRecipient } = await import("@/lib/sms/txtzw");
+      if (smsConfigured()) {
+        // One-line, plain-text alert — SMS bodies have no markup.
+        await sendMessage(sms.map(normalizeRecipient), `TopMe: ${opts.subject}`);
+      }
+    } catch (e) {
+      console.error(`[notify] SMS alert failed for "${opts.subject}":`, e instanceof Error ? e.message : e);
+    }
+  }
+  if (whatsapp.length) {
+    console.log(`[notify] ${whatsapp.length} WhatsApp recipient(s) configured but no WhatsApp provider is wired — skipping "${opts.subject}"`);
+  }
 }
 
 const PROVIDER_LABEL: Record<string, string> = {
@@ -61,8 +92,10 @@ export async function adminTopupAlert(opts: {
   const provider = PROVIDER_LABEL[opts.provider] ?? opts.provider;
   const badge = opts.success ? "#16a34a" : "#dc2626";
   const headline = opts.success ? `Top-up — $${opts.amount.toFixed(2)}` : `TOP-UP FAILED — $${opts.amount.toFixed(2)}`;
+  const subject = `${opts.success ? "💰" : "⚠️"} ${opts.success ? "Wallet top-up" : "FAILED top-up"} — $${opts.amount.toFixed(2)} via ${provider} (${opts.reference})`;
+  void notifyAdminText({ subject, text: subject });
   await notifyAdmin({
-    subject: `${opts.success ? "💰" : "⚠️"} ${opts.success ? "Wallet top-up" : "FAILED top-up"} — $${opts.amount.toFixed(2)} via ${provider} (${opts.reference})`,
+    subject,
     html: shell(
       badge,
       "TOPME WALLET TOP-UP",
@@ -89,8 +122,10 @@ export async function adminSignupAlert(opts: {
 }): Promise<void> {
   const failed = opts.status === "failed";
   const headline = failed ? "FAILED REGISTRATION" : "New registration";
+  const subject = `${failed ? "⚠️" : "👤"} ${failed ? "Failed registration" : "New registration"} — ${opts.email}`;
+  void notifyAdminText({ subject, text: subject });
   await notifyAdmin({
-    subject: `${failed ? "⚠️" : "👤"} ${failed ? "Failed registration" : "New registration"} — ${opts.email}`,
+    subject,
     html: shell(
       failed ? "#dc2626" : "#16a34a",
       "TOPME ACCOUNT",

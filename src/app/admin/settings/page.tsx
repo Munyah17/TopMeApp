@@ -1,7 +1,9 @@
 import { PaymentBannersClient } from "@/components/admin/payment-banners-client";
 import { SettingsClient } from "@/components/admin/settings-client";
 import { TopupFeeClient } from "@/components/admin/topup-fee-client";
+import { NotificationRecipientsClient } from "@/components/admin/notification-recipients-client";
 import { DEFAULT_TOPUP_FEE, type TopupFeeConfig } from "@/lib/fees";
+import { DEFAULT_NOTIFICATION_RECIPIENTS, type NotificationRecipients } from "@/lib/data/notification-recipients";
 import { getMyPermissions } from "@/lib/auth/permissions";
 import { createClient } from "@/lib/supabase/server";
 
@@ -24,13 +26,21 @@ export default async function SettingsPage() {
     flat: typeof feeValue.flat === "number" ? feeValue.flat : DEFAULT_TOPUP_FEE.flat,
     pct: typeof feeValue.pct === "number" ? feeValue.pct : DEFAULT_TOPUP_FEE.pct,
   };
-  const otherRows = rows.filter((r) => r.key !== "payment_method_banners" && r.key !== "topup_fee");
+  const recipientsRow = rows.find((r) => r.key === "notification_recipients");
+  const recipientsValue = (recipientsRow?.value as Partial<NotificationRecipients>) ?? {};
+  const recipients = {
+    emails: Array.isArray(recipientsValue.emails) ? recipientsValue.emails : DEFAULT_NOTIFICATION_RECIPIENTS.emails,
+    sms: Array.isArray(recipientsValue.sms) ? recipientsValue.sms : [],
+    whatsapp: Array.isArray(recipientsValue.whatsapp) ? recipientsValue.whatsapp : [],
+  };
+  const otherRows = rows.filter((r) => r.key !== "payment_method_banners" && r.key !== "topup_fee" && r.key !== "notification_recipients");
 
   return (
     <div>
       <h2 style={{ fontSize: 19 }}>Global Settings</h2>
       <div className="muted mb-3">Platform-wide configuration. Changes apply immediately.</div>
       <TopupFeeClient flat={feeConfig.flat} pct={feeConfig.pct} />
+      <NotificationRecipientsClient emails={recipients.emails} sms={recipients.sms} whatsapp={recipients.whatsapp} />
       <SettingsClient settings={otherRows} />
 
       <div className="section-title mt-3 mb-2">Payment method banners</div>

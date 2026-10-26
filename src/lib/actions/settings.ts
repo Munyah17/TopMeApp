@@ -43,6 +43,34 @@ export async function updateTopupFee(flat: number, percent: number) {
   revalidateAdminPath("/settings");
 }
 
+// Ops-alert recipient lists — where the internal "new registration /
+// top-up / failed transaction" notifications go. Three channels kept as
+// separate arrays in one setting row: email (SMTP via notifications@),
+// sms (txt.co.zw), whatsapp (managed now, sends when a provider is wired).
+// The Super Admin UI edits them as line-per-recipient textareas.
+export async function updateNotificationRecipients(input: { emails: string[]; sms: string[]; whatsapp: string[] }) {
+  const { supabase, user } = await requirePermission("settings.manage");
+  const clean = (list: string[] | undefined, test: (s: string) => boolean) =>
+    [...new Set((list ?? []).map((s) => s.trim()).filter((s) => s && test(s)))].slice(0, 25);
+  const value = {
+    emails: clean(input.emails, (s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)),
+    sms: clean(input.sms, (s) => /^\+?\d[\d\s-]{6,17}$/.test(s)),
+    whatsapp: clean(input.whatsapp, (s) => /^\+?\d[\d\s-]{6,17}$/.test(s)),
+  };
+  if (!value.emails.length) throw new Error("Add at least one valid email address.");
+  const { error } = await supabase.from("app_settings").upsert({
+    key: "notification_recipients",
+    value,
+    description: "Ops alert recipients — emails get HTML alerts; SMS numbers get the short text alerts via txt.co.zw; WhatsApp numbers are stored pending a provider.",
+    updated_at: new Date().toISOString(),
+    updated_by: user.id,
+  });
+  if (error) throw new Error(error.message);
+  await logAdminAction(supabase, { actorId: user.id, action: "settings.update_notification_recipients", targetTable: "app_settings", targetId: "notification_recipients", meta: { value } });
+  updateTag("settings");
+  revalidateAdminPath("/settings");
+}
+
 export async function toggleFeatureFlag(key: string, enabled: boolean) {
   const { supabase, user } = await requirePermission("flags.manage");
   const { error } = await supabase.from("feature_flags").update({ enabled, updated_at: new Date().toISOString(), updated_by: user.id }).eq("key", key);
