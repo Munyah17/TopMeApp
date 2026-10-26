@@ -22,20 +22,20 @@ export default async function ServicesPage() {
           {categories.map((c) => (
             <Link
               key={c.id}
-              href={`/services/${c.id}`}
-              className="card tap row gap-2"
+              href={c.id === "insurance" ? "/insurance" : `/services/${c.id}`}
+              className="card tap row gap-2 svc-pastel-tile"
               data-hover
-              style={{ padding: "var(--space-4)", textDecoration: "none", gap: "var(--space-3)" }}
+              style={{ padding: "var(--space-4)", textDecoration: "none", gap: "var(--space-3)", background: c.bg }}
             >
-              <div className="ibadge" style={{ background: c.bg, color: c.color }}>
+              <div className="ibadge" style={{ background: "rgba(255,255,255,0.65)", color: c.color }}>
                 <Icon name={c.icon} size={20} stroke={1.8} />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 600, fontSize: 15, letterSpacing: "-0.01em", color: "var(--text-primary)" }}>{c.name}</div>
-                <div className="muted">{c.description}</div>
+                <div style={{ fontWeight: 700, fontSize: 15, letterSpacing: "-0.01em", color: "#0f172a" }}>{c.name}</div>
+                <div style={{ color: "rgba(15,23,42,0.6)", fontSize: 12.5, marginTop: 2, lineHeight: 1.4 }}>{c.description}</div>
               </div>
-              <div style={{ color: "var(--text-tertiary)", flexShrink: 0 }}>
-                <Icon name="chevronR" size={18} stroke={2} />
+              <div className="svc-tile-chev">
+                <Icon name="chevronR" size={13} stroke={2.4} />
               </div>
             </Link>
           ))}

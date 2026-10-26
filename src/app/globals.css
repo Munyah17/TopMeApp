@@ -1802,6 +1802,29 @@ a.side-user:hover {
   letter-spacing: -0.01em;
 }
 
+/* Services pastel category tiles (mockup) — the card still provides
+   radius/shadow/hover-lift; these rules just quiet the border and style
+   the circular chevron affordance on the tinted surface. */
+.svc-pastel-tile {
+  border-color: rgba(15, 23, 42, 0.08);
+}
+.svc-tile-chev {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.55);
+  color: rgba(15, 23, 42, 0.55);
+  flex-shrink: 0;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.svc-pastel-tile:hover .svc-tile-chev {
+  background: rgba(255, 255, 255, 0.85);
+  color: #0f172a;
+}
+
 /* ---------- Empty states ---------- */
 .empty-state {
   display: flex;
