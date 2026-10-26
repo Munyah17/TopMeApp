@@ -34,7 +34,16 @@ export function PaynowTopupStatus({ reference, providerLabel = "Paynow" }: { ref
       }
       if (stopped) return;
 
-      const s = await checkTopupStatus(reference);
+      let s: string;
+      try {
+        s = await checkTopupStatus(reference);
+      } catch {
+        // Transient — the session is often mid-refresh right after Paynow
+        // redirects back, and requireUser() throws while it's resolving.
+        // Keep polling (attempts counter still advances) instead of letting
+        // one rejected action crash the whole page render.
+        return;
+      }
       if (stopped) return;
       if (s === "completed") {
         setStatus("completed");
@@ -64,6 +73,10 @@ export function PaynowTopupStatus({ reference, providerLabel = "Paynow" }: { ref
       const result = await checkTopupPaymentNow(reference);
       if (!result.checked && result.error) setCheckError(result.error);
       await checkRef.current();
+    } catch (e) {
+      // Same unhandled-rejection crash path as the poller — surface the
+      // failure inline instead of letting it hit the error boundary.
+      setCheckError(e instanceof Error ? e.message : "Couldn't check right now — try again in a moment.");
     } finally {
       setCheckingNow(false);
     }
