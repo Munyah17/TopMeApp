@@ -214,6 +214,9 @@ export default async function HomePage() {
 
               <QuickSearch services={services} />
 
+              {/* Favourites as pastel tiles (mobile mockup Quick Pay grid):
+                  the tile takes the category's pastel bg, the icon its brand
+                  colour, and the label sits inside the tile. */}
               <div className="tx-quickgrid mt-3" style={{ padding: "2px 2px 6px" }}>
                 {favoriteServices.map((f) => {
                   const cat = categories.find((c) => c.id === f.category_id);
@@ -221,24 +224,26 @@ export default async function HomePage() {
                     <Link
                       key={f.id}
                       href={`/pay/${f.id}`}
-                      className="tap"
+                      className="tap qp-tile"
                       style={{
                         display: "flex",
                         flexDirection: "column",
                         alignItems: "center",
+                        justifyContent: "center",
                         gap: 8,
                         flexShrink: 0,
-                        width: 66,
+                        width: 76,
+                        minHeight: 84,
+                        padding: "10px 6px",
+                        borderRadius: 14,
+                        background: cat?.bg ?? "var(--muted)",
                         textDecoration: "none",
                       }}
                     >
-                      <div
-                        className="ibadge round"
-                        style={{ background: cat?.bg, color: cat?.color }}
-                      >
+                      <span style={{ color: cat?.color ?? "var(--text-secondary)", display: "inline-flex" }}>
                         <Icon name={f.icon} size={22} stroke={1.8} />
-                      </div>
-                      <span style={{ fontSize: 12, fontWeight: 500, textAlign: "center", lineHeight: 1.2, color: "var(--text-secondary)" }}>
+                      </span>
+                      <span style={{ fontSize: 11.5, fontWeight: 600, textAlign: "center", lineHeight: 1.2, color: "#0f172a" }}>
                         {f.name.split(" ")[0]}
                       </span>
                     </Link>
@@ -246,16 +251,27 @@ export default async function HomePage() {
                 })}
                 <Link
                   href="/services"
-                  className="tap"
-                  style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, flexShrink: 0, width: 66, textDecoration: "none" }}
+                  className="tap qp-tile"
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 8,
+                    flexShrink: 0,
+                    width: 76,
+                    minHeight: 84,
+                    padding: "10px 6px",
+                    borderRadius: 14,
+                    background: "var(--muted)",
+                    border: "1.5px dashed var(--border)",
+                    textDecoration: "none",
+                  }}
                 >
-                  <div
-                    className="ibadge round"
-                    style={{ background: "var(--badge-neutral-bg)", color: "var(--text-soft)", border: "1.5px dashed var(--border)" }}
-                  >
+                  <span style={{ color: "var(--text-tertiary)", display: "inline-flex" }}>
                     <Icon name="plus" size={20} stroke={2} />
-                  </div>
-                  <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text-faint)" }}>More</span>
+                  </span>
+                  <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text-tertiary)" }}>More</span>
                 </Link>
               </div>
             </div>

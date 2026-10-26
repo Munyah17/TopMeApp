@@ -1750,15 +1750,19 @@ a.side-user:hover {
   flex-shrink: 0;
 }
 
-/* Quick Pay favourite tiles — the icon chip lifts while the label stays
-   planted, which reads as a gentle "press me" affordance without moving
-   the tap target. */
-.tx-quickgrid a .ibadge {
+/* Quick Pay pastel tiles — the whole tile lifts on hover; on desktop the
+   grid stretches tiles to fill their tracks (inline width is mobile's). */
+.qp-tile {
   transition: transform var(--transition-normal), box-shadow var(--transition-normal);
 }
-.tx-quickgrid a:hover .ibadge {
+.qp-tile:hover {
   transform: translateY(-3px);
   box-shadow: var(--shadow-sm);
+}
+@media (min-width: 820px) {
+  .qp-tile {
+    width: auto !important;
+  }
 }
 
 /* History header stat tiles — pastel mini-cards inside the green header
