@@ -173,11 +173,11 @@ export function NetworkTile({ network, selected, onClick }: { network: Network; 
 
 export type PaymentMethod = "wallet" | GuestGateway;
 
-const METHOD_STYLES: Record<PaymentMethod, { label: string; background: string; color: string; icon: string }> = {
-  wallet: { label: "Pay With Wallet Balance", background: "var(--green)", color: "var(--text-inverse)", icon: "wallet" },
-  paynow: { label: "Pay With Paynow", background: "#155EAB", color: "#fff", icon: "lock" },
-  ecocash: { label: "Pay With Ecocash Instant", background: "#E4032E", color: "#fff", icon: "phone" },
-  stripe: { label: "Pay With Stripe", background: "#635BFF", color: "#fff", icon: "smartphone" },
+const METHOD_STYLES: Record<PaymentMethod, { label: string; sub: string; tint: string; fg: string; icon: string }> = {
+  wallet: { label: "TopMe Wallet", sub: "Pay instantly from your balance", tint: "var(--green-50)", fg: "var(--green-600)", icon: "wallet" },
+  paynow: { label: "Paynow", sub: "Cards, bank & mobile money", tint: "rgba(21, 94, 171, 0.10)", fg: "#155EAB", icon: "lock" },
+  ecocash: { label: "EcoCash", sub: "Pay with EcoCash", tint: "rgba(228, 3, 46, 0.08)", fg: "#E4032E", icon: "phone" },
+  stripe: { label: "Visa / Mastercard", sub: "Pay with your card", tint: "rgba(99, 91, 255, 0.10)", fg: "#635BFF", icon: "smartphone" },
 };
 
 export type PaymentBanners = Partial<Record<GuestGateway, string>>;
@@ -265,28 +265,61 @@ export function PaymentMethodSection({
               type="button"
               className="tap"
               onClick={() => setMethod(m)}
+              aria-pressed={selected}
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 10,
-                padding: "14px 16px",
+                gap: 12,
+                padding: "13px 14px",
                 borderRadius: 14,
-                border: "none",
                 cursor: "pointer",
-                background: style.background,
-                color: style.color,
-                fontWeight: 800,
-                fontSize: 14,
-                boxShadow: selected ? "0 0 0 3px rgba(0,0,0,0.18) inset" : "none",
-                opacity: selected ? 1 : 0.88,
+                font: "inherit",
+                textAlign: "left",
+                border: `1.5px solid ${selected ? "var(--green)" : "var(--border)"}`,
+                background: selected ? "var(--green-50)" : "var(--surface)",
+                boxShadow: selected ? "0 0 0 3px rgba(5, 150, 105, 0.12)" : "none",
+                transition: "border-color 160ms ease, background 160ms ease, box-shadow 160ms ease",
               }}
             >
-              <Icon name={style.icon} size={18} stroke={2} />
-              <span style={{ flex: 1, textAlign: "left" }}>{style.label}</span>
-              {m === "wallet" && typeof walletBalance === "number" && (
-                <span style={{ fontSize: 12, fontWeight: 700, opacity: 0.85 }}>${walletBalance.toFixed(2)}</span>
-              )}
-              {selected && <Icon name="check" size={16} stroke={2.4} />}
+              <span
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 10,
+                  background: style.tint,
+                  color: style.fg,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                <Icon name={style.icon} size={17} stroke={2} />
+              </span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: "block", fontWeight: 700, fontSize: 14, color: "var(--text-primary)" }}>{style.label}</span>
+                <span style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginTop: 1 }}>
+                  {m === "wallet" && typeof walletBalance === "number" ? `Balance: $${walletBalance.toFixed(2)}` : style.sub}
+                </span>
+              </span>
+              {/* Radio affordance (checkout mockup) — hollow ring that gains a
+                  green fill + white pip when the method is selected. */}
+              <span
+                style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: "50%",
+                  flexShrink: 0,
+                  border: `2px solid ${selected ? "var(--green)" : "var(--border-strong)"}`,
+                  background: selected ? "var(--green)" : "transparent",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  transition: "border-color 160ms ease, background 160ms ease",
+                }}
+              >
+                {selected && <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#fff" }} />}
+              </span>
             </button>
           );
         })}
