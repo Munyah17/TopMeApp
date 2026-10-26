@@ -4,6 +4,7 @@ import { BillPayFlow } from "@/components/payment-flow/billpay-flow";
 import { AuthRequired } from "@/components/auth-required";
 import { getBillPayCatalog } from "@/lib/actions/billpay";
 import { getCurrentProfile, getMyWallet } from "@/lib/data/queries";
+import { getTopupFeeConfig } from "@/lib/data/fee-config";
 import { Icon } from "@/components/icons";
 
 /**
@@ -23,7 +24,7 @@ export default async function BillerPage({
 }) {
   const { billerCode } = await params;
   const { product: wanted } = await searchParams;
-  const [{ billers, products }, profile] = await Promise.all([getBillPayCatalog(), getCurrentProfile()]);
+  const [{ billers, products }, profile, feeConfig] = await Promise.all([getBillPayCatalog(), getCurrentProfile(), getTopupFeeConfig()]);
 
   const biller = billers.find((b) => b.code === billerCode);
   if (!biller) notFound();
@@ -40,7 +41,7 @@ export default async function BillerPage({
   const wallet = await getMyWallet(profile.id);
 
   if (selected) {
-    return <BillPayFlow biller={biller} product={selected} walletBalance={wallet?.balance ?? 0} />;
+    return <BillPayFlow biller={biller} product={selected} walletBalance={wallet?.balance ?? 0} feeConfig={feeConfig} />;
   }
 
   return (

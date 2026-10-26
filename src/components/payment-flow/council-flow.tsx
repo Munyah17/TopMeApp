@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
 import { Icon } from "@/components/icons";
 import { hexA, mutedOn, textOn } from "@/lib/data/catalog-helpers";
-import { calculatePlatformFee, calculateGatewaySurcharge } from "@/lib/fees";
+import { calculatePlatformFee, calculateGatewaySurcharge, DEFAULT_TOPUP_FEE, type TopupFeeConfig } from "@/lib/fees";
 import { payServiceResult, validateBillAccount } from "@/lib/actions/payments";
 import { watchFulfillment } from "@/lib/payments/fulfillment-watch";
 import { supportsBillAccountValidation } from "@/lib/fulfillment/vitalpay-shared";
@@ -32,6 +32,7 @@ export function CouncilFlow({
   guestEmail: initialGuestEmail = "",
   guestPhone: initialGuestPhone = "",
   banners,
+  feeConfig = DEFAULT_TOPUP_FEE,
 }: {
   service: Service;
   walletBalance: number | null;
@@ -39,6 +40,7 @@ export function CouncilFlow({
   guestEmail?: string;
   guestPhone?: string;
   banners?: PaymentBanners;
+  feeConfig?: TopupFeeConfig;
 }) {
   const router = useRouter();
   const [step, setStep] = useState<Step>("account");
@@ -235,7 +237,7 @@ export function CouncilFlow({
 
   const stepIndex = ["account", "amount", "review"].indexOf(step);
   const showTop = !["processing", "guest-ecocash", "delivering", "success"].includes(step);
-  const fee = calculatePlatformFee(service.id, amount) + calculateGatewaySurcharge(method, amount);
+  const fee = calculatePlatformFee(service.id, amount) + calculateGatewaySurcharge(method, amount, feeConfig);
   const total = amount + fee;
   const insufficient = method === "wallet" && walletBalance !== null && total > walletBalance;
   const noMethodChosen = method === null;

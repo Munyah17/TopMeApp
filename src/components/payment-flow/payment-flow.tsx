@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
 import { Icon } from "@/components/icons";
 import { hexA } from "@/lib/data/catalog-helpers";
-import { calculatePlatformFee, calculateGatewaySurcharge } from "@/lib/fees";
+import { calculatePlatformFee, calculateGatewaySurcharge, DEFAULT_TOPUP_FEE, type TopupFeeConfig } from "@/lib/fees";
 import { payServiceResult, sendGiftVoucher, validateBillAccount } from "@/lib/actions/payments";
 import { startGuestCheckoutResult, type GuestGateway } from "@/lib/actions/guest-payments";
 import { addGuestActivity } from "@/lib/guest-activity";
@@ -35,6 +35,7 @@ export function PaymentFlow({
   guestEmail: initialGuestEmail = "",
   guestPhone: initialGuestPhone = "",
   banners,
+  feeConfig = DEFAULT_TOPUP_FEE,
 }: {
   service: Service;
   bundles: DataBundle[];
@@ -45,6 +46,7 @@ export function PaymentFlow({
   guestEmail?: string;
   guestPhone?: string;
   banners?: PaymentBanners;
+  feeConfig?: TopupFeeConfig;
 }) {
   const router = useRouter();
   const [step, setStep] = useState<Step>("details");
@@ -414,6 +416,7 @@ export function PaymentFlow({
             method={method}
             setMethod={setMethod}
             banners={banners}
+            feeConfig={feeConfig}
             holderName={holderName}
             checking={identifierChecking}
             onPay={async () => {
@@ -780,6 +783,7 @@ function ReviewStep({
   method,
   setMethod,
   banners,
+  feeConfig,
   holderName,
   checking,
   onPay,
@@ -804,6 +808,7 @@ function ReviewStep({
   method: PaymentMethod | null;
   setMethod: (v: PaymentMethod) => void;
   banners?: PaymentBanners;
+  feeConfig: TopupFeeConfig;
   holderName: string | null;
   checking: boolean;
   onPay: () => void;
@@ -816,7 +821,7 @@ function ReviewStep({
     const p = packages.find((x) => x.id === pkgId);
     if (p) detailLabel = `${p.name} Package`;
   }
-  const fee = service.is_gift ? 0 : calculatePlatformFee(service.id, amount) + calculateGatewaySurcharge(method, amount);
+  const fee = service.is_gift ? 0 : calculatePlatformFee(service.id, amount) + calculateGatewaySurcharge(method, amount, feeConfig);
   const total = amount + fee;
   const insufficient = method === "wallet" && walletBalance !== null && total > walletBalance;
   const noMethodChosen = method === null;

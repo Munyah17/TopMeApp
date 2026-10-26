@@ -7,6 +7,7 @@ import { createOrGetClient, getQuote, createPolicy, getPolicy, recordPayment as 
 import { enrichInsuranceProduct } from "@/lib/insurance/types";
 import { isAgricultureInsuranceProduct } from "@/lib/insurance/availability";
 import { calculateTopupFee } from "@/lib/fees";
+import { getTopupFeeConfig } from "@/lib/data/fee-config";
 import { initiatePaynowPayment, checkPaynowStatus } from "@/lib/payments/paynow";
 import { applyPaynowResult } from "@/lib/payments/paynow-result";
 import { createGuestCheckoutSession } from "@/lib/payments/stripe";
@@ -625,7 +626,7 @@ export async function startInsuranceCheckout(params: {
 
     const baseTotal = lines.reduce((s, l) => s + l.basePremium, 0);
     const markupTotal = lines.reduce((s, l) => s + l.markupAmount, 0);
-    const gatewayFee = calculateTopupFee(params.gateway, baseTotal + markupTotal);
+    const gatewayFee = calculateTopupFee(params.gateway, baseTotal + markupTotal, await getTopupFeeConfig());
     const totalCharge = baseTotal + markupTotal + gatewayFee;
 
     const reference = `INS-${randomUUID().slice(0, 8).toUpperCase()}`;

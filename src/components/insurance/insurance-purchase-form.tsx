@@ -6,7 +6,7 @@ import type { InsuranceProduct, InsuranceSignupField } from "@/lib/insurance/typ
 import { purchaseInsurancePolicy, startInsuranceCheckout, checkInsurancePaymentNow, getInsuranceCheckoutStatus } from "@/lib/actions/insurance";
 import { displayName } from "@/lib/insurance/types";
 import { PaymentMethodSection, type PaymentBanners, type PaymentMethod } from "@/components/payment-flow/flow-shared";
-import { calculateGatewaySurcharge } from "@/lib/fees";
+import { calculateGatewaySurcharge, DEFAULT_TOPUP_FEE, type TopupFeeConfig } from "@/lib/fees";
 
 interface InsurancePurchaseFormProps {
   product: InsuranceProduct;
@@ -16,6 +16,8 @@ interface InsurancePurchaseFormProps {
   walletBalance: number;
   /** Admin-uploaded gateway banner images (see /admin/settings). */
   banners?: PaymentBanners;
+  /** Live gateway processing fee (see /admin/settings — Processing fee). */
+  feeConfig?: TopupFeeConfig;
 }
 
 /** One dependant on a cover — mirrors the Motions /apply form exactly
@@ -66,7 +68,7 @@ const labelStyle: React.CSSProperties = {
   marginBottom: 8,
 };
 
-export default function InsurancePurchaseForm({ product, allProducts, walletBalance, banners }: InsurancePurchaseFormProps) {
+export default function InsurancePurchaseForm({ product, allProducts, walletBalance, banners, feeConfig = DEFAULT_TOPUP_FEE }: InsurancePurchaseFormProps) {
   const [step, setStep] = useState<"details" | "confirm" | "pending" | "gateway-pending">("details");
   // null = customer hasn't picked yet — same rule as every other flow:
   // no default, no pre-selection.
@@ -121,7 +123,7 @@ export default function InsurancePurchaseForm({ product, allProducts, walletBala
   // Gateways charge their own surcharge on top of premium+markup — same
   // rule as every other flow (the rail's cut isn't recoverable from a
   // wallet funding step when the customer pays directly).
-  const gatewayFee = calculateGatewaySurcharge(method, premiumTotal + feeTotal);
+  const gatewayFee = calculateGatewaySurcharge(method, premiumTotal + feeTotal, feeConfig);
   const grandTotal = premiumTotal + feeTotal + gatewayFee;
   const currency = selectedProducts[0]?.currency ?? product.currency;
 

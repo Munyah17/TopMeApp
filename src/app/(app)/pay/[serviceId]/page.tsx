@@ -9,6 +9,7 @@ import { ServiceUnavailable } from "@/components/service-unavailable";
 import { hasRealCoverage } from "@/lib/fulfillment";
 import { hasMappedProvider } from "@/lib/fulfillment/select";
 import { getPublicSetting } from "@/lib/data/flags";
+import { getTopupFeeConfig } from "@/lib/data/fee-config";
 import { getAirtimeOperatorRules, getCurrentProfile, getDataBundles, getNetworks, getService, getTvPackages } from "@/lib/data/queries";
 import { createAdminClient } from "@/lib/supabase/server";
 import type { ApiModuleSafe } from "@/types/database";
@@ -42,13 +43,14 @@ export default async function PayPage({ params }: { params: Promise<{ serviceId:
   // an extra wait — worth it for collapsing a full sequential step off
   // every other service's checkout page load.
   const admin = createAdminClient();
-  const [apiModules, bundles, packages, networks, paymentBanners, airtimeRules] = await Promise.all([
+  const [apiModules, bundles, packages, networks, paymentBanners, airtimeRules, feeConfig] = await Promise.all([
     service.is_gift ? Promise.resolve([]) : admin.from("api_modules_safe").select("*").eq("status", "active").then((r) => r.data ?? []),
     service.amount_mode === "bundles" ? getDataBundles() : Promise.resolve([]),
     service.amount_mode === "packages" ? getTvPackages() : Promise.resolve([]),
     service.needs_network ? getNetworks() : Promise.resolve([]),
     getPublicSetting<Record<string, string>>("payment_method_banners"),
     service.id === "airtime" ? getAirtimeOperatorRules() : Promise.resolve({}),
+    getTopupFeeConfig(),
   ]);
 
   // Gift vouchers are wallet-to-wallet only (debit sender, mint a redeemable
@@ -87,12 +89,13 @@ export default async function PayPage({ params }: { params: Promise<{ serviceId:
         guestEmail={guestEmail}
         guestPhone={guestPhone}
         banners={banners}
+        feeConfig={feeConfig}
       />
     );
   }
 
   if (service.id === "zesa") {
-    return <ZesaFlow service={service} walletBalance={null} isGuest={isGuest} guestEmail={guestEmail} guestPhone={guestPhone} banners={banners} />;
+    return <ZesaFlow service={service} walletBalance={null} isGuest={isGuest} guestEmail={guestEmail} guestPhone={guestPhone} banners={banners} feeConfig={feeConfig} />;
   }
 
   // Councils share the same "account number -> arbitrary payment amount"
@@ -100,11 +103,11 @@ export default async function PayPage({ params }: { params: Promise<{ serviceId:
   // actually clears the coverage check above today — the other 25 stop at
   // ServiceUnavailable before ever reaching this branch.
   if (service.category_id === "government") {
-    return <CouncilFlow service={service} walletBalance={null} isGuest={isGuest} guestEmail={guestEmail} guestPhone={guestPhone} banners={banners} />;
+    return <CouncilFlow service={service} walletBalance={null} isGuest={isGuest} guestEmail={guestEmail} guestPhone={guestPhone} banners={banners} feeConfig={feeConfig} />;
   }
 
   if (BROADBAND_FLOW_SERVICES.has(service.id)) {
-    return <BroadbandFlow service={service} walletBalance={null} isGuest={isGuest} guestEmail={guestEmail} guestPhone={guestPhone} banners={banners} />;
+    return <BroadbandFlow service={service} walletBalance={null} isGuest={isGuest} guestEmail={guestEmail} guestPhone={guestPhone} banners={banners} feeConfig={feeConfig} />;
   }
 
   return (
@@ -118,6 +121,7 @@ export default async function PayPage({ params }: { params: Promise<{ serviceId:
       guestEmail={guestEmail}
       guestPhone={guestPhone}
       banners={banners}
+      feeConfig={feeConfig}
     />
   );
 }

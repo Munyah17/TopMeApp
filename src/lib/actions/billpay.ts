@@ -458,8 +458,9 @@ export async function startBillPayCheckout(params: {
     const payable = Math.round(unit * qty * 100) / 100;
 
     const { calculatePlatformFee, calculateTopupFee } = await import("@/lib/fees");
+    const { getTopupFeeConfig } = await import("@/lib/data/fee-config");
     const platformFee = calculatePlatformFee(`billpay-${biller.code.toLowerCase()}`, payable);
-    const gatewayFee = calculateTopupFee(params.gateway, payable + platformFee);
+    const gatewayFee = calculateTopupFee(params.gateway, payable + platformFee, await getTopupFeeConfig());
     const totalCharge = payable + platformFee + gatewayFee;
 
     const application: BillPayIntentApp = {

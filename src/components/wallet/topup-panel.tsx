@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icons";
 import { startEcocashTopup, startPaynowTopup, startStripeTopup, startVitalPayTopup } from "@/lib/actions/wallet";
-import { calculateTopupFee } from "@/lib/fees";
+import { calculateTopupFee, DEFAULT_TOPUP_FEE, type TopupFeeConfig } from "@/lib/fees";
 
 type Gateway = "paynow" | "stripe" | "ecocash" | "vitalpay";
 
@@ -16,7 +16,7 @@ const AMOUNT_CHIPS = [5, 10, 20, 50, 100];
 // that's guaranteed to error out. Gateway start actions return { error }
 // (not thrown) so the real reason surfaces in `error` below — a thrown
 // action error would only ever show the redacted production digest text.
-export function TopupPanel({ userPhone, vitalPayEnabled }: { userPhone?: string | null; vitalPayEnabled?: boolean }) {
+export function TopupPanel({ userPhone, vitalPayEnabled, feeConfig = DEFAULT_TOPUP_FEE }: { userPhone?: string | null; vitalPayEnabled?: boolean; feeConfig?: TopupFeeConfig }) {
   const router = useRouter();
   const [gateway, setGateway] = useState<Gateway>("paynow");
   const [amount, setAmount] = useState<number | null>(20);
@@ -28,7 +28,7 @@ export function TopupPanel({ userPhone, vitalPayEnabled }: { userPhone?: string 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const amt = amount ?? (parseFloat(customAmount) || 0);
-  const fee = calculateTopupFee(gateway, amt);
+  const fee = calculateTopupFee(gateway, amt, feeConfig);
   const total = amt + fee;
 
   async function submit() {

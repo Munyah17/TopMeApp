@@ -9,6 +9,7 @@ import { initiateEcocashPush } from "@/lib/payments/ecocash";
 import { initializeVitalPayGatewayPayment, verifyVitalPayGatewayPayment } from "@/lib/payments/vitalpay-gateway";
 import { applyVitalPayGatewayResult } from "@/lib/payments/vitalpay-gateway-result";
 import { calculateTopupFee } from "@/lib/fees";
+import { getTopupFeeConfig } from "@/lib/data/fee-config";
 
 async function requireUser() {
   const supabase = await createClient();
@@ -46,7 +47,8 @@ export async function startPaynowTopup(amount: number): Promise<TopupStartResult
     const { supabase, user } = await requireUser();
     const admin = createAdminClient();
     reference = newReference("PNW");
-    const fee = calculateTopupFee("paynow", amount);
+    const feeConfig = await getTopupFeeConfig();
+    const fee = calculateTopupFee("paynow", amount, feeConfig);
 
     await supabase.from("topup_intents").insert({ user_id: user.id, amount, fee, provider: "paynow", reference });
 
@@ -76,7 +78,8 @@ export async function startStripeTopup(amount: number): Promise<TopupStartResult
     const { supabase, user } = await requireUser();
     const admin = createAdminClient();
     reference = newReference("STR");
-    const fee = calculateTopupFee("stripe", amount);
+    const feeConfig = await getTopupFeeConfig();
+    const fee = calculateTopupFee("stripe", amount, feeConfig);
 
     await supabase.from("topup_intents").insert({ user_id: user.id, amount, fee, provider: "stripe", reference });
 
@@ -99,7 +102,8 @@ export async function startEcocashTopup(amount: number, phone: string): Promise<
     const { supabase, user } = await requireUser();
     const admin = createAdminClient();
     reference = newReference("ECO");
-    const fee = calculateTopupFee("ecocash", amount);
+    const feeConfig = await getTopupFeeConfig();
+    const fee = calculateTopupFee("ecocash", amount, feeConfig);
 
     await supabase.from("topup_intents").insert({ user_id: user.id, amount, fee, provider: "ecocash", reference, meta: { phone } });
 
@@ -130,7 +134,8 @@ export async function startVitalPayTopup(amount: number): Promise<TopupStartResu
     const { supabase, user } = await requireUser();
     const admin = createAdminClient();
     reference = newReference("VPY");
-    const fee = calculateTopupFee("vitalpay", amount);
+    const feeConfig = await getTopupFeeConfig();
+    const fee = calculateTopupFee("vitalpay", amount, feeConfig);
 
     await supabase.from("topup_intents").insert({ user_id: user.id, amount, fee, provider: "vitalpay", reference });
 

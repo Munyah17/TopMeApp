@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icons";
-import { calculatePlatformFee, calculateGatewaySurcharge } from "@/lib/fees";
+import { calculatePlatformFee, calculateGatewaySurcharge, DEFAULT_TOPUP_FEE, type TopupFeeConfig } from "@/lib/fees";
 import { authBillPayProduct, payBillPayProduct, startBillPayCheckout, checkBillPayPaymentNow, getBillPayCheckoutStatus, type BillPayAuthPreview } from "@/lib/actions/billpay";
 import { PaymentMethodSection, type PaymentMethod } from "./flow-shared";
 import { useWalletBalance } from "./use-wallet-balance";
@@ -65,10 +65,12 @@ export function BillPayFlow({
   biller,
   product,
   walletBalance: initialWalletBalance,
+  feeConfig = DEFAULT_TOPUP_FEE,
 }: {
   biller: BillPayFlowBiller;
   product: BillPayFlowProduct;
   walletBalance: number | null;
+  feeConfig?: TopupFeeConfig;
 }) {
   const router = useRouter();
   const [step, setStep] = useState<Step>("details");
@@ -103,7 +105,7 @@ export function BillPayFlow({
   const fee = preview?.price != null ? calculatePlatformFee(`billpay-${biller.code.toLowerCase()}`, preview.price) : 0;
   // Gateway rails charge their own processing fee on top of the platform
   // fee — the customer sees the real total before picking a method.
-  const surcharge = method && method !== "wallet" ? calculateGatewaySurcharge(method, (preview?.price ?? 0) + fee) : 0;
+  const surcharge = method && method !== "wallet" ? calculateGatewaySurcharge(method, (preview?.price ?? 0) + fee, feeConfig) : 0;
   const total = (preview?.price ?? 0) + fee + surcharge;
   const insufficient = method === "wallet" && preview?.price != null && walletBalance !== null && walletBalance < total;
   const gatewayReady = !method || method === "wallet" || contactEmail.includes("@");

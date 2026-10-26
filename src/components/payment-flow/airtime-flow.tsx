@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
 import { Icon } from "@/components/icons";
 import { hexA, mutedOn, textOn } from "@/lib/data/catalog-helpers";
-import { calculatePlatformFee, calculateGatewaySurcharge } from "@/lib/fees";
+import { calculatePlatformFee, calculateGatewaySurcharge, DEFAULT_TOPUP_FEE, type TopupFeeConfig } from "@/lib/fees";
 import { payServiceResult } from "@/lib/actions/payments";
 import { startGuestCheckoutResult, type GuestGateway } from "@/lib/actions/guest-payments";
 import { addGuestActivity } from "@/lib/guest-activity";
@@ -37,6 +37,7 @@ export function AirtimeFlow({
   guestEmail: initialGuestEmail = "",
   guestPhone: initialGuestPhone = "",
   banners,
+  feeConfig = DEFAULT_TOPUP_FEE,
 }: {
   service: Service;
   networks: Network[];
@@ -46,6 +47,7 @@ export function AirtimeFlow({
   guestEmail?: string;
   guestPhone?: string;
   banners?: PaymentBanners;
+  feeConfig?: TopupFeeConfig;
 }) {
   const router = useRouter();
   const [step, setStep] = useState<Step>("operator");
@@ -221,7 +223,7 @@ export function AirtimeFlow({
   const network = networks.find((n) => n.id === networkId);
   const stepIndex = ["operator", "recipient", "amount", "review"].indexOf(step);
   const showTop = !["processing", "guest-ecocash", "delivering", "success"].includes(step);
-  const fee = calculatePlatformFee(service.id, amount) + calculateGatewaySurcharge(method, amount);
+  const fee = calculatePlatformFee(service.id, amount) + calculateGatewaySurcharge(method, amount, feeConfig);
   const total = amount + fee;
   const insufficient = method === "wallet" && walletBalance !== null && total > walletBalance;
   const noMethodChosen = method === null;

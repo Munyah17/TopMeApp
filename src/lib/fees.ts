@@ -19,49 +19,25 @@ export type TopupGateway = "paynow" | "stripe" | "ecocash" | "vitalpay";
 
 // Wallet top-up processing fee: the customer pays amount + fee, the wallet
 // is credited exactly `amount` (what they asked to top up) — same shape as
-// the platform fee above. Priced per rail rather than one blended number,
-// so an EcoCash top-up doesn't subsidise a pricier Stripe one: roughly
-// gateway cost + a thin margin, not maximum extraction.
-//
-// Re-verified 2026-09-13 against each provider's own published rates
-// (not a guess — see paynow.co.zw/Home/Fees directly):
-//   - EcoCash direct (initiateEcocashPush, not through Paynow): their own
-//     merchant fee is ~1.4%, plus Zimbabwe's 2% IMTT tax applies to
-//     electronic transactions over $5 — 2.0% was under both combined.
-//     Bumped to 2.5%, which is also exactly what Paynow itself charges
-//     for reselling the same EcoCash rail — a safe, published ceiling.
-//   - Paynow (their own hosted checkout — customer can pick EcoCash/
-//     OneMoney/Telecash at 2.5% flat, OR card at 3.5% + $0.50; TopMe
-//     can't know which until the customer is on Paynow's page, so this
-//     has to be one blended number). 3.3% flat covered the mobile-money
-//     path fine but left the card path's fixed $0.50 completely
-//     unrecovered. Added a small flat component for that, without
-//     jumping all the way to card's full $0.50.
-//   - Stripe: left unverified against a public source (their real cost
-//     depends on card-issuing country / currency-conversion surcharges,
-//     which aren't published per-corridor) — check actual Stripe payout
-//     statements for Zimbabwean cards specifically before trusting this
-//     one blind.
-// The authoritative charge is recomputed server-side wherever money
-// actually moves (startPaynowTopup / startStripeTopup / startEcocashTopup)
-// using this same function — never trust a client-supplied fee.
-//   - VitalPay Payments Gateway: their own rate card was never given to
-//     us (see [[vitalpay-postpaid-gateway-deal]] memory) — 0% is a real
-//     placeholder, not a guess dressed up as a real number. Update this
-//     the moment VitalPay states their actual fee; until then this rail
-//     runs at a loss if their cut is anything but zero, which is a known,
-//     deliberate, temporary state — not an oversight.
-const TOPUP_FEE: Record<TopupGateway, { pct: number; flat: number }> = {
-  ecocash: { pct: 0.025, flat: 0 },
-  paynow: { pct: 0.033, flat: 0.3 },
-  stripe: { pct: 0.032, flat: 0.3 },
-  vitalpay: { pct: 0, flat: 0 },
-};
+// the platform fee above. One uniform rate across all rails, owner
+// directive 2026-10-26: "$0.50 + 2.5%" — and editable at runtime from
+// Super Admin → Settings (app_settings key `topup_fee`, shape
+// {"flat": <dollars>, "pct": <decimal>}), so this constant is only the
+// fallback until/unless that row is changed. Server-side callers (where
+// money actually moves) always fetch the live value via getTopupFeeConfig
+// in src/lib/data/fee-config.ts and pass it in — never trust a
+// client-computed fee.
+export interface TopupFeeConfig {
+  flat: number;
+  pct: number;
+}
 
-export function calculateTopupFee(gateway: TopupGateway, amount: number): number {
+export const DEFAULT_TOPUP_FEE: TopupFeeConfig = { flat: 0.5, pct: 0.025 };
+
+export function calculateTopupFee(gateway: TopupGateway, amount: number, config: TopupFeeConfig = DEFAULT_TOPUP_FEE): number {
+  void gateway; // uniform rate — gateway kept in the signature so every call site stays typed
   if (!(amount > 0)) return 0;
-  const { pct, flat } = TOPUP_FEE[gateway];
-  return Math.round((amount * pct + flat) * 100) / 100;
+  return Math.round((amount * config.pct + config.flat) * 100) / 100;
 }
 
 // A wallet payment never pays this — the customer already covered
@@ -75,7 +51,11 @@ export function calculateTopupFee(gateway: TopupGateway, amount: number): number
 // Every payment-flow component uses this so the review screen shows the
 // real total before the customer picks how they're paying, not a number
 // that changes underneath them once a non-wallet method is picked.
-export function calculateGatewaySurcharge(method: "wallet" | TopupGateway | null, amount: number): number {
+export function calculateGatewaySurcharge(
+  method: "wallet" | TopupGateway | null,
+  amount: number,
+  config: TopupFeeConfig = DEFAULT_TOPUP_FEE
+): number {
   if (!method || method === "wallet") return 0;
-  return calculateTopupFee(method, amount);
+  return calculateTopupFee(method, amount, config);
 }

@@ -1,6 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
+import { updateTag } from "next/cache";
 import { revalidateAdminPath } from "@/lib/actions/admin-cache";
 import { createAdminClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/auth/permissions";
@@ -12,6 +13,33 @@ export async function updateSetting(key: string, value: unknown) {
   const { error } = await supabase.from("app_settings").update({ value, updated_at: new Date().toISOString(), updated_by: user.id }).eq("key", key);
   if (error) throw new Error(error.message);
   await logAdminAction(supabase, { actorId: user.id, action: "settings.update", targetTable: "app_settings", targetId: key, meta: { value } });
+  revalidateAdminPath("/settings");
+}
+
+// Top-up / gateway processing fee — the "Processing fee" line customers
+// see on the wallet top-up screen and every gateway surcharge in checkout.
+// Stored as {flat: dollars, pct: decimal} under app_settings key topup_fee;
+// the admin UI takes the percent as a human number (2.5 means 2.5%, stored
+// 0.025). Upsert so this works even before the seed migration has run.
+export async function updateTopupFee(flat: number, percent: number) {
+  const { supabase, user } = await requirePermission("settings.manage");
+  if (!Number.isFinite(flat) || !Number.isFinite(percent) || flat < 0 || percent < 0 || percent > 100) {
+    throw new Error("Enter a non-negative flat amount and a percentage between 0 and 100.");
+  }
+  const value = { flat, pct: percent / 100 };
+  const { error } = await supabase.from("app_settings").upsert({
+    key: "topup_fee",
+    value,
+    description: "Wallet top-up / gateway processing fee: $ flat + % of amount (uniform across all payment rails).",
+    updated_at: new Date().toISOString(),
+    updated_by: user.id,
+  });
+  if (error) throw new Error(error.message);
+  await logAdminAction(supabase, { actorId: user.id, action: "settings.update_topup_fee", targetTable: "app_settings", targetId: "topup_fee", meta: { value } });
+  // getTopupFeeConfig caches under the "settings" tag — updateTag (not
+  // revalidateTag) guarantees the admin's own next render sees the new
+  // rate immediately rather than a stale-while-revalidate window.
+  updateTag("settings");
   revalidateAdminPath("/settings");
 }
 

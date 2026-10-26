@@ -10,6 +10,7 @@ import { failGuestCheckout } from "@/lib/payments/guest-checkout";
 import { hasRealCoverage } from "@/lib/fulfillment";
 import { hasMappedProvider } from "@/lib/fulfillment/select";
 import { calculatePlatformFee, calculateTopupFee } from "@/lib/fees";
+import { getTopupFeeConfig } from "@/lib/data/fee-config";
 import { resolveVerifiedAmount } from "@/lib/pricing";
 import { assertRateLimit, getClientIp } from "@/lib/rate-limit";
 import { normalizeZimbabweMobile } from "@/lib/phone-numbers";
@@ -135,7 +136,7 @@ export async function startGuestCheckout(input: StartGuestCheckoutInput) {
   // checkout.sql — and always must match what the gateway actually
   // collected regardless of how many components make it up.
   const platformFee = calculatePlatformFee(input.serviceId, verifiedAmount);
-  const gatewayFee = calculateTopupFee(input.gateway, verifiedAmount);
+  const gatewayFee = calculateTopupFee(input.gateway, verifiedAmount, await getTopupFeeConfig());
   const fee = platformFee + gatewayFee;
   const totalCharge = verifiedAmount + fee;
 

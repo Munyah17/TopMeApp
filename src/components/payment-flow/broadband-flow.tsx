@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
 import { Icon } from "@/components/icons";
 import { hexA, mutedOn, textOn } from "@/lib/data/catalog-helpers";
-import { calculatePlatformFee, calculateGatewaySurcharge } from "@/lib/fees";
+import { calculatePlatformFee, calculateGatewaySurcharge, DEFAULT_TOPUP_FEE, type TopupFeeConfig } from "@/lib/fees";
 import { payServiceResult, validateBillAccount } from "@/lib/actions/payments";
 import { startGuestCheckoutResult, type GuestGateway } from "@/lib/actions/guest-payments";
 import { addGuestActivity } from "@/lib/guest-activity";
@@ -32,6 +32,7 @@ export function BroadbandFlow({
   guestEmail: initialGuestEmail = "",
   guestPhone: initialGuestPhone = "",
   banners,
+  feeConfig = DEFAULT_TOPUP_FEE,
 }: {
   service: Service;
   walletBalance: number | null;
@@ -39,6 +40,7 @@ export function BroadbandFlow({
   guestEmail?: string;
   guestPhone?: string;
   banners?: PaymentBanners;
+  feeConfig?: TopupFeeConfig;
 }) {
   const router = useRouter();
   const usesPackages = service.id === "telone";
@@ -247,7 +249,7 @@ export function BroadbandFlow({
 
   const stepIndex = ["account", "amount", "review"].indexOf(step);
   const showTop = !["processing", "guest-ecocash", "delivering", "success"].includes(step);
-  const fee = calculatePlatformFee(service.id, amount) + calculateGatewaySurcharge(method, amount);
+  const fee = calculatePlatformFee(service.id, amount) + calculateGatewaySurcharge(method, amount, feeConfig);
   const total = amount + fee;
   const insufficient = method === "wallet" && walletBalance !== null && total > walletBalance;
   const noMethodChosen = method === null;

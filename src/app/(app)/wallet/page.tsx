@@ -7,6 +7,7 @@ import { TopupPanel } from "@/components/wallet/topup-panel";
 import { WithdrawPanel } from "@/components/wallet/withdraw-panel";
 import { fmt } from "@/lib/data/catalog-helpers";
 import { getCurrentProfile, getMyWallet, getMyWithdrawals, getWalletLedger } from "@/lib/data/queries";
+import { getTopupFeeConfig } from "@/lib/data/fee-config";
 
 // Money on screen must always be a fresh read, never a cached one — no
 // static rendering, no fetch caching, for this page.
@@ -40,10 +41,11 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
       </div>
     );
   }
-  const [wallet, ledger, withdrawals] = await Promise.all([
+  const [wallet, ledger, withdrawals, feeConfig] = await Promise.all([
     getMyWallet(profile.id),
     getWalletLedger(profile.id, 10),
     getMyWithdrawals(profile.id, 6),
+    getTopupFeeConfig(),
   ]);
   const giftLocked = wallet?.gift_locked ?? 0;
   const withdrawable = Math.max(0, (wallet?.balance ?? 0) - giftLocked);
@@ -89,7 +91,7 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
             <span className="section-title">Top up</span>
           </div>
           <div className="card card-pad">
-            <TopupPanel userPhone={profile.phone} vitalPayEnabled={!!process.env.VITALPAY_GATEWAY_SECRET_KEY} />
+            <TopupPanel userPhone={profile.phone} vitalPayEnabled={!!process.env.VITALPAY_GATEWAY_SECRET_KEY} feeConfig={feeConfig} />
           </div>
 
           <div className="row between mt-3 mb-2">

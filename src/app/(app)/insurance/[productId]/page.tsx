@@ -7,6 +7,7 @@ import { getInsuranceProducts } from "@/lib/actions/insurance";
 import { displayName, displayDescription, displayImage, enrichInsuranceProduct } from "@/lib/insurance/types";
 import { getCurrentProfile, getMyWallet } from "@/lib/data/queries";
 import { getPublicSetting } from "@/lib/data/flags";
+import { getTopupFeeConfig } from "@/lib/data/fee-config";
 import InsurancePurchaseForm from "@/components/insurance/insurance-purchase-form";
 
 // Checkout shows the wallet balance and takes payment — always a fresh
@@ -35,10 +36,11 @@ export default async function InsuranceProductPage({ params }: { params: Promise
 
   // Every purchasable product, for the form's "add another cover" picker —
   // plus the wallet balance and gateway banners the payment picker needs.
-  const [allProductsRaw, profile, paymentBanners] = await Promise.all([
+  const [allProductsRaw, profile, paymentBanners, feeConfig] = await Promise.all([
     getInsuranceProducts(),
     getCurrentProfile(),
     getPublicSetting<Record<string, string>>("payment_method_banners"),
+    getTopupFeeConfig(),
   ]);
   const allProducts = allProductsRaw.filter((p) => p.is_purchasable);
   const wallet = profile ? await getMyWallet(profile.id) : null;
@@ -121,7 +123,7 @@ export default async function InsuranceProductPage({ params }: { params: Promise
         )}
 
         {product.is_purchasable ? (
-          <InsurancePurchaseForm product={product} allProducts={allProducts} walletBalance={wallet?.balance ?? 0} banners={paymentBanners ?? {}} />
+          <InsurancePurchaseForm product={product} allProducts={allProducts} walletBalance={wallet?.balance ?? 0} banners={paymentBanners ?? {}} feeConfig={feeConfig} />
         ) : (
           <div
             className="row gap-2"
