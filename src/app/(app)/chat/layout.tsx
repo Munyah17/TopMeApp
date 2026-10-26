@@ -47,19 +47,100 @@ export default async function ChatLayout({ children }: { children: React.ReactNo
 
   const listPanel = (
     <div className="px content-wrap" style={{ paddingTop: 6 }}>
-      <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-        <div>
-          <h2 style={{ fontSize: 20 }}>Chat & Pay</h2>
-          <div className="muted" style={{ fontSize: 12 }}>Talk and pay — send money or a red packet right in the conversation</div>
+      {/* Green header card (chat mockup): title + subtitle + the new-chat
+          action, same gradient treatment as the wallet/account cards. */}
+      <div
+        style={{
+          background: "linear-gradient(135deg, var(--green-800) 0%, var(--green-950) 100%)",
+          borderRadius: 16,
+          padding: "18px 18px 16px",
+          position: "relative",
+          overflow: "hidden",
+          marginBottom: 14,
+        }}
+      >
+        <div style={{ position: "absolute", right: -40, top: -40, width: 120, height: 120, borderRadius: "50%", background: "rgba(167,243,208,0.10)", pointerEvents: "none" }} />
+        <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 10, position: "relative" }}>
+          <div>
+            <h2 style={{ fontSize: 22, color: "#fff", letterSpacing: "-0.02em", fontWeight: 800 }}>Chat & Pay</h2>
+            <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 12.5, marginTop: 4, maxWidth: 300, lineHeight: 1.45 }}>
+              Send money, pay bills and more right from your chats.
+            </div>
+          </div>
+          <Link
+            href="/chat/new"
+            className="btn tap"
+            style={{ height: 34, padding: "0 12px", fontSize: 12, flexShrink: 0, background: "rgba(255,255,255,0.14)", color: "#fff", border: "1px solid rgba(255,255,255,0.25)", textDecoration: "none", gap: 5 }}
+          >
+            <Icon name="plus" size={13} stroke={2.4} /> New
+          </Link>
         </div>
-        <Link href="/chat/new" className="btn btn-primary" style={{ height: 36, padding: "0 12px", fontSize: 12.5, flexShrink: 0 }}>
-          <Icon name="plus" size={14} stroke={2.4} /> New chat
-        </Link>
       </div>
-      <div style={{ height: 10 }} />
+
+      {/* Quick actions (mockup) — every tile is a real existing route. */}
+      <div className="acct-qa-grid" style={{ marginBottom: 4 }}>
+        {[
+          { href: "/pay/send", icon: "send", label: "Send Money", bg: "#d1fae5", fg: "#047857" },
+          { href: "/bills", icon: "building", label: "Pay Bill", bg: "#dbeafe", fg: "#1d4ed8" },
+          { href: "/services/airtimedata", icon: "smartphone", label: "Buy Airtime", bg: "#fef3c7", fg: "#b45309" },
+          { href: "/pay/gift", icon: "gift", label: "Gift Voucher", bg: "#fce7f3", fg: "#be185d" },
+        ].map((a) => (
+          <Link key={a.label} href={a.href} className="acct-qa tap" style={{ background: a.bg }}>
+            <span style={{ color: a.fg, display: "inline-flex" }}>
+              <Icon name={a.icon} size={19} stroke={1.9} />
+            </span>
+            <span className="acct-qa-label">{a.label}</span>
+          </Link>
+        ))}
+      </div>
+
+      {/* Recent Contacts (mockup): avatar shortcuts into the real recent
+          threads, plus a New tile for starting a conversation. */}
+      {conversations.length > 0 && (
+        <>
+          <div className="eyebrow mt-3 mb-2" style={{ paddingLeft: 2 }}>
+            Recent Contacts
+          </div>
+          <div className="scroll-x" style={{ display: "flex", gap: 14, paddingBottom: 4 }}>
+            <Link href="/chat/new" className="chat-contact tap">
+              <span className="chat-contact-av" style={{ background: "var(--badge-neutral-bg)", color: "var(--text-tertiary)", border: "1.5px dashed var(--border)" }}>
+                <Icon name="plus" size={17} stroke={2.2} />
+              </span>
+              <span className="chat-contact-name">New</span>
+            </Link>
+            {conversations.slice(0, 6).map((c) => (
+              <Link key={c.id} href={`/chat/${c.id}`} className="chat-contact tap">
+                <span className="chat-contact-av" style={{ background: "var(--navy)", color: "#fff", position: "relative" }}>
+                  {initials(c.counterpart?.full_name ?? null, c.counterpart?.phone ?? null)}
+                  {c.unread && (
+                    <span
+                      style={{
+                        position: "absolute",
+                        right: 0,
+                        bottom: 2,
+                        width: 10,
+                        height: 10,
+                        borderRadius: "50%",
+                        background: "var(--green)",
+                        border: "2px solid var(--surface)",
+                      }}
+                    />
+                  )}
+                </span>
+                <span className="chat-contact-name">
+                  {(c.counterpart?.full_name || c.counterpart?.phone || "User").trim().split(/\s+/)[0]}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </>
+      )}
 
       <PushSubscribeButton />
 
+      <div className="eyebrow mt-3 mb-2" style={{ paddingLeft: 2 }}>
+        Chats
+      </div>
       <div className="card" style={{ overflow: "hidden" }}>
         <Link
           href="/chat/topme"

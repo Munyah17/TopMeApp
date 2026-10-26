@@ -1855,6 +1855,43 @@ a.side-user:hover {
   line-height: 1.25;
 }
 
+/* Chat Recent Contacts — circular avatar + first-name label (chat mockup).
+   Avatars lift on hover like the other interactive tiles. */
+.chat-contact {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 56px;
+  flex-shrink: 0;
+  text-decoration: none;
+}
+.chat-contact-av {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+  transition: transform var(--transition-normal), box-shadow var(--transition-normal);
+}
+.chat-contact:hover .chat-contact-av {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+.chat-contact-name {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  max-width: 56px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+}
+
 /* ---------- Empty states ---------- */
 .empty-state {
   display: flex;
