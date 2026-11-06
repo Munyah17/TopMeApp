@@ -36,6 +36,7 @@ function fixture(options = {}) {
       assert.equal(name, "wallet_pay");
       calls.debits++;
       calls.recipient = args.p_recipient;
+      calls.walletPayArgs = args;
       return { data: options.debitError ? null : tx, error: options.debitError ?? null };
     },
   };
@@ -192,8 +193,28 @@ for (const deliveryStatus of ["pending", "fulfilled"]) {
     assert.equal(f.calls.recipient, "+263770000000");
     assert.equal(f.calls.deliveries, 1);
     assert.equal(f.calls.refunds, 0);
+    assert.equal("p_owner_label" in f.calls.walletPayArgs, true);
+    assert.equal("p_provider_cost" in f.calls.walletPayArgs, true);
+    assert.equal("p_fee" in f.calls.walletPayArgs, true);
   });
 }
+
+test("wallet_pay is called with the 9-arg set so PostgREST can uniquely match", async () => {
+  const f = fixture({ deliveryStatus: "pending" });
+  const result = await f.payServiceResult(input);
+  assert.equal(result.ok, true);
+  assert.deepEqual(Object.keys(f.calls.walletPayArgs).sort(), [
+    "p_amount",
+    "p_extra_value",
+    "p_fee",
+    "p_fulfillment_provider",
+    "p_network_id",
+    "p_owner_label",
+    "p_provider_cost",
+    "p_recipient",
+    "p_service_id",
+  ]);
+});
 
 test("invalid airtime numbers are rejected before a wallet debit", async () => {
   const f = fixture();
@@ -350,6 +371,7 @@ function guestFixture(options = {}) {
     "@/lib/fulfillment": { hasRealCoverage: () => true },
     "@/lib/fulfillment/select": { hasMappedProvider: async () => true },
     "@/lib/fees": { calculatePlatformFee: () => 0.04, calculateTopupFee: () => 0.10 },
+    "@/lib/data/fee-config": { getTopupFeeConfig: async () => ({ flat: 0.5, pct: 0.025 }) },
     "@/lib/pricing": { resolveVerifiedAmount: async () => 2 },
     "@/lib/rate-limit": { getClientIp: async () => "test", assertRateLimit: async () => {} },
     "@/lib/phone-numbers": { normalizeZimbabweMobile },

@@ -33,7 +33,7 @@ create policy "Admins can read debug errors" on public.debug_errors
     exists (
       select 1 from public.profiles
       where profiles.id = auth.uid()
-      and profiles.role in ('admin', 'super_admin')
+      and profiles.role in ('admin', 'superadmin')
     )
   );
 

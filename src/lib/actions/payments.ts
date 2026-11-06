@@ -123,6 +123,10 @@ export async function payService(input: PayServiceInput) {
   });
   const provider = selection.provider;
 
+  // Always send the 9-arg parameter set. A leftover 6-arg wallet_pay
+  // overload in production makes PostgREST return PGRST203 ("Could not
+  // choose the best candidate function") when only the original 6 names
+  // are passed — the customer sees a generic failure and no debit happens.
   const { data: txData, error } = await supabase.rpc("wallet_pay", {
     p_service_id: input.serviceId,
     p_amount: verifiedAmount,
@@ -130,6 +134,9 @@ export async function payService(input: PayServiceInput) {
     p_network_id: input.networkId ?? null,
     p_extra_value: input.extraValue ?? null,
     p_fulfillment_provider: provider.name,
+    p_owner_label: null,
+    p_provider_cost: null,
+    p_fee: null,
   });
 
   if (error) {

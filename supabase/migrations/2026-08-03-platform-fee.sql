@@ -1,3 +1,8 @@
+-- DO NOT RE-RUN this file against a live database that already has the 9-arg
+-- wallet_pay. CREATE OR REPLACE of the 6-arg signature adds a second overload
+-- and PostgREST then fails every wallet purchase (PGRST203). Use
+-- 2026-11-06-wallet-pay-single-overload.sql instead.
+--
 -- Platform processing fee: absorbed by the customer, added on top of the
 -- service amount. $0.50 flat + 1.5% of the amount by default; Airtime Direct
 -- Recharge gets a flat $0.10 instead (small, high-frequency purchases would

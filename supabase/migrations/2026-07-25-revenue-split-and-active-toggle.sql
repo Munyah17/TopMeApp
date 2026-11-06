@@ -17,6 +17,10 @@ alter table public.transactions
 alter table public.transactions
   add column revenue numeric(12,2) generated always as (amount - provider_cost) stored;
 
+-- DO NOT RE-RUN: this 6-arg wallet_pay adds an overload next to the live
+-- 9-arg function and breaks wallet checkout (PGRST203). See
+-- 2026-11-06-wallet-pay-single-overload.sql.
+
 create or replace function public.wallet_pay(
   p_service_id  text,
   p_amount      numeric,

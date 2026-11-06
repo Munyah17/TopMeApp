@@ -255,6 +255,7 @@ export async function payBillPayProduct(params: {
       p_fulfillment_provider: "billpay",
       p_owner_label: biller.name,
       p_provider_cost: payable,
+      p_fee: null,
     });
     if (payError || !txData) {
       const msg = payError?.message ?? "wallet_pay failed";

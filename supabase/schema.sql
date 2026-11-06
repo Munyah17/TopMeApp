@@ -332,14 +332,33 @@ $$;
 revoke all on function public.wallet_topup(uuid, numeric, text, text, jsonb) from public;
 grant execute on function public.wallet_topup(uuid, numeric, text, text, jsonb) to service_role;
 
+-- Platform fee charged on top of p_amount. Must stay in sync with
+-- calculatePlatformFee() in src/lib/fees.ts (flat 2%).
+create or replace function public.calculate_platform_fee(p_service_id text, p_amount numeric)
+returns numeric language sql immutable as $$
+  select case
+    when p_amount <= 0 then 0
+    else round(p_amount * 0.02, 2)
+  end;
+$$;
+
 -- Pay for a service out of the caller's own wallet (atomic debit + transaction row).
+-- CREATE OR REPLACE only replaces a matching signature. Applying the old 6-arg
+-- definition next to the live 9-arg one makes PostgREST fail every wallet
+-- purchase with PGRST203. Drop leftover signatures first, then create one 9-arg function.
+drop function if exists public.wallet_pay(text, numeric, text, text, text, text);
+drop function if exists public.wallet_pay(text, numeric, text, text, text, text, text, numeric);
+
 create or replace function public.wallet_pay(
-  p_service_id  text,
-  p_amount      numeric,
-  p_recipient   text,
-  p_network_id  text default null,
-  p_extra_value text default null,
-  p_fulfillment_provider text default 'simulated'
+  p_service_id    text,
+  p_amount        numeric,
+  p_recipient     text,
+  p_network_id    text default null,
+  p_extra_value   text default null,
+  p_fulfillment_provider text default 'simulated',
+  p_owner_label   text default null,
+  p_provider_cost numeric default null,
+  p_fee           numeric default null
 ) returns public.transactions
 language plpgsql security definer set search_path = public as $$
 declare
@@ -350,6 +369,7 @@ declare
   v_cost_pct  numeric;
   v_owner_label text;
   v_provider_cost numeric;
+  v_fee numeric;
 begin
   if v_user is null then
     raise exception 'not_authenticated';
@@ -358,24 +378,31 @@ begin
     raise exception 'invalid_amount';
   end if;
 
+  v_fee := coalesce(p_fee, public.calculate_platform_fee(p_service_id, p_amount));
+
   select balance into v_balance from public.wallets where user_id = v_user for update;
   if v_balance is null then
     raise exception 'wallet_not_found';
   end if;
-  if v_balance < p_amount then
+  if v_balance < p_amount + v_fee then
     raise exception 'insufficient_funds';
   end if;
 
-  select cost_percentage, provider_label into v_cost_pct, v_owner_label
-    from public.services where id = p_service_id;
-  v_provider_cost := round(p_amount * coalesce(v_cost_pct, 0) / 100, 2);
+  if p_owner_label is not null or p_provider_cost is not null then
+    v_owner_label := p_owner_label;
+    v_provider_cost := coalesce(p_provider_cost, 0);
+  else
+    select cost_percentage, provider_label into v_cost_pct, v_owner_label
+      from public.services where id = p_service_id;
+    v_provider_cost := round(p_amount * coalesce(v_cost_pct, 0) / 100, 2);
+  end if;
 
   v_reference := public.generate_reference('TPM');
 
-  update public.wallets set balance = balance - p_amount, updated_at = now() where user_id = v_user;
+  update public.wallets set balance = balance - (p_amount + v_fee), updated_at = now() where user_id = v_user;
 
   insert into public.wallet_ledger (user_id, type, amount, provider, reference, status)
-  values (v_user, 'debit', -p_amount, 'wallet', v_reference, 'success');
+  values (v_user, 'debit', -(p_amount + v_fee), 'wallet', v_reference, 'success');
 
   insert into public.transactions (
     user_id, service_id, network_id, recipient_identifier, extra_value,
@@ -383,15 +410,15 @@ begin
     provider_cost, owner_label
   ) values (
     v_user, p_service_id, p_network_id, p_recipient, p_extra_value,
-    p_amount, 0, 'success', v_reference, p_fulfillment_provider, 'pending',
+    p_amount, v_fee, 'success', v_reference, p_fulfillment_provider, 'pending',
     v_provider_cost, v_owner_label
   ) returning * into v_tx;
 
   return v_tx;
 end;
 $$;
-revoke all on function public.wallet_pay(text, numeric, text, text, text, text) from public;
-grant execute on function public.wallet_pay(text, numeric, text, text, text, text) to authenticated;
+revoke all on function public.wallet_pay(text, numeric, text, text, text, text, text, numeric, numeric) from public, anon;
+grant execute on function public.wallet_pay(text, numeric, text, text, text, text, text, numeric, numeric) to authenticated;
 
 -- Mark a transaction's fulfillment outcome (called server-side after invoking the
 -- fulfillment provider — simulated today, VitalPay once wired up).
